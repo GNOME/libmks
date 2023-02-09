@@ -42,7 +42,17 @@ G_BEGIN_DECLS
 
 typedef struct _MksKeyboardClass MksKeyboardClass;
 
+typedef enum _MksKeyboardModifier
+{
+  MKS_KEYBOARD_MODIFIER_NONE        = 0,
+  MKS_KEYBOARD_MODIFIER_SCROLL_LOCK = 1 << 0,
+  MKS_KEYBOARD_MODIFIER_NUM_LOCK    = 1 << 1,
+  MKS_KEYBOARD_MODIFIER_CAPS_LOCK   = 1 << 2,
+} MksKeyboardModifier;
+
 MKS_AVAILABLE_IN_ALL
-GType mks_keyboard_get_type (void) G_GNUC_CONST;
+GType               mks_keyboard_get_type      (void) G_GNUC_CONST;
+MKS_AVAILABLE_IN_ALL
+MksKeyboardModifier mks_keyboard_get_modifiers (MksKeyboard *self);
 
 G_END_DECLS
