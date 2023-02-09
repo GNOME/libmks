@@ -38,6 +38,9 @@ struct _MksScreen
   MksKeyboard    *keyboard;
   MksMouse       *mouse;
 
+  guint           width;
+  guint           height;
+
   MksScreenKind   kind : 2;
 };
 
@@ -45,13 +48,41 @@ G_DEFINE_FINAL_TYPE (MksScreen, mks_screen, MKS_TYPE_DEVICE)
 
 enum {
   PROP_0,
+  PROP_HEIGHT,
   PROP_KIND,
   PROP_KEYBOARD,
   PROP_MOUSE,
+  PROP_WIDTH,
   N_PROPS
 };
 
 static GParamSpec *properties [N_PROPS];
+
+static void
+_mks_screen_set_width (MksScreen *self,
+                       guint      width)
+{
+  g_assert (MKS_IS_SCREEN (self));
+
+  if (self->width != width)
+    {
+      self->width = width;
+      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_WIDTH]);
+    }
+}
+
+static void
+_mks_screen_set_height (MksScreen *self,
+                        guint      height)
+{
+  g_assert (MKS_IS_SCREEN (self));
+
+  if (self->height != height)
+    {
+      self->height = height;
+      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_HEIGHT]);
+    }
+}
 
 static void
 mks_screen_console_notify_cb (MksScreen      *self,
@@ -64,6 +95,10 @@ mks_screen_console_notify_cb (MksScreen      *self,
 
   if (strcmp (pspec->name, "label") == 0)
     _mks_device_set_name (MKS_DEVICE (self), mks_qemu_console_get_label (console));
+  else if (strcmp (pspec->name, "width") == 0)
+    _mks_screen_set_width (self, mks_qemu_console_get_width (console));
+  else if (strcmp (pspec->name, "height") == 0)
+    _mks_screen_set_height (self, mks_qemu_console_get_height (console));
 }
 
 static void
@@ -90,6 +125,9 @@ mks_screen_set_console (MksScreen      *self,
           if (strcmp (type, "Graphic") == 0)
             self->kind = MKS_SCREEN_KIND_GRAPHIC;
         }
+
+      self->width = mks_qemu_console_get_width (console);
+      self->height = mks_qemu_console_get_height (console);
     }
 }
 
@@ -130,6 +168,14 @@ mks_screen_get_property (GObject    *object,
 
     case PROP_MOUSE:
       g_value_set_object (value, mks_screen_get_mouse (self));
+      break;
+
+    case PROP_WIDTH:
+      g_value_set_uint (value, mks_screen_get_width (self));
+      break;
+
+    case PROP_HEIGHT:
+      g_value_set_uint (value, mks_screen_get_height (self));
       break;
 
     default:
@@ -176,6 +222,16 @@ mks_screen_class_init (MksScreenClass *klass)
     g_param_spec_object ("mouse", NULL, NULL,
                          MKS_TYPE_MOUSE,
                          (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  properties [PROP_WIDTH] =
+    g_param_spec_uint ("width", NULL, NULL,
+                       0, G_MAXUINT, 0,
+                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  properties [PROP_HEIGHT] =
+    g_param_spec_uint ("height", NULL, NULL,
+                       0, G_MAXUINT, 0,
+                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_properties (object_class, N_PROPS, properties);
 }
@@ -284,10 +340,50 @@ mks_screen_get_mouse (MksScreen *self)
   return self->mouse;
 }
 
+/**
+ * mks_screen_get_kind:
+ * @self: a #MksScreen
+ *
+ * Gets the "kind" property.
+ *
+ * Returns: a #MksScreenKind
+ */
 MksScreenKind
 mks_screen_get_kind (MksScreen *self)
 {
   g_return_val_if_fail (MKS_IS_SCREEN (self), MKS_SCREEN_KIND_TEXT);
 
   return self->kind;
+}
+
+/**
+ * mks_screen_get_width:
+ * @self: a #MksScreen
+ *
+ * Gets the "width" property.
+ *
+ * Returns: The width of the screen in pixels.
+ */
+guint
+mks_screen_get_width (MksScreen *self)
+{
+  g_return_val_if_fail (MKS_IS_SCREEN (self), 0);
+
+  return self->width;
+}
+
+/**
+ * mks_screen_get_height:
+ * @self: a #MksScreen
+ *
+ * Gets the "height" property.
+ *
+ * Returns: The height of the screen in pixels.
+ */
+guint
+mks_screen_get_height (MksScreen *self)
+{
+  g_return_val_if_fail (MKS_IS_SCREEN (self), 0);
+
+  return self->height;
 }

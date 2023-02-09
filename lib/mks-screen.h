@@ -44,5 +44,9 @@ MKS_AVAILABLE_IN_ALL
 MksKeyboard   *mks_screen_get_keyboard (MksScreen *self);
 MKS_AVAILABLE_IN_ALL
 MksMouse      *mks_screen_get_mouse    (MksScreen *self);
+MKS_AVAILABLE_IN_ALL
+guint          mks_screen_get_width    (MksScreen *self);
+MKS_AVAILABLE_IN_ALL
+guint          mks_screen_get_height   (MksScreen *self);
 
 G_END_DECLS
