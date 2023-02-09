@@ -21,13 +21,8 @@
 
 #pragma once
 
-#include <gio/gio.h>
-
-#include "mks-qemu.h"
 #include "mks-screen.h"
 
 G_BEGIN_DECLS
-
-MksDevice *_mks_screen_new (MksQemuObject *object);
 
 G_END_DECLS

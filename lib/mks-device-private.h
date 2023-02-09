@@ -22,10 +22,28 @@
 #pragma once
 
 #include "mks-device.h"
+#include "mks-qemu.h"
 
 G_BEGIN_DECLS
 
-void _mks_device_set_name (MksDevice  *self,
-                           const char *name);
+struct _MksDevice
+{
+  GObject        parent_instance;
+  MksQemuObject *object;
+  char          *name;
+};
+
+struct _MksDeviceClass
+{
+  GObjectClass parent_class;
+
+  gboolean (*setup) (MksDevice     *self,
+                     MksQemuObject *object);
+};
+
+gpointer _mks_device_new      (GType          device_type,
+                               MksQemuObject *object);
+void     _mks_device_set_name (MksDevice     *self,
+                               const char    *name);
 
 G_END_DECLS

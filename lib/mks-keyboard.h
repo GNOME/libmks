@@ -21,13 +21,28 @@
 
 #pragma once
 
-#include "mks-device.h"
+#if !defined(MKS_INSIDE) && !defined(MKS_COMPILATION)
+# error "Only <libmks.h> can be included directly."
+#endif
+
+#include <glib-object.h>
+
+#include "mks-types.h"
+#include "mks-version-macros.h"
 
 G_BEGIN_DECLS
 
-#define MKS_TYPE_KEYBOARD (mks_keyboard_get_type())
+#define MKS_TYPE_KEYBOARD            (mks_keyboard_get_type ())
+#define MKS_KEYBOARD(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_KEYBOARD, MksKeyboard))
+#define MKS_KEYBOARD_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_KEYBOARD, MksKeyboard const))
+#define MKS_KEYBOARD_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MKS_TYPE_KEYBOARD, MksKeyboardClass))
+#define MKS_IS_KEYBOARD(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MKS_TYPE_KEYBOARD))
+#define MKS_IS_KEYBOARD_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MKS_TYPE_KEYBOARD))
+#define MKS_KEYBOARD_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MKS_TYPE_KEYBOARD, MksKeyboardClass))
+
+typedef struct _MksKeyboardClass MksKeyboardClass;
 
 MKS_AVAILABLE_IN_ALL
-G_DECLARE_FINAL_TYPE (MksKeyboard, mks_keyboard, MKS, KEYBOARD, MksDevice)
+GType mks_keyboard_get_type (void) G_GNUC_CONST;
 
 G_END_DECLS

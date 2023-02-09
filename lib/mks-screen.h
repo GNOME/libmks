@@ -27,11 +27,20 @@
 
 #include <glib-object.h>
 
-#include "mks-device.h"
+#include "mks-types.h"
+#include "mks-version-macros.h"
 
 G_BEGIN_DECLS
 
-#define MKS_TYPE_SCREEN (mks_screen_get_type())
+#define MKS_TYPE_SCREEN            (mks_screen_get_type ())
+#define MKS_SCREEN(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_SCREEN, MksScreen))
+#define MKS_SCREEN_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_SCREEN, MksScreen const))
+#define MKS_SCREEN_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MKS_TYPE_SCREEN, MksScreenClass))
+#define MKS_IS_SCREEN(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MKS_TYPE_SCREEN))
+#define MKS_IS_SCREEN_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MKS_TYPE_SCREEN))
+#define MKS_SCREEN_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MKS_TYPE_SCREEN, MksScreenClass))
+
+typedef struct _MksScreenClass MksScreenClass;
 
 typedef enum _MksScreenKind
 {
@@ -40,8 +49,7 @@ typedef enum _MksScreenKind
 } MksScreenKind;
 
 MKS_AVAILABLE_IN_ALL
-G_DECLARE_FINAL_TYPE (MksScreen, mks_screen, MKS, SCREEN, MksDevice)
-
+GType          mks_screen_get_type     (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
 MksScreenKind  mks_screen_get_kind     (MksScreen *self);
 MKS_AVAILABLE_IN_ALL
@@ -54,5 +62,7 @@ MKS_AVAILABLE_IN_ALL
 guint          mks_screen_get_height   (MksScreen *self);
 MKS_AVAILABLE_IN_ALL
 guint          mks_screen_get_number   (MksScreen *self);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksScreen, g_object_unref)
 
 G_END_DECLS

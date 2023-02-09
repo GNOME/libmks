@@ -28,11 +28,15 @@
 #include "mks-mouse-private.h"
 #include "mks-screen-private.h"
 
+struct _MksScreenClass
+{
+  MksDeviceClass parent_class;
+};
+
 struct _MksScreen
 {
   MksDevice       parent_instance;
 
-  MksQemuObject  *console_object;
   MksQemuConsole *console;
   gulong          console_notify_handler;
 
@@ -154,6 +158,35 @@ mks_screen_set_console (MksScreen      *self,
     }
 }
 
+static gboolean
+mks_screen_setup (MksDevice     *device,
+                  MksQemuObject *object)
+{
+  MksScreen *self = (MksScreen *)device;
+  g_autolist(GDBusInterface) interfaces = NULL;
+
+  g_assert (MKS_IS_SCREEN (self));
+  g_assert (MKS_QEMU_IS_OBJECT (object));
+
+  interfaces = g_dbus_object_get_interfaces (G_DBUS_OBJECT (object));
+
+  for (const GList *iter = interfaces; iter; iter = iter->next)
+    {
+      GDBusInterface *iface = iter->data;
+
+      if (MKS_QEMU_IS_CONSOLE (iface))
+        mks_screen_set_console (self, MKS_QEMU_CONSOLE (iface));
+      else if (MKS_QEMU_IS_KEYBOARD (iface))
+        self->keyboard = _mks_device_new (MKS_TYPE_KEYBOARD, object);
+      else if (MKS_QEMU_IS_MOUSE (iface))
+        self->mouse = _mks_device_new (MKS_TYPE_MOUSE, object);
+    }
+
+  return self->console != NULL &&
+         self->keyboard != NULL &&
+         self->mouse != NULL;
+}
+
 static void
 mks_screen_dispose (GObject *object)
 {
@@ -165,7 +198,6 @@ mks_screen_dispose (GObject *object)
       g_clear_object (&self->console);
     }
 
-  g_clear_object (&self->console_object);
   g_clear_object (&self->keyboard);
   g_clear_object (&self->mouse);
 
@@ -215,9 +247,12 @@ static void
 mks_screen_class_init (MksScreenClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+  MksDeviceClass *device_class = MKS_DEVICE_CLASS (klass);
 
   object_class->dispose = mks_screen_dispose;
   object_class->get_property = mks_screen_get_property;
+
+  device_class->setup = mks_screen_setup;
 
   properties [PROP_KEYBOARD] =
     g_param_spec_object ("keyboard", NULL, NULL,
@@ -256,33 +291,6 @@ mks_screen_class_init (MksScreenClass *klass)
 static void
 mks_screen_init (MksScreen *self)
 {
-}
-
-MksDevice *
-_mks_screen_new (MksQemuObject *object)
-{
-  g_autoptr(MksScreen) self = NULL;
-  g_autolist(GDBusInterface) interfaces = NULL;
-
-  g_return_val_if_fail (MKS_QEMU_IS_OBJECT (object), NULL);
-
-  self = g_object_new (MKS_TYPE_SCREEN, NULL);
-  self->console_object = g_object_ref (object);
-
-  interfaces = g_dbus_object_get_interfaces (G_DBUS_OBJECT (object));
-
-  for (const GList *iter = interfaces; iter; iter = iter->next)
-    {
-      GDBusInterface *iface = iter->data;
-
-      if (MKS_QEMU_IS_CONSOLE (iface))
-        mks_screen_set_console (self, MKS_QEMU_CONSOLE (iface));
-    }
-
-  if (self->console == NULL)
-    return NULL;
-
-  return MKS_DEVICE (g_steal_pointer (&self));
 }
 
 /**

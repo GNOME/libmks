@@ -32,20 +32,21 @@
 
 G_BEGIN_DECLS
 
-#define MKS_TYPE_DEVICE (mks_device_get_type())
+#define MKS_TYPE_DEVICE            (mks_device_get_type ())
+#define MKS_DEVICE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_DEVICE, MksDevice))
+#define MKS_DEVICE_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_DEVICE, MksDevice const))
+#define MKS_DEVICE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MKS_TYPE_DEVICE, MksDeviceClass))
+#define MKS_IS_DEVICE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MKS_TYPE_DEVICE))
+#define MKS_IS_DEVICE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MKS_TYPE_DEVICE))
+#define MKS_DEVICE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MKS_TYPE_DEVICE, MksDeviceClass))
+
+typedef struct _MksDeviceClass MksDeviceClass;
 
 MKS_AVAILABLE_IN_ALL
-G_DECLARE_DERIVABLE_TYPE (MksDevice, mks_device, MKS, DEVICE, GObject)
-
-struct _MksDeviceClass
-{
-  GObjectClass parent_class;
-
-  /*< private >*/
-  gpointer _reserved[15];
-};
-
+GType       mks_device_get_type (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
 const char *mks_device_get_name (MksDevice *self);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksDevice, g_object_unref)
 
 G_END_DECLS

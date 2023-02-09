@@ -21,11 +21,17 @@
 
 #include "config.h"
 
+#include "mks-device-private.h"
 #include "mks-keyboard.h"
 
 struct _MksKeyboard
 {
   MksDevice parent_instance;
+};
+
+struct _MksKeyboardClass
+{
+  MksDeviceClass parent_instance;
 };
 
 G_DEFINE_FINAL_TYPE (MksKeyboard, mks_keyboard, MKS_TYPE_DEVICE)

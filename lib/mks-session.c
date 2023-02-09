@@ -21,7 +21,7 @@
 
 #include "config.h"
 
-#include "mks-device.h"
+#include "mks-device-private.h"
 #include "mks-read-only-list-model-private.h"
 #include "mks-qemu.h"
 #include "mks-screen-private.h"
@@ -225,7 +225,7 @@ mks_session_object_manager_object_added_cb (MksSession         *self,
       if (MKS_QEMU_IS_VM (iface))
         mks_session_set_vm (self, object, MKS_QEMU_VM (iface));
       else if (MKS_QEMU_IS_CONSOLE (iface))
-        mks_session_add_device (self, _mks_screen_new (object));
+        mks_session_add_device (self, _mks_device_new (MKS_TYPE_SCREEN, object));
     }
 }
 
@@ -423,7 +423,6 @@ mks_session_initable_init (GInitable     *initable,
 {
   MksSession *self = (MksSession *)initable;
   g_autoptr(GDBusObjectManager) object_manager = NULL;
-  g_autolist(GDBusObjectProxy) objects = NULL;
 
   g_assert (MKS_IS_SESSION (self));
   g_assert (!cancellable || G_IS_CANCELLABLE (cancellable));

@@ -21,11 +21,17 @@
 
 #include "config.h"
 
+#include "mks-device-private.h"
 #include "mks-mouse.h"
 
 struct _MksMouse
 {
   MksDevice parent_instance;
+};
+
+struct _MksMouseClass
+{
+  MksDeviceClass parent_class;
 };
 
 G_DEFINE_FINAL_TYPE (MksMouse, mks_mouse, MKS_TYPE_DEVICE)

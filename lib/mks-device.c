@@ -23,12 +23,7 @@
 
 #include "mks-device-private.h"
 
-typedef struct
-{
-  char *name;
-} MksDevicePrivate;
-
-G_DEFINE_TYPE_WITH_PRIVATE (MksDevice, mks_device, G_TYPE_OBJECT)
+G_DEFINE_TYPE (MksDevice, mks_device, G_TYPE_OBJECT)
 
 enum {
   PROP_0,
@@ -38,15 +33,25 @@ enum {
 
 static GParamSpec *properties [N_PROPS];
 
+static gboolean
+mks_device_real_setup (MksDevice     *device,
+                       MksQemuObject *object)
+{
+  g_assert (MKS_IS_DEVICE (device));
+  g_assert (MKS_QEMU_IS_OBJECT (object));
+
+  return TRUE;
+}
+
 static void
-mks_device_finalize (GObject *object)
+mks_device_dispose (GObject *object)
 {
   MksDevice *self = (MksDevice *)object;
-  MksDevicePrivate *priv = mks_device_get_instance_private (self);
 
-  g_clear_pointer (&priv->name, g_free);
+  g_clear_pointer (&self->name, g_free);
+  g_clear_object (&self->object);
 
-  G_OBJECT_CLASS (mks_device_parent_class)->finalize (object);
+  G_OBJECT_CLASS (mks_device_parent_class)->dispose (object);
 }
 
 static void
@@ -73,8 +78,10 @@ mks_device_class_init (MksDeviceClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-  object_class->finalize = mks_device_finalize;
+  object_class->dispose = mks_device_dispose;
   object_class->get_property = mks_device_get_property;
+
+  klass->setup = mks_device_real_setup;
 
   properties [PROP_NAME] =
     g_param_spec_string ("name", NULL, NULL,
@@ -92,21 +99,38 @@ mks_device_init (MksDevice *self)
 const char *
 mks_device_get_name (MksDevice *self)
 {
-  MksDevicePrivate *priv = mks_device_get_instance_private (self);
-
   g_return_val_if_fail (MKS_IS_DEVICE (self), NULL);
 
-  return priv->name;
+  return self->name;
 }
 
 void
 _mks_device_set_name (MksDevice  *self,
                       const char *name)
 {
-  MksDevicePrivate *priv = mks_device_get_instance_private (self);
-
   g_return_if_fail (MKS_IS_DEVICE (self));
 
-  if (g_set_str (&priv->name, name))
+  if (g_set_str (&self->name, name))
     g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_NAME]);
+}
+
+gpointer
+_mks_device_new (GType          device_type,
+                 MksQemuObject *object)
+{
+  g_autoptr(MksDevice) self = NULL;
+
+  g_return_val_if_fail (g_type_is_a (device_type, MKS_TYPE_DEVICE), NULL);
+  g_return_val_if_fail (device_type != MKS_TYPE_DEVICE, NULL);
+  g_return_val_if_fail (MKS_QEMU_IS_OBJECT (object), NULL);
+
+  if (!(self = g_object_new (device_type, NULL)))
+    return NULL;
+
+  self->object = g_object_ref (object);
+
+  if (!MKS_DEVICE_GET_CLASS (self)->setup (self, object))
+    return NULL;
+
+  return g_steal_pointer (&self);
 }
