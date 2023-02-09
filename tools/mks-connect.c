@@ -35,8 +35,8 @@ main (int argc,
   g_autoptr(GOptionContext) context = g_option_context_new ("DBUS_ADDRESS - Connect to Qemu at DBUS_ADDRESS");
   g_autoptr(GDBusConnection) connection = NULL;
   g_autoptr(MksSession) session = NULL;
-  g_autoptr(GListModel) devices = NULL;
   g_autoptr(GError) error = NULL;
+  GListModel *devices = NULL;
   guint n_items;
 
   setlocale (LC_ALL, "");
