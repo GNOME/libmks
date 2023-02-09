@@ -72,6 +72,7 @@ pkg.generate(
 )
 
 libmks_gir = gnome.generate_gir(libmks,
+              sources: libmks_sources + libmks_headers,
             nsversion: api_version,
             namespace: 'Mks',
         symbol_prefix: 'mks',
