@@ -1,9 +1,30 @@
 libmks_sources = [
   'mks-init.c',
   'mks-device.c',
+  'mks-keyboard.c',
+  'mks-mouse.c',
   'mks-screen.c',
   'mks-session.c',
 ]
+
+libmks_headers = [
+  'libmks.h',
+  'mks-device.h',
+  'mks-init.h',
+  'mks-keyboard.h',
+  'mks-mouse.h',
+  'mks-screen.h',
+  'mks-session.h',
+  'mks-types.h',
+]
+
+libmks_enums = gnome.mkenums_simple('mks-enums',
+            sources: libmks_headers,
+     install_header: true,
+        install_dir: join_paths(get_option('libdir'), 'libmks-@0@'.format(api_version)),
+  identifier_prefix: 'Mks',
+      symbol_prefix: 'mks',
+)
 
 libmks_private_sources = [
   'mks-read-only-list-model.c',
@@ -14,15 +35,6 @@ libmks_private_sources = [
            namespace: 'MksQemu',
              sources: 'dbus-display1.xml',
   )
-]
-
-libmks_headers = [
-  'libmks.h',
-  'mks-device.h',
-  'mks-init.h',
-  'mks-screen.h',
-  'mks-session.h',
-  'mks-types.h',
 ]
 
 # Setup mks-version.h for version checking
@@ -47,7 +59,7 @@ libmks_deps = [
 ]
 
 libmks = shared_library('mks-' + api_version,
-  libmks_sources + libmks_private_sources,
+  libmks_sources + [libmks_enums[0]] + libmks_private_sources,
   dependencies: libmks_deps,
        install: true,
 )

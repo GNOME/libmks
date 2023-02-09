@@ -21,30 +21,91 @@
 
 #include "config.h"
 
+#include "mks-device-private.h"
+#include "mks-enums.h"
 #include "mks-qemu.h"
+#include "mks-keyboard-private.h"
+#include "mks-mouse-private.h"
 #include "mks-screen-private.h"
 
 struct _MksScreen
 {
   MksDevice       parent_instance;
+
   MksQemuConsole *console;
+  gulong          console_notify_handler;
+
+  MksKeyboard    *keyboard;
+  MksMouse       *mouse;
+
+  MksScreenKind   kind : 2;
 };
 
 G_DEFINE_FINAL_TYPE (MksScreen, mks_screen, MKS_TYPE_DEVICE)
 
 enum {
   PROP_0,
+  PROP_KIND,
+  PROP_KEYBOARD,
+  PROP_MOUSE,
   N_PROPS
 };
 
 static GParamSpec *properties [N_PROPS];
 
 static void
+mks_screen_console_notify_cb (MksScreen      *self,
+                              GParamSpec     *pspec,
+                              MksQemuConsole *console)
+{
+  g_assert (MKS_IS_SCREEN (self));
+  g_assert (pspec != NULL);
+  g_assert (MKS_QEMU_IS_CONSOLE (console));
+
+  if (strcmp (pspec->name, "label") == 0)
+    _mks_device_set_name (MKS_DEVICE (self), mks_qemu_console_get_label (console));
+}
+
+static void
+mks_screen_set_console (MksScreen      *self,
+                        MksQemuConsole *console)
+{
+  g_assert (MKS_IS_SCREEN (self));
+  g_assert (!console || MKS_QEMU_IS_CONSOLE (console));
+  g_assert (self->console == NULL);
+
+  if (g_set_object (&self->console, console))
+    {
+      const char *type;
+
+      self->console_notify_handler =
+        g_signal_connect_object (console,
+                                 "notify",
+                                 G_CALLBACK (mks_screen_console_notify_cb),
+                                 self,
+                                 G_CONNECT_SWAPPED);
+
+      if ((type = mks_qemu_console_get_type_ ((console))))
+        {
+          if (strcmp (type, "Graphic") == 0)
+            self->kind = MKS_SCREEN_KIND_GRAPHIC;
+        }
+    }
+}
+
+static void
 mks_screen_dispose (GObject *object)
 {
   MksScreen *self = (MksScreen *)object;
 
-  g_clear_object (&self->console);
+  if (self->console != NULL)
+    {
+      g_clear_signal_handler (&self->console_notify_handler, self->console);
+      g_clear_object (&self->console);
+    }
+
+  g_clear_object (&self->keyboard);
+  g_clear_object (&self->mouse);
 
   G_OBJECT_CLASS (mks_screen_parent_class)->dispose (object);
 }
@@ -59,6 +120,18 @@ mks_screen_get_property (GObject    *object,
 
   switch (prop_id)
     {
+    case PROP_KEYBOARD:
+      g_value_set_object (value, mks_screen_get_keyboard (self));
+      break;
+
+    case PROP_KIND:
+      g_value_set_enum (value, mks_screen_get_kind (self));
+      break;
+
+    case PROP_MOUSE:
+      g_value_set_object (value, mks_screen_get_mouse (self));
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     }
@@ -87,6 +160,24 @@ mks_screen_class_init (MksScreenClass *klass)
   object_class->dispose = mks_screen_dispose;
   object_class->get_property = mks_screen_get_property;
   object_class->set_property = mks_screen_set_property;
+
+  properties [PROP_KEYBOARD] =
+    g_param_spec_object ("keyboard", NULL, NULL,
+                         MKS_TYPE_KEYBOARD,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  properties [PROP_KIND] =
+    g_param_spec_enum ("kind", NULL, NULL,
+                       MKS_TYPE_SCREEN_KIND,
+                       MKS_SCREEN_KIND_TEXT,
+                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  properties [PROP_MOUSE] =
+    g_param_spec_object ("mouse", NULL, NULL,
+                         MKS_TYPE_MOUSE,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_properties (object_class, N_PROPS, properties);
 }
 
 static void
@@ -113,7 +204,7 @@ mks_screen_new_cb (GObject      *object,
   g_assert (MKS_IS_SCREEN (self));
   g_assert (!console || MKS_QEMU_IS_CONSOLE (console));
 
-  self->console = g_steal_pointer (&console);
+  mks_screen_set_console (self, console);
 
   if (error)
     g_task_return_error (task, g_steal_pointer (&error));
@@ -159,4 +250,44 @@ _mks_screen_new_finish (GAsyncResult  *result,
   g_return_val_if_fail (!ret || MKS_IS_SCREEN (ret), NULL);
 
   return ret;
+}
+
+/**
+ * mks_screen_get_keyboard:
+ * @self: a #MksScreen
+ *
+ * Gets the #MksScreen:keyboard property.
+ *
+ * Returns: (transfer none): a #MksKeyboard
+ */
+MksKeyboard *
+mks_screen_get_keyboard (MksScreen *self)
+{
+  g_return_val_if_fail (MKS_IS_SCREEN (self), NULL);
+
+  return self->keyboard;
+}
+
+/**
+ * mks_screen_get_mouse:
+ * @self: a #MksScreen
+ *
+ * Gets the #MksScreen:mouse property.
+ *
+ * Returns: (transfer none): a #MksMouse
+ */
+MksMouse *
+mks_screen_get_mouse (MksScreen *self)
+{
+  g_return_val_if_fail (MKS_IS_SCREEN (self), NULL);
+
+  return self->mouse;
+}
+
+MksScreenKind
+mks_screen_get_kind (MksScreen *self)
+{
+  g_return_val_if_fail (MKS_IS_SCREEN (self), MKS_SCREEN_KIND_TEXT);
+
+  return self->kind;
 }

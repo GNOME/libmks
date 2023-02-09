@@ -29,7 +29,20 @@ G_BEGIN_DECLS
 
 #define MKS_TYPE_SCREEN (mks_screen_get_type())
 
+typedef enum _MksScreenKind
+{
+  MKS_SCREEN_KIND_TEXT = 0,
+  MKS_SCREEN_KIND_GRAPHIC = 1,
+} MksScreenKind;
+
 MKS_AVAILABLE_IN_ALL
 G_DECLARE_FINAL_TYPE (MksScreen, mks_screen, MKS, SCREEN, MksDevice)
+
+MKS_AVAILABLE_IN_ALL
+MksScreenKind  mks_screen_get_kind     (MksScreen *self);
+MKS_AVAILABLE_IN_ALL
+MksKeyboard   *mks_screen_get_keyboard (MksScreen *self);
+MKS_AVAILABLE_IN_ALL
+MksMouse      *mks_screen_get_mouse    (MksScreen *self);
 
 G_END_DECLS

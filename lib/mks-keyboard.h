@@ -1,6 +1,7 @@
-/* libmks.h
+/*
+ * mks-keyboard.h
  *
- * Copyright 2023 Christian Hergert
+ * Copyright 2023 Christian Hergert <chergert@redhat.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,21 +21,13 @@
 
 #pragma once
 
-#include <glib.h>
+#include "mks-device.h"
 
 G_BEGIN_DECLS
 
-#define MKS_INSIDE
-# include "mks-device.h"
-# include "mks-enums.h"
-# include "mks-init.h"
-# include "mks-keyboard.h"
-# include "mks-mouse.h"
-# include "mks-screen.h"
-# include "mks-session.h"
-# include "mks-types.h"
-# include "mks-version.h"
-# include "mks-version-macros.h"
-#undef MKS_INSIDE
+#define MKS_TYPE_KEYBOARD (mks_keyboard_get_type())
+
+MKS_AVAILABLE_IN_ALL
+G_DECLARE_FINAL_TYPE (MksKeyboard, mks_keyboard, MKS, KEYBOARD, MksDevice)
 
 G_END_DECLS
