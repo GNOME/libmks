@@ -35,7 +35,9 @@ main (int argc,
   g_autoptr(GOptionContext) context = g_option_context_new ("DBUS_ADDRESS - Connect to Qemu at DBUS_ADDRESS");
   g_autoptr(GDBusConnection) connection = NULL;
   g_autoptr(MksSession) session = NULL;
+  g_autoptr(GListModel) devices = NULL;
   g_autoptr(GError) error = NULL;
+  guint n_items;
 
   setlocale (LC_ALL, "");
   bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
@@ -71,6 +73,26 @@ main (int argc,
   g_print ("Session(uuid=\"%s\" name=\"%s\")\n",
            mks_session_get_uuid (session),
            mks_session_get_name (session));
+
+  devices = mks_session_get_devices (session);
+  n_items = g_list_model_get_n_items (devices);
+
+  for (guint i = 0; i < n_items; i++)
+    {
+      g_autoptr(MksDevice) device = g_list_model_get_item (devices, i);
+
+      g_print (" - %s(name=\"%s\"",
+               G_OBJECT_TYPE_NAME (device),
+               mks_device_get_name (device));
+
+      if (MKS_IS_SCREEN (device))
+        g_print (" number=%u width=%u height=%u",
+                 mks_screen_get_number (MKS_SCREEN (device)),
+                 mks_screen_get_width (MKS_SCREEN (device)),
+                 mks_screen_get_height (MKS_SCREEN (device)));
+
+      g_print (")\n");
+    }
 
   return EXIT_SUCCESS;
 }
