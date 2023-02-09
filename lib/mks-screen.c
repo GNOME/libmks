@@ -38,6 +38,7 @@ struct _MksScreen
   MksKeyboard    *keyboard;
   MksMouse       *mouse;
 
+  guint           number;
   guint           width;
   guint           height;
 
@@ -52,6 +53,7 @@ enum {
   PROP_KIND,
   PROP_KEYBOARD,
   PROP_MOUSE,
+  PROP_NUMBER,
   PROP_WIDTH,
   N_PROPS
 };
@@ -128,6 +130,7 @@ mks_screen_set_console (MksScreen      *self,
 
       self->width = mks_qemu_console_get_width (console);
       self->height = mks_qemu_console_get_height (console);
+      self->number = mks_qemu_console_get_head (console);
     }
 }
 
@@ -168,6 +171,10 @@ mks_screen_get_property (GObject    *object,
 
     case PROP_MOUSE:
       g_value_set_object (value, mks_screen_get_mouse (self));
+      break;
+
+    case PROP_NUMBER:
+      g_value_set_uint (value, mks_screen_get_number (self));
       break;
 
     case PROP_WIDTH:
@@ -222,6 +229,11 @@ mks_screen_class_init (MksScreenClass *klass)
     g_param_spec_object ("mouse", NULL, NULL,
                          MKS_TYPE_MOUSE,
                          (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  properties [PROP_NUMBER] =
+    g_param_spec_uint ("number", NULL, NULL,
+                       0, G_MAXUINT, 0,
+                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   properties [PROP_WIDTH] =
     g_param_spec_uint ("width", NULL, NULL,
@@ -386,4 +398,20 @@ mks_screen_get_height (MksScreen *self)
   g_return_val_if_fail (MKS_IS_SCREEN (self), 0);
 
   return self->height;
+}
+
+/**
+ * mks_screen_get_number:
+ * @self: a #MksScreen
+ *
+ * Gets the "number" property.
+ *
+ * Returns: the screen number
+ */
+guint
+mks_screen_get_number (MksScreen *self)
+{
+  g_return_val_if_fail (MKS_IS_SCREEN (self), 0);
+
+  return self->number;
 }

@@ -48,5 +48,7 @@ MKS_AVAILABLE_IN_ALL
 guint          mks_screen_get_width    (MksScreen *self);
 MKS_AVAILABLE_IN_ALL
 guint          mks_screen_get_height   (MksScreen *self);
+MKS_AVAILABLE_IN_ALL
+guint          mks_screen_get_number   (MksScreen *self);
 
 G_END_DECLS
