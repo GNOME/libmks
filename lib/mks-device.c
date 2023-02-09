@@ -48,6 +48,7 @@ mks_device_dispose (GObject *object)
 {
   MksDevice *self = (MksDevice *)object;
 
+  g_clear_weak_pointer (&self->session);
   g_clear_pointer (&self->name, g_free);
   g_clear_object (&self->object);
 
@@ -116,17 +117,20 @@ _mks_device_set_name (MksDevice  *self,
 
 gpointer
 _mks_device_new (GType          device_type,
+                 MksSession    *session,
                  MksQemuObject *object)
 {
   g_autoptr(MksDevice) self = NULL;
 
   g_return_val_if_fail (g_type_is_a (device_type, MKS_TYPE_DEVICE), NULL);
   g_return_val_if_fail (device_type != MKS_TYPE_DEVICE, NULL);
+  g_return_val_if_fail (MKS_IS_SESSION (session), NULL);
   g_return_val_if_fail (MKS_QEMU_IS_OBJECT (object), NULL);
 
   if (!(self = g_object_new (device_type, NULL)))
     return NULL;
 
+  g_set_weak_pointer (&self->session, session);
   self->object = g_object_ref (object);
 
   if (!MKS_DEVICE_GET_CLASS (self)->setup (self, object))

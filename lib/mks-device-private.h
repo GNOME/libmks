@@ -23,12 +23,14 @@
 
 #include "mks-device.h"
 #include "mks-qemu.h"
+#include "mks-session.h"
 
 G_BEGIN_DECLS
 
 struct _MksDevice
 {
   GObject        parent_instance;
+  MksSession    *session;
   MksQemuObject *object;
   char          *name;
 };
@@ -42,6 +44,7 @@ struct _MksDeviceClass
 };
 
 gpointer _mks_device_new      (GType          device_type,
+                               MksSession    *session,
                                MksQemuObject *object);
 void     _mks_device_set_name (MksDevice     *self,
                                const char    *name);

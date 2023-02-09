@@ -178,9 +178,9 @@ mks_screen_setup (MksDevice     *device,
       if (MKS_QEMU_IS_CONSOLE (iface))
         mks_screen_set_console (self, MKS_QEMU_CONSOLE (iface));
       else if (MKS_QEMU_IS_KEYBOARD (iface))
-        self->keyboard = _mks_device_new (MKS_TYPE_KEYBOARD, object);
+        self->keyboard = _mks_device_new (MKS_TYPE_KEYBOARD, device->session, object);
       else if (MKS_QEMU_IS_MOUSE (iface))
-        self->mouse = _mks_device_new (MKS_TYPE_MOUSE, object);
+        self->mouse = _mks_device_new (MKS_TYPE_MOUSE, device->session, object);
     }
 
   return self->console != NULL &&

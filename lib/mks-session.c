@@ -225,7 +225,7 @@ mks_session_object_manager_object_added_cb (MksSession         *self,
       if (MKS_QEMU_IS_VM (iface))
         mks_session_set_vm (self, object, MKS_QEMU_VM (iface));
       else if (MKS_QEMU_IS_CONSOLE (iface))
-        mks_session_add_device (self, _mks_device_new (MKS_TYPE_SCREEN, object));
+        mks_session_add_device (self, _mks_device_new (MKS_TYPE_SCREEN, self, object));
     }
 }
 
