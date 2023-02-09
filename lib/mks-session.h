@@ -21,6 +21,10 @@
 
 #pragma once
 
+#if !defined(MKS_INSIDE) && !defined(MKS_COMPILATION)
+# error "Only <libmks.h> can be included directly."
+#endif
+
 #include <gio/gio.h>
 
 #include "mks-types.h"
