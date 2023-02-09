@@ -34,6 +34,7 @@ libmks_private_sources = [
     interface_prefix: 'org.qemu.Display1.',
            namespace: 'MksQemu',
              sources: 'dbus-display1.xml',
+      object_manager: true,
   )
 ]
 

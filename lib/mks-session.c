@@ -91,10 +91,19 @@ struct _MksSession
    */
   GListModel *devices_read_only;
 
-  /* @vm contains our "top-level" proxy object to the Qemu instance. This is
-   * where access to other devices begins. It is setup during either GInitable
-   * or GAsyncInitable initialization.
+  /* An object manager client is used to monitor for new objects exported by
+   * the Qemu instance. Those objects are then wrapped by MksDevice objects
+   * as necessary and exported to consumers via @devices.
    */
+  GDBusObjectManager *object_manager;
+
+  /* A GDBusObjectProxy to the `/org/qemu/Display1/VM` instance. Generally
+   * this used via the `org.qemu.Display1.VM` interface. We track the
+   * top-level object-manager instance so that we can detect easily when
+   * the VM has been removed from the peer. (Which could happen if it is
+   * running on a private D-Bus rather than a socketpair().
+   */
+  MksQemuObject *vm_object;
   MksQemuVM *vm;
 };
 
@@ -161,11 +170,19 @@ mks_session_vm_notify_cb (MksSession *self,
 }
 
 static void
-mks_session_set_vm (MksSession *self,
-                    MksQemuVM  *vm)
+mks_session_set_vm (MksSession    *self,
+                    MksQemuObject *vm_object,
+                    MksQemuVM     *vm)
 {
   g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_QEMU_IS_OBJECT (vm_object));
   g_assert (MKS_QEMU_IS_VM (vm));
+
+  if (self->vm != NULL)
+    return;
+
+  g_set_object (&self->vm_object, vm_object);
+  g_set_object (&self->vm, vm);
 
   g_signal_connect_object (vm,
                            "notify",
@@ -173,7 +190,76 @@ mks_session_set_vm (MksSession *self,
                            self,
                            G_CONNECT_SWAPPED);
 
-  self->vm = g_object_ref (vm);
+  g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_NAME]);
+  g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_UUID]);
+}
+
+static void
+mks_session_object_manager_object_added_cb (MksSession         *self,
+                                            MksQemuObject      *object,
+                                            GDBusObjectManager *manager)
+{
+  g_autolist(GDBusInterface) interfaces = NULL;
+
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_QEMU_IS_OBJECT (object));
+  g_assert (G_IS_DBUS_OBJECT_MANAGER (manager));
+
+  interfaces = g_dbus_object_get_interfaces (G_DBUS_OBJECT (object));
+
+  for (const GList *iter = interfaces; iter; iter = iter->next)
+    {
+      GDBusInterface *iface = iter->data;
+
+      if (MKS_QEMU_IS_VM (iface))
+        mks_session_set_vm (self, object, MKS_QEMU_VM (iface));
+    }
+}
+
+static void
+mks_session_object_manager_object_removed_cb (MksSession         *self,
+                                              MksQemuObject      *object,
+                                              GDBusObjectManager *manager)
+{
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_QEMU_IS_OBJECT (object));
+  g_assert (G_IS_DBUS_OBJECT_MANAGER (manager));
+
+  if (object == self->vm_object)
+    {
+      g_clear_object (&self->vm);
+      g_clear_object (&self->vm_object);
+      g_list_store_remove_all (self->devices);
+    }
+}
+
+static void
+mks_session_set_object_manager (MksSession         *self,
+                                GDBusObjectManager *object_manager)
+{
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (!object_manager || MKS_QEMU_IS_OBJECT_MANAGER_CLIENT (object_manager));
+  g_assert (self->object_manager == NULL);
+
+  if (g_set_object (&self->object_manager, object_manager))
+    {
+      g_autolist(GDBusObjectProxy) objects = NULL;
+
+      g_signal_connect_object (object_manager,
+                               "object-added",
+                               G_CALLBACK (mks_session_object_manager_object_added_cb),
+                               self,
+                               G_CONNECT_SWAPPED);
+      g_signal_connect_object (object_manager,
+                               "object-removed",
+                               G_CALLBACK (mks_session_object_manager_object_removed_cb),
+                               self,
+                               G_CONNECT_SWAPPED);
+
+      objects = g_dbus_object_manager_get_objects (object_manager);
+      for (const GList *iter = objects; iter; iter = iter->next)
+        mks_session_object_manager_object_added_cb (self, iter->data, object_manager);
+    }
 }
 
 static void
@@ -184,6 +270,10 @@ mks_session_dispose (GObject *object)
   if (self->devices != NULL)
     g_list_store_remove_all (self->devices);
 
+  g_clear_object (&self->object_manager);
+  g_clear_object (&self->vm);
+  g_clear_object (&self->vm_object);
+
   G_OBJECT_CLASS (mks_session_parent_class)->dispose (object);
 }
 
@@ -192,7 +282,6 @@ mks_session_finalize (GObject *object)
 {
   MksSession *self = (MksSession *)object;
 
-  g_clear_object (&self->vm);
   g_clear_object (&self->devices);
   g_clear_object (&self->devices_read_only);
   g_clear_object (&self->connection);
@@ -320,7 +409,8 @@ mks_session_initable_init (GInitable     *initable,
                            GError       **error)
 {
   MksSession *self = (MksSession *)initable;
-  g_autoptr(MksQemuVM) vm = NULL;
+  g_autoptr(GDBusObjectManager) object_manager = NULL;
+  g_autolist(GDBusObjectProxy) objects = NULL;
 
   g_assert (MKS_IS_SESSION (self));
   g_assert (!cancellable || G_IS_CANCELLABLE (cancellable));
@@ -334,17 +424,17 @@ mks_session_initable_init (GInitable     *initable,
       return FALSE;
     }
 
-  vm = mks_qemu_vm_proxy_new_sync (self->connection,
-                                   G_DBUS_PROXY_FLAGS_NONE,
-                                   "org.qemu",
-                                   "/org/qemu/Display1/VM",
-                                   cancellable,
-                                   error);
+  object_manager =
+    mks_qemu_object_manager_client_new_sync (self->connection,
+                                             G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
+                                             "org.qemu",
+                                             "/org/qemu/Display1",
+                                             cancellable,
+                                             error);
 
-  if (vm != NULL)
-    mks_session_set_vm (self, vm);
+  mks_session_set_object_manager (self, object_manager);
 
-  return vm != NULL;
+  return object_manager != NULL;
 }
 
 static void
@@ -352,7 +442,7 @@ mks_session_async_initable_vm_cb (GObject      *object,
                                   GAsyncResult *result,
                                   gpointer      user_data)
 {
-  g_autoptr(MksQemuVM) vm = NULL;
+  g_autoptr(GDBusObjectManager) object_manager = NULL;
   g_autoptr(GError) error = NULL;
   g_autoptr(GTask) task = user_data;
   MksSession *self;
@@ -361,15 +451,14 @@ mks_session_async_initable_vm_cb (GObject      *object,
   g_assert (G_IS_TASK (task));
 
   self = g_task_get_source_object (task);
-  vm = mks_qemu_vm_proxy_new_finish (result, &error);
+  object_manager = mks_qemu_object_manager_client_new_finish (result, &error);
 
   g_assert (MKS_IS_SESSION (self));
-  g_assert (!vm || MKS_QEMU_IS_VM (vm));
+  g_assert (!object_manager || MKS_QEMU_IS_OBJECT_MANAGER_CLIENT (object_manager));
 
-  if (vm != NULL)
-    mks_session_set_vm (self, vm);
+  mks_session_set_object_manager (self, object_manager);
 
-  if (error)
+  if (error != NULL)
     g_task_return_error (task, g_steal_pointer (&error));
   else
     g_task_return_boolean (task, TRUE);
@@ -398,13 +487,13 @@ mks_session_async_initable_init_async (GAsyncInitable      *async_initable,
                              G_IO_ERROR_NOT_CONNECTED,
                              "Not connected");
   else
-    mks_qemu_vm_proxy_new (self->connection,
-                           G_DBUS_PROXY_FLAGS_NONE,
-                           "org.qemu",
-                           "/org/qemu/Display1/VM",
-                           cancellable,
-                           mks_session_async_initable_vm_cb,
-                           g_steal_pointer (&task));
+    mks_qemu_object_manager_client_new (self->connection,
+                                        G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
+                                        "org.qemu",
+                                        "/org/qemu/Display1/VM",
+                                        cancellable,
+                                        mks_session_async_initable_vm_cb,
+                                        g_steal_pointer (&task));
 }
 
 static gboolean
