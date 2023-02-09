@@ -3,6 +3,7 @@ libmks_sources = [
   'mks-device.c',
   'mks-keyboard.c',
   'mks-mouse.c',
+  'mks-paintable.c',
   'mks-screen.c',
   'mks-session.c',
 ]
@@ -13,6 +14,7 @@ libmks_headers = [
   'mks-init.h',
   'mks-keyboard.h',
   'mks-mouse.h',
+  'mks-paintable.h',
   'mks-screen.h',
   'mks-session.h',
   'mks-types.h',

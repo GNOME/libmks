@@ -26,6 +26,7 @@
 #include "mks-init.h"
 #include "mks-keyboard.h"
 #include "mks-mouse.h"
+#include "mks-paintable.h"
 #include "mks-qemu.h"
 #include "mks-read-only-list-model-private.h"
 #include "mks-screen.h"
@@ -53,6 +54,7 @@ mks_init_gtypes (void)
   g_type_ensure (MKS_TYPE_DEVICE);
   g_type_ensure (MKS_TYPE_KEYBOARD);
   g_type_ensure (MKS_TYPE_MOUSE);
+  g_type_ensure (MKS_TYPE_PAINTABLE);
   g_type_ensure (MKS_TYPE_SCREEN);
   g_type_ensure (MKS_TYPE_SESSION);
 }
