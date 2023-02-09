@@ -28,6 +28,37 @@
 #include <gtk/gtk.h>
 #include <libmks.h>
 
+static void
+print_device_info (MksDevice *device,
+                   guint      depth)
+{
+  if (device == NULL)
+    return;
+
+  for (guint i = 0; i < depth; i++)
+    g_print ("  ");
+
+  g_print ("- %s(name=\"%s\"",
+           G_OBJECT_TYPE_NAME (device),
+           mks_device_get_name (device) ?: "");
+  if (MKS_IS_SCREEN (device))
+    g_print (" number=%u width=%u height=%u",
+             mks_screen_get_number (MKS_SCREEN (device)),
+             mks_screen_get_width (MKS_SCREEN (device)),
+             mks_screen_get_height (MKS_SCREEN (device)));
+  g_print (")\n");
+
+  if (MKS_IS_SCREEN (device))
+    {
+      MksScreen *screen = MKS_SCREEN (device);
+      MksKeyboard *keyboard = mks_screen_get_keyboard (screen);
+      MksMouse *mouse = mks_screen_get_mouse (screen);
+
+      print_device_info (MKS_DEVICE (keyboard), depth+1);
+      print_device_info (MKS_DEVICE (mouse), depth+1);
+    }
+}
+
 int
 main (int argc,
       char *argv[])
@@ -70,7 +101,7 @@ main (int argc,
       return EXIT_FAILURE;
     }
 
-  g_print ("Session(uuid=\"%s\" name=\"%s\")\n",
+  g_print ("Session(uuid=\"%s\", name=\"%s\")\n",
            mks_session_get_uuid (session),
            mks_session_get_name (session));
 
@@ -80,18 +111,7 @@ main (int argc,
   for (guint i = 0; i < n_items; i++)
     {
       g_autoptr(MksDevice) device = g_list_model_get_item (devices, i);
-
-      g_print (" - %s(name=\"%s\"",
-               G_OBJECT_TYPE_NAME (device),
-               mks_device_get_name (device));
-
-      if (MKS_IS_SCREEN (device))
-        g_print (" number=%u width=%u height=%u",
-                 mks_screen_get_number (MKS_SCREEN (device)),
-                 mks_screen_get_width (MKS_SCREEN (device)),
-                 mks_screen_get_height (MKS_SCREEN (device)));
-
-      g_print (")\n");
+      print_device_info (device, 1);
     }
 
   return EXIT_SUCCESS;
