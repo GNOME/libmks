@@ -166,3 +166,159 @@ mks_keyboard_get_modifiers (MksKeyboard *self)
 
   return self->modifiers;
 }
+
+static gboolean
+check_keyboard (MksKeyboard  *self,
+                GError      **error)
+{
+  if (self->keyboard == NULL)
+    {
+      g_set_error_literal (error,
+                           G_IO_ERROR,
+                           G_IO_ERROR_NOT_CONNECTED,
+                           "Not connected");
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static void
+mks_keyboard_press_cb (GObject      *object,
+                       GAsyncResult *result,
+                       gpointer      user_data)
+{
+  MksQemuKeyboard *keyboard = (MksQemuKeyboard *)object;
+  g_autoptr(GTask) task = user_data;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (MKS_QEMU_IS_KEYBOARD (keyboard));
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (G_IS_TASK (task));
+
+  if (!mks_qemu_keyboard_call_press_finish (keyboard, result, &error))
+    g_task_return_error (task, g_steal_pointer (&error));
+  else
+    g_task_return_boolean (task, TRUE);
+}
+
+/**
+ * mks_keyboard_press:
+ * @self: an #MksKeyboard
+ * @keycode: the hardware keycode
+ * @cancellable: (nullable): a #GCancellable
+ * @callback: a #GAsyncReadyCallback to execute upon completion
+ * @user_data: closure data for @callback
+ *
+ * Asynchronously presses @keycode.
+ */
+void
+mks_keyboard_press (MksKeyboard         *self,
+                    guint                keycode,
+                    GCancellable        *cancellable,
+                    GAsyncReadyCallback  callback,
+                    gpointer             user_data)
+{
+  g_autoptr(GTask) task = NULL;
+  g_autoptr(GError) error = NULL;
+
+  g_return_if_fail (MKS_IS_KEYBOARD (self));
+  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
+
+  task = g_task_new (self, cancellable, callback, user_data);
+  g_task_set_source_tag (task, mks_keyboard_press);
+
+  if (!check_keyboard (self, &error))
+    g_task_return_error (task, g_steal_pointer (&error));
+  else
+    mks_qemu_keyboard_call_press (self->keyboard,
+                                  keycode,
+                                  cancellable,
+                                  mks_keyboard_press_cb,
+                                  g_steal_pointer (&task));
+}
+
+gboolean
+mks_keyboard_press_sync (MksKeyboard   *self,
+                         guint          keycode,
+                         GCancellable  *cancellable,
+                         GError       **error)
+{
+  g_return_val_if_fail (MKS_IS_KEYBOARD (self), FALSE);
+  g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
+
+  if (!check_keyboard (self, error))
+    return FALSE;
+
+  return mks_qemu_keyboard_call_press_sync (self->keyboard, keycode, cancellable, error);
+}
+
+static void
+mks_keyboard_release_cb (GObject      *object,
+                         GAsyncResult *result,
+                         gpointer      user_data)
+{
+  MksQemuKeyboard *keyboard = (MksQemuKeyboard *)object;
+  g_autoptr(GTask) task = user_data;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (MKS_QEMU_IS_KEYBOARD (keyboard));
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (G_IS_TASK (task));
+
+  if (!mks_qemu_keyboard_call_release_finish (keyboard, result, &error))
+    g_task_return_error (task, g_steal_pointer (&error));
+  else
+    g_task_return_boolean (task, TRUE);
+}
+
+/**
+ * mks_keyboard_release:
+ * @self: an #MksKeyboard
+ * @keycode: the hardware keycode
+ * @cancellable: (nullable): a #GCancellable
+ * @callback: a #GAsyncReadyCallback to execute upon completion
+ * @user_data: closure data for @callback
+ *
+ * Asynchronously releases @keycode.
+ */
+void
+mks_keyboard_release (MksKeyboard         *self,
+                      guint                keycode,
+                      GCancellable        *cancellable,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
+{
+  g_autoptr(GTask) task = NULL;
+  g_autoptr(GError) error = NULL;
+
+  g_return_if_fail (MKS_IS_KEYBOARD (self));
+  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
+
+  task = g_task_new (self, cancellable, callback, user_data);
+  g_task_set_source_tag (task, mks_keyboard_release);
+
+  if (!check_keyboard (self, &error))
+    g_task_return_error (task, g_steal_pointer (&error));
+  else
+    mks_qemu_keyboard_call_release (self->keyboard,
+                                    keycode,
+                                    cancellable,
+                                    mks_keyboard_release_cb,
+                                    g_steal_pointer (&task));
+}
+
+gboolean
+mks_keyboard_release_sync (MksKeyboard   *self,
+                           guint          keycode,
+                           GCancellable  *cancellable,
+                           GError       **error)
+{
+  g_return_val_if_fail (MKS_IS_KEYBOARD (self), FALSE);
+  g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
+
+  if (!check_keyboard (self, error))
+    return FALSE;
+
+  return mks_qemu_keyboard_call_release_sync (self->keyboard, keycode, cancellable, error);
+}

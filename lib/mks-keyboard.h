@@ -25,7 +25,7 @@
 # error "Only <libmks.h> can be included directly."
 #endif
 
-#include <glib-object.h>
+#include <gio/gio.h>
 
 #include "mks-types.h"
 #include "mks-version-macros.h"
@@ -51,8 +51,38 @@ typedef enum _MksKeyboardModifier
 } MksKeyboardModifier;
 
 MKS_AVAILABLE_IN_ALL
-GType               mks_keyboard_get_type      (void) G_GNUC_CONST;
+GType               mks_keyboard_get_type       (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
-MksKeyboardModifier mks_keyboard_get_modifiers (MksKeyboard *self);
+MksKeyboardModifier mks_keyboard_get_modifiers  (MksKeyboard          *self);
+MKS_AVAILABLE_IN_ALL
+void                mks_keyboard_press          (MksKeyboard          *self,
+                                                 guint                 keycode,
+                                                 GCancellable         *cancellable,
+                                                 GAsyncReadyCallback   callback,
+                                                 gpointer              user_data);
+MKS_AVAILABLE_IN_ALL
+gboolean            mks_keyboard_press_finish   (MksKeyboard          *self,
+                                                 GAsyncResult         *result,
+                                                 GError              **error);
+MKS_AVAILABLE_IN_ALL
+gboolean            mks_keyboard_press_sync     (MksKeyboard          *self,
+                                                 guint                 keycode,
+                                                 GCancellable         *cancellable,
+                                                 GError              **error);
+MKS_AVAILABLE_IN_ALL
+void                mks_keyboard_release        (MksKeyboard          *self,
+                                                 guint                 keycode,
+                                                 GCancellable         *cancellable,
+                                                 GAsyncReadyCallback   callback,
+                                                 gpointer              user_data);
+MKS_AVAILABLE_IN_ALL
+gboolean            mks_keyboard_release_finish (MksKeyboard          *self,
+                                                 GAsyncResult         *result,
+                                                 GError              **error);
+MKS_AVAILABLE_IN_ALL
+gboolean            mks_keyboard_release_sync   (MksKeyboard          *self,
+                                                 guint                 keycode,
+                                                 GCancellable         *cancellable,
+                                                 GError              **error);
 
 G_END_DECLS
