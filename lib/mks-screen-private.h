@@ -23,16 +23,11 @@
 
 #include <gio/gio.h>
 
+#include "mks-qemu.h"
 #include "mks-screen.h"
 
 G_BEGIN_DECLS
 
-void       _mks_screen_new        (GDBusConnection      *connection,
-                                   const char           *object_path,
-                                   GCancellable         *cancellable,
-                                   GAsyncReadyCallback   callback,
-                                   gpointer              user_data);
-MksScreen *_mks_screen_new_finish (GAsyncResult         *result,
-                                   GError              **error);
+MksDevice *_mks_screen_new (MksQemuObject *object);
 
 G_END_DECLS

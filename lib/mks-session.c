@@ -24,6 +24,7 @@
 #include "mks-device.h"
 #include "mks-read-only-list-model-private.h"
 #include "mks-qemu.h"
+#include "mks-screen-private.h"
 #include "mks-session.h"
 
 /**
@@ -144,13 +145,23 @@ mks_session_set_connection (MksSession      *self,
   g_assert (self->connection == NULL);
 
   if (connection == NULL)
-    {
-      g_critical ("%s created without a GDBusConnection, this cannot work.",
-                  G_OBJECT_TYPE_NAME (self));
-      return;
-    }
+    g_critical ("%s created without a GDBusConnection, this cannot work.",
+                G_OBJECT_TYPE_NAME (self));
+  else
+    self->connection = g_object_ref (connection);
+}
 
-  self->connection = g_object_ref (connection);
+static void
+mks_session_add_device (MksSession *self,
+                        MksDevice  *device)
+{
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (!device || MKS_IS_DEVICE (device));
+
+  if (device == NULL)
+    return;
+
+  g_list_store_append (self->devices, device);
 }
 
 static void
@@ -213,6 +224,8 @@ mks_session_object_manager_object_added_cb (MksSession         *self,
 
       if (MKS_QEMU_IS_VM (iface))
         mks_session_set_vm (self, object, MKS_QEMU_VM (iface));
+      else if (MKS_QEMU_IS_CONSOLE (iface))
+        mks_session_add_device (self, _mks_screen_new (object));
     }
 }
 
