@@ -44,13 +44,18 @@ version_conf.set('VERSION', meson.project_version())
 version_conf.set('MAJOR_VERSION', version_split[0])
 version_conf.set('MINOR_VERSION', version_split[1])
 version_conf.set('MICRO_VERSION', version_split[2])
-configure_file(
+mks_version_h = configure_file(
           input: 'mks-version.h.in',
          output: 'mks-version.h',
   configuration: version_conf,
         install: true,
     install_dir: join_paths(get_option('includedir'), 'libmks-@0@'.format(api_version))
 )
+
+libmks_generated_sources = [
+  libmks_enums,
+  mks_version_h,
+]
 
 libmks_deps = [
   libgio_dep,
@@ -59,12 +64,13 @@ libmks_deps = [
 ]
 
 libmks = shared_library('mks-' + api_version,
-  libmks_sources + [libmks_enums[0]] + libmks_private_sources,
+  libmks_sources + libmks_generated_sources + libmks_private_sources,
   dependencies: libmks_deps,
        install: true,
 )
 
 libmks_dep = declare_dependency(
+              sources: libmks_generated_sources,
             link_with: libmks,
          dependencies: libmks_deps,
   include_directories: include_directories('.'),
