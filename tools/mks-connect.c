@@ -49,6 +49,9 @@ print_device_info (MksDevice *device,
   else if (MKS_IS_KEYBOARD (device))
     g_print (", modifiers=0x%x",
              mks_keyboard_get_modifiers (MKS_KEYBOARD (device)));
+  else if (MKS_IS_MOUSE (device))
+    g_print (", is-absolute=%u",
+             mks_mouse_get_is_absolute (MKS_MOUSE (device)));
   g_print (")\n");
 
   if (MKS_IS_SCREEN (device))

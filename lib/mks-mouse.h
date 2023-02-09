@@ -43,6 +43,8 @@ G_BEGIN_DECLS
 typedef struct _MksMouseClass MksMouseClass;
 
 MKS_AVAILABLE_IN_ALL
-GType mks_mouse_get_type (void) G_GNUC_CONST;
+GType    mks_mouse_get_type        (void) G_GNUC_CONST;
+MKS_AVAILABLE_IN_ALL
+gboolean mks_mouse_get_is_absolute (MksMouse *self);
 
 G_END_DECLS
