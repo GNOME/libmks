@@ -25,7 +25,7 @@
 # error "Only <libmks.h> can be included directly."
 #endif
 
-#include <glib-object.h>
+#include <gio/gio.h>
 
 #include "mks-types.h"
 #include "mks-version-macros.h"
@@ -42,9 +42,84 @@ G_BEGIN_DECLS
 
 typedef struct _MksMouseClass MksMouseClass;
 
+typedef enum _MksMouseButton
+{
+  MKS_MOUSE_BUTTON_LEFT       = 0,
+  MKS_MOUSE_BUTTON_MIDDLE     = 1,
+  MKS_MOUSE_BUTTON_RIGHT      = 2,
+  MKS_MOUSE_BUTTON_WHEEL_UP   = 3,
+  MKS_MOUSE_BUTTON_WHEEL_DOWN = 4,
+  MKS_MOUSE_BUTTON_SIDE       = 5,
+  MKS_MOUSE_BUTTON_EXTRA      = 6,
+} MksMouseButton;
+
 MKS_AVAILABLE_IN_ALL
 GType    mks_mouse_get_type        (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
-gboolean mks_mouse_get_is_absolute (MksMouse *self);
+gboolean mks_mouse_get_is_absolute (MksMouse             *self);
+MKS_AVAILABLE_IN_ALL
+void     mks_mouse_press           (MksMouse             *self,
+                                    MksMouseButton        button,
+                                    GCancellable         *cancellable,
+                                    GAsyncReadyCallback   callback,
+                                    gpointer              user_data);
+MKS_AVAILABLE_IN_ALL
+gboolean mks_mouse_press_finish    (MksMouse             *self,
+                                    GAsyncResult         *result,
+                                    GError              **error);
+MKS_AVAILABLE_IN_ALL
+gboolean mks_mouse_press_sync      (MksMouse             *self,
+                                    MksMouseButton        button,
+                                    GCancellable         *cancellable,
+                                    GError              **error);
+MKS_AVAILABLE_IN_ALL
+void     mks_mouse_release         (MksMouse             *self,
+                                    MksMouseButton        button,
+                                    GCancellable         *cancellable,
+                                    GAsyncReadyCallback   callback,
+                                    gpointer              user_data);
+MKS_AVAILABLE_IN_ALL
+gboolean mks_mouse_release_finish  (MksMouse             *self,
+                                    GAsyncResult         *result,
+                                    GError              **error);
+MKS_AVAILABLE_IN_ALL
+gboolean mks_mouse_release_sync    (MksMouse             *self,
+                                    MksMouseButton        button,
+                                    GCancellable         *cancellable,
+                                    GError              **error);
+MKS_AVAILABLE_IN_ALL
+void     mks_mouse_move_to         (MksMouse             *self,
+                                    guint                 x,
+                                    guint                 y,
+                                    GCancellable         *cancellable,
+                                    GAsyncReadyCallback   callback,
+                                    gpointer              user_data);
+MKS_AVAILABLE_IN_ALL
+gboolean mks_mouse_move_to_finish  (MksMouse             *self,
+                                    GAsyncResult         *result,
+                                    GError              **error);
+MKS_AVAILABLE_IN_ALL
+gboolean mks_mouse_move_to_sync    (MksMouse             *self,
+                                    guint                 x,
+                                    guint                 y,
+                                    GCancellable         *cancellable,
+                                    GError              **error);
+MKS_AVAILABLE_IN_ALL
+void     mks_mouse_move_by         (MksMouse             *self,
+                                    int                   delta_x,
+                                    int                   delta_y,
+                                    GCancellable         *cancellable,
+                                    GAsyncReadyCallback   callback,
+                                    gpointer              user_data);
+MKS_AVAILABLE_IN_ALL
+gboolean mks_mouse_move_by_finish  (MksMouse             *self,
+                                    GAsyncResult         *result,
+                                    GError              **error);
+MKS_AVAILABLE_IN_ALL
+gboolean mks_mouse_move_by_sync    (MksMouse             *self,
+                                    int                   delta_x,
+                                    int                   delta_y,
+                                    GCancellable         *cancellable,
+                                    GError              **error);
 
 G_END_DECLS
