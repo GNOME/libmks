@@ -32,6 +32,7 @@ G_BEGIN_DECLS
 # include "mks-mouse.h"
 # include "mks-paintable.h"
 # include "mks-screen.h"
+# include "mks-screen-attributes.h"
 # include "mks-session.h"
 # include "mks-types.h"
 # include "mks-version.h"

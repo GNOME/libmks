@@ -30,6 +30,7 @@
 #include "mks-qemu.h"
 #include "mks-read-only-list-model-private.h"
 #include "mks-screen.h"
+#include "mks-screen-attributes.h"
 #include "mks-session.h"
 #include "mks-version.h"
 
@@ -56,6 +57,7 @@ mks_init_gtypes (void)
   g_type_ensure (MKS_TYPE_MOUSE);
   g_type_ensure (MKS_TYPE_PAINTABLE);
   g_type_ensure (MKS_TYPE_SCREEN);
+  g_type_ensure (MKS_TYPE_SCREEN_ATTRIBUTES);
   g_type_ensure (MKS_TYPE_SESSION);
 }
 

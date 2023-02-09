@@ -25,7 +25,7 @@
 # error "Only <libmks.h> can be included directly."
 #endif
 
-#include <glib-object.h>
+#include <gio/gio.h>
 
 #include "mks-types.h"
 #include "mks-version-macros.h"
@@ -51,19 +51,34 @@ typedef enum _MksScreenKind
 MKS_AVAILABLE_IN_ALL
 GType          mks_screen_get_type           (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
-MksScreenKind  mks_screen_get_kind           (MksScreen *self);
+MksScreenKind  mks_screen_get_kind           (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-MksKeyboard   *mks_screen_get_keyboard       (MksScreen *self);
+MksKeyboard   *mks_screen_get_keyboard       (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-MksMouse      *mks_screen_get_mouse          (MksScreen *self);
+MksMouse      *mks_screen_get_mouse          (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-guint          mks_screen_get_width          (MksScreen *self);
+guint          mks_screen_get_width          (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-guint          mks_screen_get_height         (MksScreen *self);
+guint          mks_screen_get_height         (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-guint          mks_screen_get_number         (MksScreen *self);
+guint          mks_screen_get_number         (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-const char    *mks_screen_get_device_address (MksScreen *self);
+const char    *mks_screen_get_device_address (MksScreen            *self);
+MKS_AVAILABLE_IN_ALL
+void           mks_screen_configure          (MksScreen            *self,
+                                              MksScreenAttributes  *attributes,
+                                              GCancellable         *cancellable,
+                                              GAsyncReadyCallback   callback,
+                                              gpointer              user_data);
+MKS_AVAILABLE_IN_ALL
+gboolean       mks_screen_configure_finish   (MksScreen            *self,
+                                              GAsyncResult         *result,
+                                              GError              **error);
+MKS_AVAILABLE_IN_ALL
+gboolean       mks_screen_configure_sync     (MksScreen            *self,
+                                              MksScreenAttributes  *attributes,
+                                              GCancellable         *cancellable,
+                                              GError              **error);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksScreen, g_object_unref)
 

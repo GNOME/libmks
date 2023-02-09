@@ -1,5 +1,5 @@
 /*
- * mks-types.h
+ * mks-screen-attributes-private.h
  *
  * Copyright 2023 Christian Hergert <chergert@redhat.com>
  *
@@ -21,24 +21,18 @@
 
 #pragma once
 
-#if !defined(MKS_INSIDE) && !defined(MKS_COMPILATION)
-# error "Only <libmks.h> can be included directly."
-#endif
-
-#include <glib.h>
+#include "mks-screen-attributes.h"
 
 G_BEGIN_DECLS
 
-typedef struct _MksDevice              MksDevice;
-typedef struct _MksKeyboard            MksKeyboard;
-typedef struct _MksMouse               MksMouse;
-typedef struct _MksScreen              MksScreen;
-typedef struct _MksSession             MksSession;
-typedef struct _MksScreenAttributes    MksScreenAttributes;
-
-typedef struct _MksAudio     MksAudio;
-typedef struct _MksChardev   MksChardev;
-typedef struct _MksClipboard MksClipboard;
-typedef struct _MksUsb       MksUsb;
+struct _MksScreenAttributes
+{
+  guint16 width_mm;
+  guint16 height_mm;
+  int x_offset;
+  int y_offset;
+  guint width;
+  guint height;
+};
 
 G_END_DECLS

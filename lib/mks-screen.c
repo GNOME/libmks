@@ -26,6 +26,7 @@
 #include "mks-qemu.h"
 #include "mks-keyboard-private.h"
 #include "mks-mouse-private.h"
+#include "mks-screen-attributes-private.h"
 #include "mks-screen-private.h"
 
 struct _MksScreenClass
@@ -408,4 +409,150 @@ mks_screen_get_device_address (MksScreen *self)
     return mks_qemu_console_get_device_address (self->console);
 
   return NULL;
+}
+
+static gboolean
+check_console (MksScreen  *self,
+               GError    **error)
+{
+  if (self->console == NULL)
+    {
+      g_set_error_literal (error,
+                           G_IO_ERROR,
+                           G_IO_ERROR_NOT_CONNECTED,
+                           "Not connected");
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static void
+mks_screen_configure_cb (GObject      *object,
+                         GAsyncResult *result,
+                         gpointer      user_data)
+{
+  MksQemuConsole *console = (MksQemuConsole *)object;
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GTask) task = user_data;
+
+  g_assert (MKS_QEMU_IS_CONSOLE (console));
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (G_IS_TASK (task));
+
+  if (!mks_qemu_console_call_set_uiinfo_finish (console, result, &error))
+    g_task_return_error (task, g_steal_pointer (&error));
+  else
+    g_task_return_boolean (task, TRUE);
+}
+
+/**
+ * mks_screen_configure_async:
+ * @self: an #MksScreen
+ * @attributes: (transfer full): a #MksScreenAttributes
+ * @cancellable: (nullable): a #GCancellable
+ * @callback: a #GAsyncReadyCallback to execute upon completion
+ * @user_data: closure data for @callback
+ *
+ * Requests the Qemu instance reconfigure the screen with @attributes.
+ *
+ * This function takes ownership of @attributes.
+ *
+ * @callback is executed upon acknowledgment from the Qemu instance or
+ * if the request timed out.
+ *
+ * Call mks_screen_configure_finish() to get the result.
+ */
+void
+mks_screen_configure (MksScreen           *self,
+                      MksScreenAttributes *attributes,
+                      GCancellable        *cancellable,
+                      GAsyncReadyCallback  callback,
+                      gpointer             user_data)
+{
+  g_autoptr(GTask) task = NULL;
+  g_autoptr(GError) error = NULL;
+
+  g_return_if_fail (MKS_IS_SCREEN (self));
+  g_return_if_fail (attributes != NULL);
+  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
+
+  task = g_task_new (self, cancellable, callback, user_data);
+  g_task_set_source_tag (task, mks_screen_configure);
+
+  if (!check_console (self, &error))
+    g_task_return_error (task, g_steal_pointer (&error));
+  else
+    mks_qemu_console_call_set_uiinfo (self->console,
+                                      attributes->width_mm,
+                                      attributes->height_mm,
+                                      attributes->x_offset,
+                                      attributes->y_offset,
+                                      attributes->width,
+                                      attributes->height,
+                                      cancellable,
+                                      mks_screen_configure_cb,
+                                      g_steal_pointer (&task));
+
+  mks_screen_attributes_free (attributes);
+}
+
+/**
+ * mks_screen_configure_finish:
+ * @self: an #MksScreen
+ * @result: a #GAsyncResult provided to callback
+ * @error: a location for a #GError, or %NULL
+ *
+ * Completes a call to mks_screen_configure().
+ *
+ * Returns: %TRUE if the operation completed successfully; otherwise %FALSE
+ *   and @error is set.
+ */
+gboolean
+mks_screen_configure_finish (MksScreen     *self,
+                             GAsyncResult  *result,
+                             GError       **error)
+{
+  g_return_val_if_fail (MKS_IS_SCREEN (self), FALSE);
+  g_return_val_if_fail (g_task_is_valid (result, self), FALSE);
+
+  return g_task_propagate_boolean (G_TASK (result), error);
+}
+
+/**
+ * mks_screen_configure_sync:
+ * @self: a #MksScreen
+ * @attributes: (transfer full): a #MksScreenAttributes
+ * @cancellable: a #GCancellable
+ * @error: a location for a #GError, or %NULL
+ *
+ * Requests the Qemu instance reconfigure the screen using @attributes.
+ *
+ * This function takes ownership of @attributes.
+ *
+ * Returns: %TRUE if the operation completed successfully; otherwise %FALSE
+ *   and @error is set.
+ */
+gboolean
+mks_screen_configure_sync (MksScreen            *self,
+                           MksScreenAttributes  *attributes,
+                           GCancellable         *cancellable,
+                           GError              **error)
+{
+  g_return_val_if_fail (MKS_IS_SCREEN (self), FALSE);
+  g_return_val_if_fail (attributes != NULL, FALSE);
+  g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
+
+  if (!check_console (self, error))
+    return FALSE;
+
+  return mks_qemu_console_call_set_uiinfo_sync (self->console,
+                                                attributes->width_mm,
+                                                attributes->height_mm,
+                                                attributes->x_offset,
+                                                attributes->y_offset,
+                                                attributes->width,
+                                                attributes->height,
+                                                cancellable,
+                                                error);
 }

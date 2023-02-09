@@ -5,6 +5,7 @@ libmks_sources = [
   'mks-mouse.c',
   'mks-paintable.c',
   'mks-screen.c',
+  'mks-screen-attributes.c',
   'mks-session.c',
 ]
 
@@ -16,6 +17,7 @@ libmks_headers = [
   'mks-mouse.h',
   'mks-paintable.h',
   'mks-screen.h',
+  'mks-screen-attributes.h',
   'mks-session.h',
   'mks-types.h',
 ]
