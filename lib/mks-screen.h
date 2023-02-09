@@ -49,19 +49,21 @@ typedef enum _MksScreenKind
 } MksScreenKind;
 
 MKS_AVAILABLE_IN_ALL
-GType          mks_screen_get_type     (void) G_GNUC_CONST;
+GType          mks_screen_get_type           (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
-MksScreenKind  mks_screen_get_kind     (MksScreen *self);
+MksScreenKind  mks_screen_get_kind           (MksScreen *self);
 MKS_AVAILABLE_IN_ALL
-MksKeyboard   *mks_screen_get_keyboard (MksScreen *self);
+MksKeyboard   *mks_screen_get_keyboard       (MksScreen *self);
 MKS_AVAILABLE_IN_ALL
-MksMouse      *mks_screen_get_mouse    (MksScreen *self);
+MksMouse      *mks_screen_get_mouse          (MksScreen *self);
 MKS_AVAILABLE_IN_ALL
-guint          mks_screen_get_width    (MksScreen *self);
+guint          mks_screen_get_width          (MksScreen *self);
 MKS_AVAILABLE_IN_ALL
-guint          mks_screen_get_height   (MksScreen *self);
+guint          mks_screen_get_height         (MksScreen *self);
 MKS_AVAILABLE_IN_ALL
-guint          mks_screen_get_number   (MksScreen *self);
+guint          mks_screen_get_number         (MksScreen *self);
+MKS_AVAILABLE_IN_ALL
+const char    *mks_screen_get_device_address (MksScreen *self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksScreen, g_object_unref)
 

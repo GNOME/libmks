@@ -54,6 +54,7 @@ G_DEFINE_FINAL_TYPE (MksScreen, mks_screen, MKS_TYPE_DEVICE)
 
 enum {
   PROP_0,
+  PROP_DEVICE_ADDRESS,
   PROP_HEIGHT,
   PROP_KIND,
   PROP_KEYBOARD,
@@ -214,6 +215,10 @@ mks_screen_get_property (GObject    *object,
 
   switch (prop_id)
     {
+    case PROP_DEVICE_ADDRESS:
+      g_value_set_string (value, mks_screen_get_device_address (self));
+      break;
+
     case PROP_KEYBOARD:
       g_value_set_object (value, mks_screen_get_keyboard (self));
       break;
@@ -253,6 +258,11 @@ mks_screen_class_init (MksScreenClass *klass)
   object_class->get_property = mks_screen_get_property;
 
   device_class->setup = mks_screen_setup;
+
+  properties [PROP_DEVICE_ADDRESS] =
+    g_param_spec_string ("device-address", NULL, NULL,
+                         NULL,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   properties [PROP_KEYBOARD] =
     g_param_spec_object ("keyboard", NULL, NULL,
@@ -387,4 +397,15 @@ mks_screen_get_number (MksScreen *self)
   g_return_val_if_fail (MKS_IS_SCREEN (self), 0);
 
   return self->number;
+}
+
+const char *
+mks_screen_get_device_address (MksScreen *self)
+{
+  g_return_val_if_fail (MKS_IS_SCREEN (self), NULL);
+
+  if (self->console != NULL)
+    return mks_qemu_console_get_device_address (self->console);
+
+  return NULL;
 }

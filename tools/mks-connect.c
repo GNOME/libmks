@@ -42,7 +42,8 @@ print_device_info (MksDevice *device,
            G_OBJECT_TYPE_NAME (device),
            mks_device_get_name (device) ?: "");
   if (MKS_IS_SCREEN (device))
-    g_print (", number=%u, width=%u, height=%u",
+    g_print (", address=\"%s\", number=%u, width=%u, height=%u",
+             mks_screen_get_device_address (MKS_SCREEN (device)),
              mks_screen_get_number (MKS_SCREEN (device)),
              mks_screen_get_width (MKS_SCREEN (device)),
              mks_screen_get_height (MKS_SCREEN (device)));
