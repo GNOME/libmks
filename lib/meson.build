@@ -23,6 +23,7 @@ libmks_headers = [
 ]
 
 libmks_private_sources = [
+  'mks-framebuffer.c',
   'mks-paintable-listener.c',
   'mks-read-only-list-model.c',
 
