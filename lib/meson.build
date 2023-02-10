@@ -31,6 +31,7 @@ libmks_enums = gnome.mkenums_simple('mks-enums',
 )
 
 libmks_private_sources = [
+  'mks-paintable-listener.c',
   'mks-read-only-list-model.c',
 
   gnome.gdbus_codegen('mks-qemu',
