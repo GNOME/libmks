@@ -21,7 +21,7 @@
 
 #include "config.h"
 
-#include "mks-paintable.h"
+#include "mks-paintable-private.h"
 #include "mks-screen.h"
 
 struct _MksPaintable
@@ -223,4 +223,18 @@ paintable_iface_init (GdkPaintableInterface *iface)
   iface->get_flags = mks_paintable_get_flags;
   iface->get_intrinsic_aspect_ratio = mks_paintable_get_intrinsic_aspect_ratio;
   iface->snapshot = mks_paintable_snapshot;
+}
+
+GdkPaintable *
+_mks_paintable_new (GDBusConnection      *connection,
+                    MksScreen            *screen,
+                    MksPaintableListener *listener)
+{
+  g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
+  g_return_val_if_fail (MKS_IS_SCREEN (screen), NULL);
+  g_return_val_if_fail (MKS_IS_PAINTABLE_LISTENER (listener), NULL);
+
+  /* TODO: */
+
+  return mks_paintable_new (screen);
 }

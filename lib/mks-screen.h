@@ -25,6 +25,7 @@
 # error "Only <libmks.h> can be included directly."
 #endif
 
+#include <gdk/gdk.h>
 #include <gio/gio.h>
 
 #include "mks-types.h"
@@ -77,6 +78,19 @@ gboolean       mks_screen_configure_finish   (MksScreen            *self,
 MKS_AVAILABLE_IN_ALL
 gboolean       mks_screen_configure_sync     (MksScreen            *self,
                                               MksScreenAttributes  *attributes,
+                                              GCancellable         *cancellable,
+                                              GError              **error);
+MKS_AVAILABLE_IN_ALL
+void           mks_screen_attach             (MksScreen            *screen,
+                                              GCancellable         *cancellable,
+                                              GAsyncReadyCallback   callback,
+                                              gpointer              user_data);
+MKS_AVAILABLE_IN_ALL
+GdkPaintable  *mks_screen_attach_finish      (MksScreen            *self,
+                                              GAsyncResult         *result,
+                                              GError              **error);
+MKS_AVAILABLE_IN_ALL
+GdkPaintable  *mks_screen_attach_sync        (MksScreen            *screen,
                                               GCancellable         *cancellable,
                                               GError              **error);
 
