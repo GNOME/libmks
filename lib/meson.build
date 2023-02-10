@@ -22,14 +22,6 @@ libmks_headers = [
   'mks-types.h',
 ]
 
-libmks_enums = gnome.mkenums_simple('mks-enums',
-            sources: libmks_headers,
-     install_header: true,
-        install_dir: join_paths(get_option('libdir'), 'libmks-@0@'.format(api_version)),
-  identifier_prefix: 'Mks',
-      symbol_prefix: 'mks',
-)
-
 libmks_private_sources = [
   'mks-paintable-listener.c',
   'mks-read-only-list-model.c',
@@ -42,6 +34,14 @@ libmks_private_sources = [
       object_manager: true,
   )
 ]
+
+libmks_enums = gnome.mkenums_simple('mks-enums',
+            sources: libmks_headers,
+     install_header: true,
+        install_dir: join_paths(get_option('libdir'), 'libmks-@0@'.format(api_version)),
+  identifier_prefix: 'Mks',
+      symbol_prefix: 'mks',
+)
 
 # Setup mks-version.h for version checking
 version_split = meson.project_version().split('.')
