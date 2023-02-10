@@ -389,7 +389,7 @@ mks_mouse_move_to_finish (MksMouse      *self,
 }
 
 /**
- * mks_mouse_move_to:
+ * mks_mouse_move_to_sync:
  * @self: an #MksMouse
  * @x: the x coordinate
  * @y: the y coordinate
@@ -486,7 +486,7 @@ mks_mouse_move_by_finish (MksMouse      *self,
 }
 
 /**
- * mks_mouse_move_by:
+ * mks_mouse_move_by_sync:
  * @self: an #MksMouse
  * @delta_x: the x coordinate delta
  * @delta_y: the y coordinate delta

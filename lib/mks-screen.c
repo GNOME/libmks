@@ -729,6 +729,18 @@ mks_screen_attach_finish (MksScreen     *self,
   return g_task_propagate_pointer (G_TASK (result), error);
 }
 
+/**
+ * mks_screen_attach_sync:
+ * @self: a #MksScreen
+ * @cancellable: (nullable): a #GCancellable or %NULL
+ * @error: (nullable): a location for a #GError, or %NULL
+ *
+ * Synchronous request to attach to screen, creating a paintable that can
+ * be used to update display as the Qemu instance updates.
+ *
+ * Returns: (transfer full): a #GdkPaintable if successful; otherwise %NULL
+ *   and @error is set.
+ */
 GdkPaintable *
 mks_screen_attach_sync (MksScreen     *self,
                         GCancellable  *cancellable,
