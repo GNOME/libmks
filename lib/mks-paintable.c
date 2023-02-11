@@ -249,7 +249,7 @@ create_socketpair (int     *us,
   int fds[2];
   int rv;
 
-  rv = socketpair (AF_UNIX, SOCK_NONBLOCK|SOCK_CLOEXEC, SOCK_STREAM, fds);
+  rv = socketpair (AF_UNIX, SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, 0, fds);
 
   if (rv != 0)
     {
