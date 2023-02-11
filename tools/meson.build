@@ -1,5 +1,6 @@
 tools = {
   'mks-connect': {},
+  'mks': {},
 }
 
 foreach tool, params: tools
