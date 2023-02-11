@@ -122,7 +122,9 @@ mks_paintable_listener_update_dmabuf (MksPaintable          *self,
 
   g_print ("Update dmabuf\n");
 
-  return FALSE;
+  mks_qemu_listener_complete_update_dmabuf (listener, invocation);
+
+  return TRUE;
 }
 
 static gboolean
@@ -153,7 +155,9 @@ mks_paintable_listener_scanout_dmabuf (MksPaintable          *self,
   else
     gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
 
-  return FALSE;
+  mks_qemu_listener_complete_scanout_dmabuf (listener, invocation, NULL);
+
+  return TRUE;
 }
 
 static gboolean
@@ -171,6 +175,8 @@ mks_paintable_listener_update (MksPaintable          *self,
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
+
+  gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
 
   g_print ("Update {%d,%d,%d,%d}\n", x, y, width, height);
   mks_qemu_listener_complete_update (listener, invocation);
@@ -224,7 +230,9 @@ mks_paintable_listener_cursor_define (MksPaintable          *self,
 
   g_print ("Cursor Define\n");
 
-  return FALSE;
+  mks_qemu_listener_complete_cursor_define (listener, invocation);
+
+  return TRUE;
 }
 
 static gboolean
@@ -241,7 +249,9 @@ mks_paintable_listener_mouse_set (MksPaintable          *self,
 
   g_print ("Mouse Set\n");
 
-  return FALSE;
+  mks_qemu_listener_complete_mouse_set (listener, invocation);
+
+  return TRUE;
 }
 
 static gboolean
@@ -253,9 +263,13 @@ mks_paintable_listener_disable (MksPaintable          *self,
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
 
+  gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
+
   g_print ("Disable\n");
 
-  return FALSE;
+  mks_qemu_listener_complete_disable (listener, invocation);
+
+  return TRUE;
 }
 
 static gboolean
