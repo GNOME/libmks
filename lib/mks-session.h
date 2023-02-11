@@ -58,5 +58,7 @@ MKS_AVAILABLE_IN_ALL
 const char      *mks_session_get_name                  (MksSession           *self);
 MKS_AVAILABLE_IN_ALL
 const char      *mks_session_get_uuid                  (MksSession           *self);
+MKS_AVAILABLE_IN_ALL
+MksScreen       *mks_session_ref_screen                (MksSession           *self);
 
 G_END_DECLS

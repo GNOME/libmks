@@ -707,3 +707,33 @@ mks_session_get_name (MksSession *self)
 
   return NULL;
 }
+
+/**
+ * mks_session_ref_screen:
+ * @self: a #MksSession
+ *
+ * Gets the main screen for the session.
+ *
+ * Returns: (transfer full) (nullable): a #MksScreen or %NULL
+ */
+MksScreen *
+mks_session_ref_screen (MksSession *self)
+{
+  GListModel *model;
+  guint n_items;
+
+  g_return_val_if_fail (MKS_IS_SESSION (self), NULL);
+
+  model = G_LIST_MODEL (self->devices);
+  n_items = g_list_model_get_n_items (model);
+
+  for (guint i = 0; i < n_items; i++)
+    {
+      g_autoptr(MksDevice) device = g_list_model_get_item (model, i);
+
+      if (MKS_IS_SCREEN (device))
+        return MKS_SCREEN (g_steal_pointer (&device));
+    }
+
+  return NULL;
+}
