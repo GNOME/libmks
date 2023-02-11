@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 
 #include <glib/gstdio.h>
+#include <pixman.h>
 
 #include "mks-paintable-private.h"
 #include "mks-qemu.h"
@@ -39,6 +40,32 @@ struct _MksPaintable
   MksQemuListener *listener;
   GDBusConnection *connection;
 };
+
+static cairo_format_t
+_pixman_format_to_cairo_format (guint pixman_format)
+{
+  switch (pixman_format)
+    {
+    case PIXMAN_rgba_float:
+      return CAIRO_FORMAT_RGBA128F;
+    case PIXMAN_rgb_float:
+      return CAIRO_FORMAT_RGB96F;
+    case PIXMAN_a8r8g8b8:
+      return CAIRO_FORMAT_ARGB32;
+    case PIXMAN_x2r10g10b10:
+      return CAIRO_FORMAT_RGB30;
+    case PIXMAN_x8r8g8b8:
+      return CAIRO_FORMAT_RGB24;
+    case PIXMAN_a8:
+      return CAIRO_FORMAT_A8;
+    case PIXMAN_a1:
+      return CAIRO_FORMAT_A1;
+    case PIXMAN_r5g6b5:
+      return CAIRO_FORMAT_RGB16_565;
+    default:
+      return 0;
+  }
+}
 
 static int
 mks_paintable_get_intrinsic_height (GdkPaintable *paintable)
