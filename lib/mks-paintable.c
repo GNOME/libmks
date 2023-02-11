@@ -199,9 +199,20 @@ mks_paintable_listener_update (MksPaintable          *self,
                                GVariant              *bytes,
                                MksQemuListener       *listener)
 {
+  cairo_format_t format;
+
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
+
+  if (!(format = _pixman_format_to_cairo_format (pixman_format)))
+    {
+      g_dbus_method_invocation_return_error_literal (invocation,
+                                                     G_IO_ERROR,
+                                                     G_IO_ERROR_NOT_SUPPORTED,
+                                                     "Pixman format not supported");
+      return TRUE;
+    }
 
   gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
 
@@ -221,11 +232,21 @@ mks_paintable_listener_scanout (MksPaintable          *self,
                                 GVariant              *bytes,
                                 MksQemuListener       *listener)
 {
+  cairo_format_t format;
   gboolean size_changed;
 
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
+
+  if (!(format = _pixman_format_to_cairo_format (pixman_format)))
+    {
+      g_dbus_method_invocation_return_error_literal (invocation,
+                                                     G_IO_ERROR,
+                                                     G_IO_ERROR_NOT_SUPPORTED,
+                                                     "Pixman format not supported");
+      return TRUE;
+    }
 
   size_changed = width != self->width || height != self->height;
 
