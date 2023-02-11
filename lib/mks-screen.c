@@ -31,7 +31,6 @@
 #include "mks-qemu.h"
 #include "mks-keyboard-private.h"
 #include "mks-mouse-private.h"
-#include "mks-paintable-listener-private.h"
 #include "mks-paintable-private.h"
 #include "mks-screen-attributes-private.h"
 #include "mks-screen-private.h"
@@ -564,35 +563,6 @@ mks_screen_configure_sync (MksScreen            *self,
                                                 error);
 }
 
-static gboolean
-mks_screen_create_socketpair (int     *us,
-                              int     *them,
-                              GError **error)
-{
-  int rv;
-  int fds[2];
-
-  g_assert (us != NULL);
-  g_assert (them != NULL);
-
-  rv = socketpair (AF_UNIX, SOCK_NONBLOCK | SOCK_CLOEXEC, SOCK_STREAM, fds);
-
-  if (rv != 0)
-    {
-      int errsv = errno;
-      g_set_error_literal (error,
-                           G_IO_ERROR,
-                           g_io_error_from_errno (errsv),
-                           g_strerror (errsv));
-      return FALSE;
-    }
-
-  *us = fds[0];
-  *them = fds[1];
-
-  return TRUE;
-}
-
 static void
 mks_screen_attach_cb (GObject      *object,
                       GAsyncResult *result,
@@ -635,15 +605,11 @@ mks_screen_attach (MksScreen           *self,
                    GAsyncReadyCallback  callback,
                    gpointer             user_data)
 {
-  g_autoptr(MksPaintableListener) listener = NULL;
   g_autoptr(GUnixFDList) unix_fd_list = NULL;
-  g_autoptr(GDBusConnection) connection = NULL;
-  g_autoptr(GSocketConnection) io_stream = NULL;
-  g_autoptr(GSocket) socket = NULL;
+  g_autoptr(GdkPaintable) paintable = NULL;
   g_autoptr(GTask) task = NULL;
   g_autoptr(GError) error = NULL;
-  g_autofd int us = -1;
-  g_autofd int them = -1;
+  g_autofd int fd = -1;
 
   g_return_if_fail (MKS_IS_SCREEN (self));
   g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
@@ -652,49 +618,18 @@ mks_screen_attach (MksScreen           *self,
   g_task_set_source_tag (task, mks_screen_attach);
 
   if (!check_console (self, &error) ||
-      !mks_screen_create_socketpair (&us, &them, &error))
+      !(paintable = _mks_paintable_new (cancellable, &fd, &error)))
     goto failure;
 
-  g_assert (us != -1);
-  g_assert (them != -1);
+  g_task_set_task_data (task, g_steal_pointer (&paintable), g_object_unref);
 
-  if (!(socket = g_socket_new_from_fd (us, &error)))
-    goto failure;
-
-  us = -1;
-  io_stream = g_socket_connection_factory_create_connection (socket);
-  connection = g_dbus_connection_new_sync (G_IO_STREAM (io_stream),
-                                           NULL,
-                                           G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING,
-                                           NULL,
-                                           cancellable,
-                                           &error);
-
-  if (connection == NULL)
-    goto failure;
-
-  unix_fd_list = g_unix_fd_list_new_from_array (&them, 1);
-  them = -1;
-
-  listener = mks_paintable_listener_new ();
-  if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (listener),
-                                         connection,
-                                         MKS_PAINTABLE_LISTENER_OBJECT_PATH,
-                                         &error))
-    goto failure;
-
-  g_task_set_task_data (task,
-                        _mks_paintable_new (connection, self, listener),
-                        g_object_unref);
-
+  unix_fd_list = g_unix_fd_list_new_from_array (&fd, 1), fd = -1;
   mks_qemu_console_call_register_listener (self->console,
                                            g_variant_new_handle (0),
                                            unix_fd_list,
                                            cancellable,
                                            mks_screen_attach_cb,
                                            g_steal_pointer (&task));
-
-  g_dbus_connection_start_message_processing (connection);
 
   return;
 
@@ -747,47 +682,17 @@ mks_screen_attach_sync (MksScreen     *self,
                         GError       **error)
 {
   g_autoptr(GUnixFDList) unix_fd_list = NULL;
-  g_autoptr(GDBusConnection) connection = NULL;
-  g_autoptr(GSocketConnection) io_stream = NULL;
-  g_autoptr(MksPaintableListener) listener = NULL;
-  g_autoptr(GSocket) socket = NULL;
-  g_autofd int us = -1;
-  g_autofd int them = -1;
+  g_autoptr(GdkPaintable) paintable = NULL;
+  g_autofd int fd = -1;
 
   g_return_val_if_fail (MKS_IS_SCREEN (self), NULL);
   g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), NULL);
 
   if (!check_console (self, error) ||
-      !mks_screen_create_socketpair (&us, &them, error))
+      !(paintable = _mks_paintable_new (cancellable, &fd, error)))
     return NULL;
 
-  g_assert (us != -1);
-  g_assert (them != -1);
-
-  if (!(socket = g_socket_new_from_fd (us, error)))
-    return NULL;
-
-  us = -1;
-  io_stream = g_socket_connection_factory_create_connection (socket);
-  connection = g_dbus_connection_new_sync (G_IO_STREAM (io_stream),
-                                           NULL,
-                                           G_DBUS_CONNECTION_FLAGS_NONE,
-                                           NULL,
-                                           cancellable,
-                                           error);
-  if (connection == NULL)
-    return FALSE;
-
-  unix_fd_list = g_unix_fd_list_new_from_array (&them, 1);
-  them = -1;
-
-  listener = mks_paintable_listener_new ();
-  if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (listener),
-                                         connection,
-                                         MKS_PAINTABLE_LISTENER_OBJECT_PATH,
-                                         error))
-    return NULL;
-
+  unix_fd_list = g_unix_fd_list_new_from_array (&fd, 1), fd = -1;
   if (!mks_qemu_console_call_register_listener_sync (self->console,
                                                      g_variant_new_handle (0),
                                                      unix_fd_list,
@@ -796,5 +701,5 @@ mks_screen_attach_sync (MksScreen     *self,
                                                      error))
     return NULL;
 
-  return _mks_paintable_new (connection, self, listener);
+  return g_steal_pointer (&paintable);
 }

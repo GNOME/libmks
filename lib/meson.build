@@ -15,7 +15,6 @@ libmks_headers = [
   'mks-init.h',
   'mks-keyboard.h',
   'mks-mouse.h',
-  'mks-paintable.h',
   'mks-screen.h',
   'mks-screen-attributes.h',
   'mks-session.h',
@@ -24,7 +23,6 @@ libmks_headers = [
 
 libmks_private_sources = [
   'mks-framebuffer.c',
-  'mks-paintable-listener.c',
   'mks-read-only-list-model.c',
 
   gnome.gdbus_codegen('mks-qemu',

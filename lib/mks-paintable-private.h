@@ -21,13 +21,16 @@
 
 #pragma once
 
-#include "mks-paintable.h"
-#include "mks-paintable-listener-private.h"
+#include <gdk/gdk.h>
 
 G_BEGIN_DECLS
 
-GdkPaintable *_mks_paintable_new (GDBusConnection      *connection,
-                                  MksScreen            *screen,
-                                  MksPaintableListener *listener);
+#define MKS_TYPE_PAINTABLE (mks_paintable_get_type())
+
+G_DECLARE_FINAL_TYPE (MksPaintable, mks_paintable, MKS, PAINTABLE, GObject)
+
+GdkPaintable *_mks_paintable_new (GCancellable  *cancellable,
+                                  int           *peer_fd,
+                                  GError       **error);
 
 G_END_DECLS
