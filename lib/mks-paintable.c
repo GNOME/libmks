@@ -120,6 +120,8 @@ mks_paintable_listener_update_dmabuf (MksPaintable          *self,
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
 
+  g_print ("Update dmabuf\n");
+
   return FALSE;
 }
 
@@ -141,6 +143,8 @@ mks_paintable_listener_scanout_dmabuf (MksPaintable          *self,
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
+
+  g_print ("Scanout dmabuf\n");
 
   size_changed = width != self->width || height != self->height;
 
@@ -168,7 +172,10 @@ mks_paintable_listener_update (MksPaintable          *self,
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
 
-  return FALSE;
+  g_print ("Update {%d,%d,%d,%d}\n", x, y, width, height);
+  mks_qemu_listener_complete_update (listener, invocation);
+
+  return TRUE;
 }
 
 static gboolean
@@ -189,12 +196,16 @@ mks_paintable_listener_scanout (MksPaintable          *self,
 
   size_changed = width != self->width || height != self->height;
 
+  g_print ("Scannout!\n");
+
   if (size_changed)
     gdk_paintable_invalidate_size (GDK_PAINTABLE (self));
   else
     gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
 
-  return FALSE;
+  mks_qemu_listener_complete_scanout (listener, invocation);
+
+  return TRUE;
 }
 
 static gboolean
@@ -211,6 +222,8 @@ mks_paintable_listener_cursor_define (MksPaintable          *self,
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
 
+  g_print ("Cursor Define\n");
+
   return FALSE;
 }
 
@@ -226,6 +239,8 @@ mks_paintable_listener_mouse_set (MksPaintable          *self,
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
 
+  g_print ("Mouse Set\n");
+
   return FALSE;
 }
 
@@ -237,6 +252,8 @@ mks_paintable_listener_disable (MksPaintable          *self,
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
+
+  g_print ("Disable\n");
 
   return FALSE;
 }
@@ -267,14 +284,45 @@ create_socketpair (int     *us,
   return TRUE;
 }
 
+static void
+mks_paintable_connection_cb (GObject      *object,
+                             GAsyncResult *result,
+                             gpointer      user_data)
+{
+  g_autoptr(MksPaintable) self = user_data;
+  g_autoptr(GDBusConnection) connection = NULL;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (G_IS_ASYNC_RESULT (result));
+
+  if (!(connection = g_dbus_connection_new_finish (result, &error)))
+    {
+      g_warning ("Failed to create D-Bus connection: %s", error->message);
+      return;
+    }
+
+  g_set_object (&self->connection, connection);
+
+  if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self->listener),
+                                         connection,
+                                         "/org/qemu/Display1/Listener",
+                                         &error))
+    {
+      g_warning ("Failed to export listener on bus: %s", error->message);
+      return;
+    }
+
+  g_dbus_connection_start_message_processing (connection);
+
+}
+
 GdkPaintable *
 _mks_paintable_new (GCancellable  *cancellable,
                     int           *peer_fd,
                     GError       **error)
 {
   g_autoptr(MksPaintable) self = NULL;
-  g_autoptr(MksQemuListener) listener = NULL;
-  g_autoptr(GDBusConnection) connection = NULL;
   g_autoptr(GSocketConnection) io_stream = NULL;
   g_autoptr(GSocket) socket = NULL;
   g_autofd int us = -1;
@@ -301,70 +349,60 @@ _mks_paintable_new (GCancellable  *cancellable,
   /* And convert that socket into a GIOStream */
   io_stream = g_socket_connection_factory_create_connection (socket);
 
-  /* Setup our GDBusConnection. We can do this synchronously because we are
-   * not connecting to a message bus, therefore nothing to process up front.
-   */
-  if (!(connection = g_dbus_connection_new_sync (G_IO_STREAM (io_stream),
-                                                 NULL,
-                                                 G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING,
-                                                 NULL,
-                                                 cancellable,
-                                                 error)))
-    return NULL;
-
   /* Setup our listener and callbacks to process requests */
-  listener = mks_qemu_listener_skeleton_new ();
-  g_signal_connect_object (listener,
+  self->listener = mks_qemu_listener_skeleton_new ();
+  g_signal_connect_object (self->listener,
                            "handle-scanout",
                            G_CALLBACK (mks_paintable_listener_scanout),
                            self,
                            G_CONNECT_SWAPPED);
-  g_signal_connect_object (listener,
+  g_signal_connect_object (self->listener,
                            "handle-update",
                            G_CALLBACK (mks_paintable_listener_update),
                            self,
                            G_CONNECT_SWAPPED);
-  g_signal_connect_object (listener,
+  g_signal_connect_object (self->listener,
                            "handle-scanout-dmabuf",
                            G_CALLBACK (mks_paintable_listener_scanout_dmabuf),
                            self,
                            G_CONNECT_SWAPPED);
-  g_signal_connect_object (listener,
+  g_signal_connect_object (self->listener,
                            "handle-update-dmabuf",
                            G_CALLBACK (mks_paintable_listener_update_dmabuf),
                            self,
                            G_CONNECT_SWAPPED);
-  g_signal_connect_object (listener,
+  g_signal_connect_object (self->listener,
                            "handle-disable",
                            G_CALLBACK (mks_paintable_listener_disable),
                            self,
                            G_CONNECT_SWAPPED);
-  g_signal_connect_object (listener,
+  g_signal_connect_object (self->listener,
                            "handle-cursor-define",
                            G_CALLBACK (mks_paintable_listener_cursor_define),
                            self,
                            G_CONNECT_SWAPPED);
-  g_signal_connect_object (listener,
+  g_signal_connect_object (self->listener,
                            "handle-mouse-set",
                            G_CALLBACK (mks_paintable_listener_mouse_set),
                            self,
                            G_CONNECT_SWAPPED);
 
-  /* Export our listener before we return back so we know that when the peer
-   * tries to connect, we're guaranteed to already be available.
+  /* Asynchronously create connection because we can't do it synchronously
+   * as the other side is doing AUTHENTICATION_SERVER for no good reason.
    */
-  if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (listener),
-                                         connection,
-                                         "/org/qemu/Display1/Listener",
-                                         error))
-    return NULL;
-
-  self->connection = g_object_ref (connection);
-  self->listener = g_object_ref (listener);
-
-  g_dbus_connection_start_message_processing (connection);
+  g_dbus_connection_new (G_IO_STREAM (io_stream),
+                         NULL,
+                         G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING|G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT,
+                         NULL,
+                         cancellable,
+                         mks_paintable_connection_cb,
+                         g_object_ref (self));
 
   *peer_fd = g_steal_fd (&them);
+
+  g_assert (*peer_fd != -1);
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (MKS_QEMU_IS_LISTENER (self->listener));
 
   return GDK_PAINTABLE (g_steal_pointer (&self));
 }
