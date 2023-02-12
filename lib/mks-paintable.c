@@ -27,6 +27,7 @@
 #include <glib/gstdio.h>
 #include <pixman.h>
 
+#include "mks-framebuffer-private.h"
 #include "mks-paintable-private.h"
 #include "mks-qemu.h"
 
@@ -34,11 +35,20 @@ struct _MksPaintable
 {
   GObject          parent_instance;
 
+  MksQemuListener *listener;
+  GDBusConnection *connection;
+  MksFramebuffer  *framebuffer;
+
   guint            width;
   guint            height;
 
-  MksQemuListener *listener;
-  GDBusConnection *connection;
+  guint            mode : 2;
+};
+
+enum {
+  MODE_INITIAL = 0,
+  MODE_FRAMEBUFFER,
+  MODE_DMABUF,
 };
 
 static cairo_format_t
@@ -96,6 +106,14 @@ mks_paintable_snapshot (GdkPaintable *paintable,
                         double        width,
                         double        height)
 {
+  MksPaintable *self = (MksPaintable *)paintable;
+
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (GDK_IS_SNAPSHOT (snapshot));
+
+  if (self->mode == MODE_FRAMEBUFFER)
+    gdk_paintable_snapshot (GDK_PAINTABLE (self->framebuffer),
+                            snapshot, width, height);
 }
 
 static void
@@ -214,9 +232,19 @@ mks_paintable_listener_update (MksPaintable          *self,
       return TRUE;
     }
 
-  gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
+  if (self->mode == MODE_FRAMEBUFFER)
+    {
+      const guint8 *data;
+      gsize data_len;
 
-  g_print ("Update {%d,%d,%d,%d}\n", x, y, width, height);
+      data_len = g_variant_n_children (bytes);
+      data = (const guint8 *)g_variant_get_bytestring (bytes);
+
+      mks_framebuffer_update (self->framebuffer, x, y, width, height, stride, format, data, data_len);
+
+      gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
+    }
+
   mks_qemu_listener_complete_update (listener, invocation);
 
   return TRUE;
@@ -234,10 +262,13 @@ mks_paintable_listener_scanout (MksPaintable          *self,
 {
   cairo_format_t format;
   gboolean size_changed;
+  const guint8 *data;
+  gsize data_len;
 
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
+  g_assert (g_variant_is_of_type (bytes, G_VARIANT_TYPE_BYTESTRING));
 
   if (!(format = _pixman_format_to_cairo_format (pixman_format)))
     {
@@ -250,7 +281,20 @@ mks_paintable_listener_scanout (MksPaintable          *self,
 
   size_changed = width != self->width || height != self->height;
 
-  g_print ("Scannout!\n");
+  if (size_changed || self->framebuffer == NULL)
+    {
+      g_clear_object (&self->framebuffer);
+      self->framebuffer = mks_framebuffer_new (width, height, format);
+    }
+
+  data_len = g_variant_n_children (bytes);
+  data = (const guint8 *)g_variant_get_bytestring (bytes);
+  mks_framebuffer_update (self->framebuffer,
+                          0, 0, width, height,
+                          stride, format,
+                          data, data_len);
+
+  self->mode = MODE_FRAMEBUFFER;
 
   if (size_changed)
     gdk_paintable_invalidate_size (GDK_PAINTABLE (self));

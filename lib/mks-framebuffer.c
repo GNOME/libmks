@@ -147,9 +147,7 @@ mks_framebuffer_snapshot (GdkPaintable *paintable,
    * composited over on the GPU. It saves us a large GPU upload since
    * the GL renderer will cache the texture in VRAM in many cases.
    */
-  gtk_snapshot_append_texture (snapshot,
-                               GDK_TEXTURE (self->base_texture),
-                               &GRAPHENE_RECT_INIT (0, 0, self->width, self->height));
+  gdk_paintable_snapshot (GDK_PAINTABLE (self->base_texture), snapshot, width, height);
 
   /* Now draw our damage rectangles which are going to require an upload
    * since we can't reuse them between frames without a lot of tracking.
@@ -245,7 +243,16 @@ mks_framebuffer_update (MksFramebuffer *self,
   cairo_surface_destroy (surface);
   cairo_destroy (cr);
 
-  cairo_region_union_rectangle (self->damage, &(cairo_rectangle_int_t) { x, y, width, height });
+  if (x == 0 && y == 0 && width == self->width && height == self->height)
+    {
+      g_clear_pointer (&self->damage, cairo_region_destroy);
+      self->damage = cairo_region_create ();
+    }
+  else
+    {
+      cairo_region_union_rectangle (self->damage,
+                                    &(cairo_rectangle_int_t) { x, y, width, height });
+    }
 }
 
 static void
