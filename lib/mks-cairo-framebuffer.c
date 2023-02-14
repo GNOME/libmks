@@ -114,16 +114,11 @@ mks_cairo_framebuffer_snapshot (GdkPaintable *paintable,
 {
   MksCairoFramebuffer *self = MKS_CAIRO_FRAMEBUFFER (paintable);
   static GdkRGBA black = {0,0,0,1};
-  double width_ratio = width / self->width;
-  double height_ratio = height / self->height;
-
-  if (width_ratio > height_ratio)
-    width_ratio = height_ratio;
-  else
-    height_ratio = width_ratio;
 
   gtk_snapshot_save (snapshot);
-  gtk_snapshot_scale (snapshot, width_ratio, height_ratio);
+  gtk_snapshot_scale (snapshot,
+                      width / (double)self->width,
+                      height / (double)self->height);
 
   gtk_snapshot_append_color (snapshot,
                              &black,
