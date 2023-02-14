@@ -20,9 +20,15 @@
 
 #include "config.h"
 
+#include <stdlib.h>
+
 #include "mks-css-private.h"
 #include "mks-display.h"
+#include "mks-keyboard.h"
+#include "mks-mouse.h"
 #include "mks-screen.h"
+
+#include "mks-keymap-xorgevdev2qnum-private.h"
 
 typedef struct
 {
@@ -35,6 +41,16 @@ typedef struct
    * painable when available.
    */
   GtkPicture *picture;
+
+  /* Used to update the cursor position by calling into the MksMouse
+   * API using move_to/move_by.
+   */
+  GtkEventControllerMotion *motion;
+
+  /* Used to send key press/release events by calling into MksKeyboard
+   * API using press/release and the hardware keycode.
+   */
+  GtkEventControllerKey *key;
 } MksDisplayPrivate;
 
 enum {
@@ -47,6 +63,165 @@ enum {
 G_DEFINE_TYPE_WITH_PRIVATE (MksDisplay, mks_display, GTK_TYPE_WIDGET)
 
 static GParamSpec *properties [N_PROPS];
+
+static void
+mks_display_translate_keycode (MksDisplay *self,
+                               guint       keyval,
+                               guint       keycode,
+                               guint      *translated)
+{
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (translated != NULL);
+
+  if (keycode < xorgevdev_to_qnum_len &&
+      xorgevdev_to_qnum[keycode] != 0)
+    *translated = xorgevdev_to_qnum[keycode];
+  else
+    *translated = keycode;
+}
+
+static void
+mks_display_keyboard_press_cb (GObject      *object,
+                               GAsyncResult *result,
+                               gpointer      user_data)
+{
+  MksKeyboard *keyboard = (MksKeyboard *)object;
+  g_autoptr(MksDisplay) self = user_data;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (MKS_IS_KEYBOARD (keyboard));
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (MKS_IS_DISPLAY (self));
+
+  if (!mks_keyboard_press_finish (keyboard, result, &error))
+    g_warning ("Keyboard press failed: %s", error->message);
+}
+
+static void
+mks_display_key_key_pressed_cb (MksDisplay            *self,
+                                guint                  keyval,
+                                guint                  keycode,
+                                GdkModifierType        state,
+                                GtkEventControllerKey *key)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  MksKeyboard *keyboard;
+  guint qkeycode;
+
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (GTK_IS_EVENT_CONTROLLER_KEY (key));
+
+  if (priv->screen == NULL)
+    return;
+
+  keyboard = mks_screen_get_keyboard (priv->screen);
+  mks_display_translate_keycode (self, keyval, keycode, &qkeycode);
+  mks_keyboard_press (keyboard,
+                      qkeycode,
+                      NULL,
+                      mks_display_keyboard_press_cb,
+                      g_object_ref (self));
+}
+
+static void
+mks_display_keyboard_release_cb (GObject      *object,
+                                 GAsyncResult *result,
+                                 gpointer      user_data)
+{
+  MksKeyboard *keyboard = (MksKeyboard *)object;
+  g_autoptr(MksDisplay) self = user_data;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (MKS_IS_KEYBOARD (keyboard));
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (MKS_IS_DISPLAY (self));
+
+  if (!mks_keyboard_release_finish (keyboard, result, &error))
+    g_warning ("Keyboard release failed: %s", error->message);
+}
+
+static void
+mks_display_key_key_released_cb (MksDisplay            *self,
+                                 guint                  keyval,
+                                 guint                  keycode,
+                                 GdkModifierType        state,
+                                 GtkEventControllerKey *key)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  MksKeyboard *keyboard;
+  guint qkeycode;
+
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (GTK_IS_EVENT_CONTROLLER_KEY (key));
+
+  if (priv->screen == NULL)
+    return;
+
+  keyboard = mks_screen_get_keyboard (priv->screen);
+  mks_display_translate_keycode (self, keyval, keycode, &qkeycode);
+  mks_keyboard_release (keyboard,
+                        qkeycode,
+                        NULL,
+                        mks_display_keyboard_release_cb,
+                        g_object_ref (self));
+}
+
+static void
+mks_display_translate_coordinate (MksDisplay *self,
+                                  double     *x,
+                                  double     *y)
+{
+  g_assert (MKS_IS_DISPLAY (self));
+
+}
+
+static void
+mks_display_motion_enter_cb (MksDisplay               *self,
+                             double                    x,
+                             double                    y,
+                             GtkEventControllerMotion *motion)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  MksMouse *mouse;
+
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (GTK_IS_EVENT_CONTROLLER_MOTION (motion));
+
+  if (priv->screen == NULL)
+    return;
+
+  mouse = mks_screen_get_mouse (priv->screen);
+  mks_display_translate_coordinate (self, &x, &y);
+  mks_mouse_move_to (mouse, x, y, NULL, NULL, NULL);
+}
+
+static void
+mks_display_motion_motion_cb (MksDisplay               *self,
+                              double                    x,
+                              double                    y,
+                              GtkEventControllerMotion *motion)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  MksMouse *mouse;
+
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (GTK_IS_EVENT_CONTROLLER_MOTION (motion));
+
+  if (priv->screen == NULL)
+    return;
+
+  mouse = mks_screen_get_mouse (priv->screen);
+  mks_display_translate_coordinate (self, &x, &y);
+  mks_mouse_move_to (mouse, x, y, NULL, NULL, NULL);
+}
+
+static void
+mks_display_motion_leave_cb (MksDisplay               *self,
+                             GtkEventControllerMotion *motion)
+{
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (GTK_IS_EVENT_CONTROLLER_MOTION (motion));
+}
 
 static void
 mks_display_attach_cb (GObject      *object,
@@ -186,7 +361,14 @@ mks_display_class_init (MksDisplayClass *klass)
   gtk_widget_class_set_css_name (widget_class, "MksDisplay");
   gtk_widget_class_set_layout_manager_type (widget_class, GTK_TYPE_BIN_LAYOUT);
   gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/libmks/mks-display.ui");
+  gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, key);
+  gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, motion);
   gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, picture);
+  gtk_widget_class_bind_template_callback (widget_class, mks_display_motion_enter_cb);
+  gtk_widget_class_bind_template_callback (widget_class, mks_display_motion_motion_cb);
+  gtk_widget_class_bind_template_callback (widget_class, mks_display_motion_leave_cb);
+  gtk_widget_class_bind_template_callback (widget_class, mks_display_key_key_pressed_cb);
+  gtk_widget_class_bind_template_callback (widget_class, mks_display_key_key_released_cb);
 
   _mks_css_init ();
 }

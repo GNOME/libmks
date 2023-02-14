@@ -1,9 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
   <template class="MksDisplay" parent="GtkWidget">
+    <property name="focusable">false</property>
     <child>
       <object class="GtkPicture" id="picture">
         <property name="content-fit">scale-down</property>
+        <property name="focusable">true</property>
+        <child>
+          <object class="GtkEventControllerMotion" id="motion">
+            <signal name="enter" handler="mks_display_motion_enter_cb" swapped="true"/>
+            <signal name="leave" handler="mks_display_motion_leave_cb" swapped="true"/>
+            <signal name="motion" handler="mks_display_motion_motion_cb" swapped="true"/>
+          </object>
+        </child>
+        <child>
+          <object class="GtkEventControllerKey" id="key">
+            <signal name="key-pressed" handler="mks_display_key_key_pressed_cb" swapped="true"/>
+            <signal name="key-released" handler="mks_display_key_key_released_cb" swapped="true"/>
+          </object>
+        </child>
       </object>
     </child>
   </template>
