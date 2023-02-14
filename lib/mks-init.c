@@ -23,6 +23,7 @@
 #include "gconstructor.h"
 
 #include "mks-device.h"
+#include "mks-display.h"
 #include "mks-init.h"
 #include "mks-keyboard.h"
 #include "mks-mouse.h"
@@ -54,6 +55,7 @@ mks_init_gtypes (void)
 
   /* GTypes that are part of our public API */
   g_type_ensure (MKS_TYPE_DEVICE);
+  g_type_ensure (MKS_TYPE_DISPLAY);
   g_type_ensure (MKS_TYPE_KEYBOARD);
   g_type_ensure (MKS_TYPE_MOUSE);
   g_type_ensure (MKS_TYPE_SCREEN);

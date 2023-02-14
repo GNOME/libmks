@@ -1,6 +1,7 @@
 libmks_sources = [
   'mks-init.c',
   'mks-device.c',
+  'mks-display.c',
   'mks-keyboard.c',
   'mks-mouse.c',
   'mks-paintable.c',
@@ -12,6 +13,7 @@ libmks_sources = [
 libmks_headers = [
   'libmks.h',
   'mks-device.h',
+  'mks-display.h',
   'mks-init.h',
   'mks-keyboard.h',
   'mks-mouse.h',

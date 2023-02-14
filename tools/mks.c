@@ -47,7 +47,7 @@ main (int   argc,
   g_autoptr(GMainLoop) main_loop = NULL;
   g_autoptr(GError) error = NULL;
   GtkWindow *window;
-  GtkPicture *picture;
+  GtkWidget *display;
 
   gtk_init ();
   mks_init ();
@@ -65,10 +65,8 @@ main (int   argc,
                          "default-height", 480,
                          "title", "Mouse, Keyboard, Screen",
                          NULL);
-  picture = g_object_new (GTK_TYPE_PICTURE,
-                          "content-fit", GTK_CONTENT_FIT_SCALE_DOWN,
-                          NULL);
-  gtk_window_set_child (window, GTK_WIDGET (picture));
+  display = mks_display_new ();
+  gtk_window_set_child (window, display);
   g_signal_connect_swapped (window,
                             "close-request",
                             G_CALLBACK (g_main_loop_quit),
@@ -86,13 +84,7 @@ main (int   argc,
       return EXIT_FAILURE;
     }
 
-  if (!(paintable = mks_screen_attach_sync (screen, NULL, &error)))
-    {
-      g_printerr ("Failed to create paintable for screen: %s\n", error->message);
-      return EXIT_FAILURE;
-    }
-
-  gtk_picture_set_paintable (picture, paintable);
+  mks_display_set_screen (MKS_DISPLAY (display), screen);
 
   gtk_window_present (window);
   g_main_loop_run (main_loop);

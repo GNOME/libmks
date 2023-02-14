@@ -1,6 +1,6 @@
-/* libmks.h
+/* mks-display.h
  *
- * Copyright 2023 Christian Hergert
+ * Copyright 2023 Christian Hergert <chergert@redhat.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,23 +20,32 @@
 
 #pragma once
 
-#include <glib.h>
+#include <gtk/gtk.h>
+
+#include "mks-types.h"
+#include "mks-version-macros.h"
 
 G_BEGIN_DECLS
 
-#define MKS_INSIDE
-# include "mks-device.h"
-# include "mks-display.h"
-# include "mks-enums.h"
-# include "mks-init.h"
-# include "mks-keyboard.h"
-# include "mks-mouse.h"
-# include "mks-screen.h"
-# include "mks-screen-attributes.h"
-# include "mks-session.h"
-# include "mks-types.h"
-# include "mks-version.h"
-# include "mks-version-macros.h"
-#undef MKS_INSIDE
+#define MKS_TYPE_DISPLAY (mks_display_get_type())
+
+MKS_AVAILABLE_IN_ALL
+G_DECLARE_DERIVABLE_TYPE (MksDisplay, mks_display, MKS, DISPLAY, GtkWidget)
+
+struct _MksDisplayClass
+{
+  GtkWidgetClass parent_class;
+
+  /*< private >*/
+  gpointer _reserved[16];
+};
+
+MKS_AVAILABLE_IN_ALL
+GtkWidget *mks_display_new        (void);
+MKS_AVAILABLE_IN_ALL
+MksScreen *mks_display_get_screen (MksDisplay *self);
+MKS_AVAILABLE_IN_ALL
+void       mks_display_set_screen (MksDisplay *self,
+                                   MksScreen  *screen);
 
 G_END_DECLS
