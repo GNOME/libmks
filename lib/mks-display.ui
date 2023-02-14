@@ -14,6 +14,14 @@
           </object>
         </child>
         <child>
+          <object class="GtkGestureClick" id="click">
+            <property name="button">0</property>
+            <property name="exclusive">true</property>
+            <signal name="pressed" handler="mks_display_click_pressed_cb" swapped="true"/>
+            <signal name="released" handler="mks_display_click_released_cb" swapped="true"/>
+          </object>
+        </child>
+        <child>
           <object class="GtkEventControllerKey" id="key">
             <signal name="key-pressed" handler="mks_display_key_key_pressed_cb" swapped="true"/>
             <signal name="key-released" handler="mks_display_key_key_released_cb" swapped="true"/>

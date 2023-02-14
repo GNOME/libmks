@@ -28,6 +28,8 @@ struct _MksMouse
 {
   MksDevice parent_instance;
   MksQemuMouse *mouse;
+  double last_known_x;
+  double last_known_y;
 };
 
 struct _MksMouseClass
@@ -367,6 +369,9 @@ mks_mouse_move_to (MksMouse            *self,
   task = g_task_new (self, cancellable, callback, user_data);
   g_task_set_source_tag (task, mks_mouse_move_to);
 
+  self->last_known_x = x;
+  self->last_known_y = y;
+
   if (!check_mouse (self, &error))
     g_task_return_error (task, g_steal_pointer (&error));
   else
@@ -410,6 +415,9 @@ mks_mouse_move_to_sync (MksMouse      *self,
 {
   g_return_val_if_fail (MKS_IS_MOUSE (self), FALSE);
   g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
+
+  self->last_known_x = x;
+  self->last_known_y = y;
 
   if (!check_mouse (self, error))
     return FALSE;
@@ -464,6 +472,9 @@ mks_mouse_move_by (MksMouse            *self,
   task = g_task_new (self, cancellable, callback, user_data);
   g_task_set_source_tag (task, mks_mouse_move_by);
 
+  self->last_known_x += delta_x;
+  self->last_known_y += delta_y;
+
   if (!check_mouse (self, &error))
     g_task_return_error (task, g_steal_pointer (&error));
   else
@@ -507,6 +518,9 @@ mks_mouse_move_by_sync (MksMouse      *self,
 {
   g_return_val_if_fail (MKS_IS_MOUSE (self), FALSE);
   g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
+
+  self->last_known_x += delta_x;
+  self->last_known_y += delta_y;
 
   if (!check_mouse (self, error))
     return FALSE;

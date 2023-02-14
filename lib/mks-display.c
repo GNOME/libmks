@@ -51,6 +51,18 @@ typedef struct
    * API using press/release and the hardware keycode.
    */
   GtkEventControllerKey *key;
+
+  /* Used to send mouse press/release events translated from the current
+   * button in the gesture. X,Y coordinates are expected to already be
+   * updated from GtkEventControllerMotion::motion events.
+   */
+  GtkGestureClick *click;
+
+  /* Tracking the last known positions of mouse events so that we may
+   * emulate mks_mouse_move_by() using GtkEventControllerMotion.
+   */
+  double last_mouse_x;
+  double last_mouse_y;
 } MksDisplayPrivate;
 
 enum {
@@ -176,23 +188,96 @@ mks_display_translate_coordinate (MksDisplay *self,
 }
 
 static void
-mks_display_motion_enter_cb (MksDisplay               *self,
-                             double                    x,
-                             double                    y,
-                             GtkEventControllerMotion *motion)
+mks_display_mouse_move_to_cb (GObject      *object,
+                              GAsyncResult *result,
+                              gpointer      user_data)
+{
+  MksMouse *mouse = (MksMouse *)object;
+  g_autoptr(MksDisplay) self = user_data;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (MKS_IS_MOUSE (mouse));
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (MKS_IS_DISPLAY (self));
+
+  if (!mks_mouse_move_to_finish (mouse, result, &error))
+    g_warning ("Failed move_to: %s", error->message);
+}
+
+static void
+mks_display_mouse_move_by_cb (GObject      *object,
+                              GAsyncResult *result,
+                              gpointer      user_data)
+{
+  MksMouse *mouse = (MksMouse *)object;
+  g_autoptr(MksDisplay) self = user_data;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (MKS_IS_MOUSE (mouse));
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (MKS_IS_DISPLAY (self));
+
+  if (!mks_mouse_move_by_finish (mouse, result, &error))
+    g_warning ("Failed move_by: %s", error->message);
+}
+
+static void
+mks_display_motion (MksDisplay *self,
+                    double      x,
+                    double      y)
 {
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
   MksMouse *mouse;
 
   g_assert (MKS_IS_DISPLAY (self));
-  g_assert (GTK_IS_EVENT_CONTROLLER_MOTION (motion));
+  g_assert (!priv->screen || MKS_IS_SCREEN (priv->screen));
 
   if (priv->screen == NULL)
     return;
 
+  /* TODO:
+   *
+   * This is pretty crappy right now because as you enter and
+   * leave you never really reset your position within the remote
+   * display.
+   *
+   * To fix this, we need real grabs or some other mechanism so
+   * that we can hide the local cursor and warp it to where we
+   * discover the cursor in the remote display upon entering
+   * the picture widget.
+   */
+
   mouse = mks_screen_get_mouse (priv->screen);
+
+  if (mks_mouse_get_is_absolute (mouse))
+    mks_mouse_move_to (mouse,
+                       x, y,
+                       NULL,
+                       mks_display_mouse_move_to_cb,
+                       g_object_ref (self));
+  else
+    mks_mouse_move_by (mouse,
+                       x - priv->last_mouse_x,
+                       y - priv->last_mouse_y,
+                       NULL,
+                       mks_display_mouse_move_by_cb,
+                       g_object_ref (self));
+
+  priv->last_mouse_x = x;
+  priv->last_mouse_y = y;
+}
+
+static void
+mks_display_motion_enter_cb (MksDisplay               *self,
+                             double                    x,
+                             double                    y,
+                             GtkEventControllerMotion *motion)
+{
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (GTK_IS_EVENT_CONTROLLER_MOTION (motion));
+
   mks_display_translate_coordinate (self, &x, &y);
-  mks_mouse_move_to (mouse, x, y, NULL, NULL, NULL);
+  mks_display_motion (self, x, y);
 }
 
 static void
@@ -201,18 +286,11 @@ mks_display_motion_motion_cb (MksDisplay               *self,
                               double                    y,
                               GtkEventControllerMotion *motion)
 {
-  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-  MksMouse *mouse;
-
   g_assert (MKS_IS_DISPLAY (self));
   g_assert (GTK_IS_EVENT_CONTROLLER_MOTION (motion));
 
-  if (priv->screen == NULL)
-    return;
-
-  mouse = mks_screen_get_mouse (priv->screen);
   mks_display_translate_coordinate (self, &x, &y);
-  mks_mouse_move_to (mouse, x, y, NULL, NULL, NULL);
+  mks_display_motion (self, x, y);
 }
 
 static void
@@ -221,6 +299,114 @@ mks_display_motion_leave_cb (MksDisplay               *self,
 {
   g_assert (MKS_IS_DISPLAY (self));
   g_assert (GTK_IS_EVENT_CONTROLLER_MOTION (motion));
+}
+
+static void
+mks_display_translate_button (MksDisplay *self,
+                              int        *button)
+{
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (button != NULL);
+
+  switch (*button)
+    {
+    case 1: *button = MKS_MOUSE_BUTTON_LEFT;   break;
+    case 2: *button = MKS_MOUSE_BUTTON_MIDDLE; break;
+    case 3: *button = MKS_MOUSE_BUTTON_RIGHT;  break;
+    case 8: *button = MKS_MOUSE_BUTTON_SIDE;   break;
+    case 9: *button = MKS_MOUSE_BUTTON_EXTRA;  break;
+    default: break;
+    }
+}
+
+static void
+mks_display_mouse_press_cb (GObject      *object,
+                            GAsyncResult *result,
+                            gpointer      user_data)
+{
+  MksMouse *mouse = (MksMouse *)object;
+  g_autoptr(MksDisplay) self = user_data;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (MKS_IS_MOUSE (mouse));
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (MKS_IS_DISPLAY (self));
+
+  if (!mks_mouse_press_finish (mouse, result, &error))
+    g_warning ("Mouse press failed: %s", error->message);
+}
+
+static void
+mks_display_click_pressed_cb (MksDisplay      *self,
+                              int              n_press,
+                              double           x,
+                              double           y,
+                              GtkGestureClick *click)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  MksMouse *mouse;
+  int button;
+
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (GTK_IS_GESTURE_CLICK (click));
+
+  if (priv->screen == NULL)
+    return;
+
+  mouse = mks_screen_get_mouse (priv->screen);
+
+  button = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (click));
+  mks_display_translate_button (self, &button);
+  mks_mouse_press (mouse,
+                   button,
+                   NULL,
+                   mks_display_mouse_press_cb,
+                   g_object_ref (self));
+}
+
+static void
+mks_display_mouse_release_cb (GObject      *object,
+                              GAsyncResult *result,
+                              gpointer      user_data)
+{
+  MksMouse *mouse = (MksMouse *)object;
+  g_autoptr(MksDisplay) self = user_data;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (MKS_IS_MOUSE (mouse));
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (MKS_IS_DISPLAY (self));
+
+  if (!mks_mouse_release_finish (mouse, result, &error))
+    g_warning ("Mouse release failed: %s", error->message);
+}
+
+static void
+mks_display_click_released_cb (MksDisplay      *self,
+                               int              n_press,
+                               double           x,
+                               double           y,
+                               GtkGestureClick *click)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  MksMouse *mouse;
+  int button;
+
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (GTK_IS_GESTURE_CLICK (click));
+
+  if (priv->screen == NULL)
+    return;
+
+  mouse = mks_screen_get_mouse (priv->screen);
+
+  button = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (click));
+  mks_display_translate_button (self, &button);
+  mks_mouse_release (mouse,
+                     button,
+                     NULL,
+                     mks_display_mouse_release_cb,
+                     g_object_ref (self));
 }
 
 static void
@@ -361,9 +547,12 @@ mks_display_class_init (MksDisplayClass *klass)
   gtk_widget_class_set_css_name (widget_class, "MksDisplay");
   gtk_widget_class_set_layout_manager_type (widget_class, GTK_TYPE_BIN_LAYOUT);
   gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/libmks/mks-display.ui");
+  gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, click);
   gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, key);
   gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, motion);
   gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, picture);
+  gtk_widget_class_bind_template_callback (widget_class, mks_display_click_pressed_cb);
+  gtk_widget_class_bind_template_callback (widget_class, mks_display_click_released_cb);
   gtk_widget_class_bind_template_callback (widget_class, mks_display_motion_enter_cb);
   gtk_widget_class_bind_template_callback (widget_class, mks_display_motion_motion_cb);
   gtk_widget_class_bind_template_callback (widget_class, mks_display_motion_leave_cb);
