@@ -101,7 +101,7 @@ static double
 mks_cairo_framebuffer_get_intrinsic_aspect_ratio (GdkPaintable *paintable)
 {
   double width = gdk_paintable_get_intrinsic_width (paintable);
-  double height = gdk_paintable_get_intrinsic_width (paintable);
+  double height = gdk_paintable_get_intrinsic_height (paintable);
 
   return width / height;
 }
