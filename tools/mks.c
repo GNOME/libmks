@@ -61,13 +61,12 @@ main (int   argc,
   main_loop = g_main_loop_new (NULL, FALSE);
 
   window = g_object_new (GTK_TYPE_WINDOW,
-                         "default-width", 800,
-                         "default-height", 600,
+                         "default-width", 640,
+                         "default-height", 480,
                          "title", "Mouse, Keyboard, Screen",
                          NULL);
   picture = g_object_new (GTK_TYPE_PICTURE,
-                          "halign", GTK_ALIGN_CENTER,
-                          "valign", GTK_ALIGN_CENTER,
+                          "content-fit", GTK_CONTENT_FIT_SCALE_DOWN,
                           NULL);
   gtk_window_set_child (window, GTK_WIDGET (picture));
   g_signal_connect_swapped (window,
