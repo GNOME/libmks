@@ -160,6 +160,26 @@ mks_paintable_init (MksPaintable *self)
 }
 
 static void
+mks_paintable_invalidate_contents_cb (MksPaintable *self,
+                                      GdkPaintable *paintable)
+{
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (GDK_IS_PAINTABLE (paintable));
+
+  gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
+}
+
+static void
+mks_paintable_invalidate_size_cb (MksPaintable *self,
+                                  GdkPaintable *paintable)
+{
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (GDK_IS_PAINTABLE (paintable));
+
+  gdk_paintable_invalidate_size (GDK_PAINTABLE (self));
+}
+
+static void
 mks_paintable_set_framebuffer (MksPaintable        *self,
                                MksCairoFramebuffer *framebuffer)
 {
@@ -193,12 +213,12 @@ mks_paintable_set_framebuffer (MksPaintable        *self,
       self->framebuffer = g_object_ref (framebuffer);
       g_signal_connect_object (self->framebuffer,
                                "invalidate-size",
-                               G_CALLBACK (gdk_paintable_invalidate_size),
+                               G_CALLBACK (mks_paintable_invalidate_size_cb),
                                self,
                                G_CONNECT_SWAPPED);
       g_signal_connect_object (self->framebuffer,
                                "invalidate-contents",
-                               G_CALLBACK (gdk_paintable_invalidate_contents),
+                               G_CALLBACK (mks_paintable_invalidate_contents_cb),
                                self,
                                G_CONNECT_SWAPPED);
       self->mode = MODE_FRAMEBUFFER;
@@ -267,6 +287,8 @@ mks_paintable_listener_update (MksPaintable          *self,
   guint8 *data;
   cairo_format_t format;
   gsize data_len;
+  static int counter;
+  char name[32];
 
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
@@ -319,10 +341,13 @@ mks_paintable_listener_update (MksPaintable          *self,
     }
 
   source = cairo_image_surface_create_for_data (data, format, width, height, stride);
+  g_snprintf (name, sizeof name, "update-%u.png", counter++ % 10);
+  cairo_surface_write_to_png (source, name);
   cr = mks_cairo_framebuffer_update (self->framebuffer, x, y, width, height);
+  cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
   cairo_set_source_surface (cr, source, 0, 0);
-  cairo_rectangle (cr, x, y, width, height);
-  cairo_paint (cr);
+  cairo_rectangle (cr, 0, 0, width, height);
+  cairo_fill (cr);
   cairo_destroy (cr);
   cairo_surface_destroy (source);
 
@@ -385,6 +410,7 @@ mks_paintable_listener_scanout (MksPaintable          *self,
   source = cairo_image_surface_create_for_data (data, format, width, height, stride);
   cr = mks_cairo_framebuffer_update (self->framebuffer, 0, 0, width, height);
   cairo_set_source_surface (cr, source, 0, 0);
+  cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
   cairo_rectangle (cr, 0, 0, width, height);
   cairo_paint (cr);
   cairo_destroy (cr);
