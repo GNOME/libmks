@@ -25,8 +25,8 @@
 
 #include "mks-cairo-framebuffer-private.h"
 
-#define TILE_WIDTH 256
-#define TILE_HEIGHT 256
+#define TILE_WIDTH  128
+#define TILE_HEIGHT 128
 
 struct _MksCairoFramebuffer
 {
