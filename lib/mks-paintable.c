@@ -279,12 +279,13 @@ mks_paintable_listener_update (MksPaintable          *self,
                                int                    height,
                                guint                  stride,
                                guint                  pixman_format,
-                               GVariant              *bytes,
+                               GVariant              *bytestring,
                                MksQemuListener       *listener)
 {
+  g_autoptr(GBytes) bytes = NULL;
   cairo_surface_t *source;
+  const guint8 *data;
   cairo_t *cr;
-  guint8 *data;
   cairo_format_t format;
   gsize data_len;
 
@@ -302,8 +303,8 @@ mks_paintable_listener_update (MksPaintable          *self,
       return TRUE;
     }
 
-  data = (guint8 *)g_variant_get_bytestring (bytes);
-  data_len = g_variant_n_children (bytes);
+  bytes = g_variant_get_data_as_bytes (bytestring);
+  data = g_bytes_get_data (bytes, &data_len);
 
   if (data_len < cairo_format_stride_for_width (format, width) * height)
     {
@@ -338,12 +339,12 @@ mks_paintable_listener_update (MksPaintable          *self,
       mks_paintable_set_framebuffer (self, framebuffer);
     }
 
-  source = cairo_image_surface_create_for_data (data, format, width, height, stride);
+  source = cairo_image_surface_create_for_data ((guint8 *)data, format, width, height, stride);
   cr = mks_cairo_framebuffer_update (self->framebuffer, x, y, width, height);
   cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
   cairo_set_source_surface (cr, source, 0, 0);
   cairo_rectangle (cr, 0, 0, width, height);
-  cairo_fill (cr);
+  cairo_paint (cr);
   cairo_destroy (cr);
   cairo_surface_destroy (source);
 
@@ -359,19 +360,20 @@ mks_paintable_listener_scanout (MksPaintable          *self,
                                 guint                  height,
                                 guint                  stride,
                                 guint                  pixman_format,
-                                GVariant              *bytes,
+                                GVariant              *bytestring,
                                 MksQemuListener       *listener)
 {
+  g_autoptr(GBytes) bytes = NULL;
   cairo_surface_t *source;
+  const guint8 *data;
   cairo_t *cr;
-  guint8 *data;
   cairo_format_t format;
   gsize data_len;
 
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
-  g_assert (g_variant_is_of_type (bytes, G_VARIANT_TYPE_BYTESTRING));
+  g_assert (g_variant_is_of_type (bytestring, G_VARIANT_TYPE_BYTESTRING));
 
   if (!(format = _pixman_format_to_cairo_format (pixman_format)))
     {
@@ -382,8 +384,8 @@ mks_paintable_listener_scanout (MksPaintable          *self,
       return TRUE;
     }
 
-  data = (guint8 *)g_variant_get_bytestring (bytes);
-  data_len = g_variant_n_children (bytes);
+  bytes = g_variant_get_data_as_bytes (bytestring);
+  data = g_bytes_get_data (bytes, &data_len);
 
   if (data_len < cairo_format_stride_for_width (format, width) * height)
     {
@@ -403,7 +405,7 @@ mks_paintable_listener_scanout (MksPaintable          *self,
       mks_paintable_set_framebuffer (self, framebuffer);
     }
 
-  source = cairo_image_surface_create_for_data (data, format, width, height, stride);
+  source = cairo_image_surface_create_for_data ((guint8 *)data, format, width, height, stride);
   cr = mks_cairo_framebuffer_update (self->framebuffer, 0, 0, width, height);
   cairo_set_source_surface (cr, source, 0, 0);
   cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
