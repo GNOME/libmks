@@ -190,9 +190,6 @@ mks_paintable_set_framebuffer (MksPaintable        *self,
 
   if (framebuffer != NULL)
     {
-      g_print ("Framebuffer set to %ux%u\n",
-               mks_cairo_framebuffer_get_width (framebuffer),
-               mks_cairo_framebuffer_get_height (framebuffer));
       self->framebuffer = g_object_ref (framebuffer);
       g_signal_connect_object (self->framebuffer,
                                "invalidate-size",

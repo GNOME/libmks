@@ -30,6 +30,7 @@
 #include "mks-paintable-private.h"
 #include "mks-qemu.h"
 #include "mks-read-only-list-model-private.h"
+#include "mks-resources.h"
 #include "mks-screen.h"
 #include "mks-screen-attributes.h"
 #include "mks-session.h"
@@ -38,6 +39,8 @@
 static void
 mks_init_gtypes (void)
 {
+  g_resources_register (mks_get_resource ());
+
   /* First register GTypes for Qemu IPC */
   g_type_ensure (MKS_QEMU_TYPE_AUDIO);
   g_type_ensure (MKS_QEMU_TYPE_AUDIO_IN_LISTENER);

@@ -25,6 +25,7 @@ libmks_headers = [
 
 libmks_private_sources = [
   'mks-cairo-framebuffer.c',
+  'mks-css.c',
   'mks-read-only-list-model.c',
 
   gnome.gdbus_codegen('mks-qemu',
@@ -33,7 +34,13 @@ libmks_private_sources = [
            namespace: 'MksQemu',
              sources: 'dbus-display1.xml',
       object_manager: true,
-  )
+  ),
+
+  gnome.compile_resources(
+    'mks-resources',
+    'mks.gresource.xml',
+    c_name: 'mks',
+  ),
 ]
 
 libmks_enums = gnome.mkenums_simple('mks-enums',
