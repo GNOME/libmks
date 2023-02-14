@@ -449,7 +449,7 @@ mks_cairo_framebuffer_clear (MksCairoFramebuffer *self)
                    self->n_columns * TILE_WIDTH,
                    self->n_rows * TILE_HEIGHT);
   cairo_set_source_rgba (cr, 0, 0, 0, 1);
-  cairo_fill (cr);
+  cairo_paint (cr);
   cairo_destroy (cr);
 }
 
