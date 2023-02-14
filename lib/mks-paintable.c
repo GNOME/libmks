@@ -287,8 +287,6 @@ mks_paintable_listener_update (MksPaintable          *self,
   guint8 *data;
   cairo_format_t format;
   gsize data_len;
-  static int counter;
-  char name[32];
 
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
@@ -341,8 +339,6 @@ mks_paintable_listener_update (MksPaintable          *self,
     }
 
   source = cairo_image_surface_create_for_data (data, format, width, height, stride);
-  g_snprintf (name, sizeof name, "update-%u.png", counter++ % 10);
-  cairo_surface_write_to_png (source, name);
   cr = mks_cairo_framebuffer_update (self->framebuffer, x, y, width, height);
   cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
   cairo_set_source_surface (cr, source, 0, 0);
