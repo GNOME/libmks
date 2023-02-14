@@ -239,6 +239,17 @@ mks_keyboard_press (MksKeyboard         *self,
 }
 
 gboolean
+mks_keyboard_press_finish (MksKeyboard   *self,
+                           GAsyncResult  *result,
+                           GError       **error)
+{
+  g_return_val_if_fail (MKS_IS_KEYBOARD (self), FALSE);
+  g_return_val_if_fail (g_task_is_valid (result, self), FALSE);
+
+  return g_task_propagate_boolean (G_TASK (result), error);
+}
+
+gboolean
 mks_keyboard_press_sync (MksKeyboard   *self,
                          guint          keycode,
                          GCancellable  *cancellable,
@@ -306,6 +317,17 @@ mks_keyboard_release (MksKeyboard         *self,
                                     cancellable,
                                     mks_keyboard_release_cb,
                                     g_steal_pointer (&task));
+}
+
+gboolean
+mks_keyboard_release_finish (MksKeyboard   *self,
+                             GAsyncResult  *result,
+                             GError       **error)
+{
+  g_return_val_if_fail (MKS_IS_KEYBOARD (self), FALSE);
+  g_return_val_if_fail (g_task_is_valid (result, self), FALSE);
+
+  return g_task_propagate_boolean (G_TASK (result), error);
 }
 
 gboolean
