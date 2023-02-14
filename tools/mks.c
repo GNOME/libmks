@@ -66,6 +66,8 @@ main (int   argc,
                          "title", "Mouse, Keyboard, Screen",
                          NULL);
   picture = g_object_new (GTK_TYPE_PICTURE,
+                          "halign", GTK_ALIGN_CENTER,
+                          "valign", GTK_ALIGN_CENTER,
                           NULL);
   gtk_window_set_child (window, GTK_WIDGET (picture));
   g_signal_connect_swapped (window,
