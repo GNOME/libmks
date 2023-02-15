@@ -39,10 +39,12 @@ struct _MksPaintable
   MksQemuListener *listener;
   GDBusConnection *connection;
   GdkPaintable    *child;
+  GdkCursor       *cursor;
 };
 
 enum {
   PROP_0,
+  PROP_CURSOR,
   PROP_PAINTABLE,
   N_PROPS
 };
@@ -149,6 +151,7 @@ mks_paintable_dispose (GObject *object)
   g_clear_object (&self->listener);
   g_clear_object (&self->child);
   g_clear_object (&self->gl_context);
+  g_clear_object (&self->cursor);
 
   G_OBJECT_CLASS (mks_paintable_parent_class)->dispose (object);
 }
@@ -163,6 +166,10 @@ mks_paintable_get_property (GObject    *object,
 
   switch (prop_id)
     {
+    case PROP_CURSOR:
+      g_value_set_object (value, _mks_paintable_get_cursor (self));
+      break;
+
     case PROP_PAINTABLE:
       g_value_set_object (value, self->child);
       break;
@@ -179,6 +186,11 @@ mks_paintable_class_init (MksPaintableClass *klass)
 
   object_class->dispose = mks_paintable_dispose;
   object_class->get_property = mks_paintable_get_property;
+
+  properties [PROP_CURSOR] =
+    g_param_spec_object ("cursor", NULL, NULL,
+                         GDK_TYPE_CURSOR,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   properties [PROP_PAINTABLE] =
     g_param_spec_object ("paintable", NULL, NULL,
@@ -497,13 +509,43 @@ mks_paintable_listener_cursor_define (MksPaintable          *self,
                                       int                    height,
                                       int                    hot_x,
                                       int                    hot_y,
-                                      GVariant              *bytes,
+                                      GVariant              *bytestring,
                                       MksQemuListener       *listener)
 {
+  g_autoptr(GBytes) bytes = NULL;
+  g_autoptr(GdkTexture) texture = NULL;
+  g_autoptr(GdkCursor) cursor = NULL;
+  gsize data_len;
+
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
 
+  if (width < 1 || width > 512 ||
+      height < 1 || height > 512 ||
+      !(bytes = g_variant_get_data_as_bytes (bytestring)))
+    goto failure;
+
+  data_len = g_bytes_get_size (bytes);
+  if (data_len != (4 * width * height))
+    goto failure;
+
+  texture = gdk_memory_texture_new (width,
+                                    height,
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+                                    GDK_MEMORY_B8G8R8A8_PREMULTIPLIED,
+#else
+                                    GDK_MEMORY_A8R8G8B8_PREMULTIPLIED,
+#endif
+                                    bytes,
+                                    width * 4);
+
+  cursor = gdk_cursor_new_from_texture (texture, hot_x, hot_y, NULL);
+
+  if (g_set_object (&self->cursor, cursor))
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_CURSOR]);
+
+failure:
   mks_qemu_listener_complete_cursor_define (listener, invocation);
 
   return TRUE;
@@ -692,4 +734,20 @@ _mks_paintable_new (GCancellable  *cancellable,
   g_assert (MKS_QEMU_IS_LISTENER (self->listener));
 
   return GDK_PAINTABLE (g_steal_pointer (&self));
+}
+
+/**
+ * _mks_paintable_get_cursor:
+ * @self: a #MksPaintable
+ *
+ * Gets the cursor as defined by the Qemu instance.
+ *
+ * Returns: (transfer none) (nullable): a #GdkCursor or %NULL
+ */
+GdkCursor *
+_mks_paintable_get_cursor (MksPaintable *self)
+{
+  g_return_val_if_fail (MKS_IS_PAINTABLE (self), NULL);
+
+  return self->cursor;
 }

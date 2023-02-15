@@ -26,6 +26,7 @@
 #include "mks-display.h"
 #include "mks-keyboard.h"
 #include "mks-mouse.h"
+#include "mks-paintable-private.h"
 #include "mks-screen.h"
 #include "mks-util-private.h"
 
@@ -42,6 +43,7 @@ typedef struct
   GdkPaintable *paintable;
   gulong invalidate_contents_handler;
   gulong invalidate_size_handler;
+  gulong notify_cursor_handler;
 
   /* Tracking the last known positions of mouse events so that we may
    * do something "reasonable" if the pointer is not absolute.
@@ -98,22 +100,37 @@ mks_display_get_paintable_area (MksDisplay      *self,
 
 static void
 mks_display_invalidate_contents_cb (MksDisplay   *self,
-                                    GdkPaintable *paintable)
+                                    MksPaintable *paintable)
 {
   g_assert (MKS_IS_DISPLAY (self));
-  g_assert (GDK_IS_PAINTABLE (paintable));
+  g_assert (MKS_IS_PAINTABLE (paintable));
 
   gtk_widget_queue_draw (GTK_WIDGET (self));
 }
 
 static void
 mks_display_invalidate_size_cb (MksDisplay   *self,
-                                GdkPaintable *paintable)
+                                MksPaintable *paintable)
 {
   g_assert (MKS_IS_DISPLAY (self));
-  g_assert (GDK_IS_PAINTABLE (paintable));
+  g_assert (MKS_IS_PAINTABLE (paintable));
 
   gtk_widget_queue_resize (GTK_WIDGET (self));
+}
+
+static void
+mks_display_notify_cursor_cb (MksDisplay   *self,
+                              GParamSpec   *pspec,
+                              MksPaintable *paintable)
+{
+  GdkCursor *cursor;
+
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (MKS_IS_PAINTABLE (paintable));
+
+  cursor = _mks_paintable_get_cursor (paintable);
+
+  gtk_widget_set_cursor (GTK_WIDGET (self), cursor);
 }
 
 static void
@@ -132,6 +149,7 @@ mks_display_set_paintable (MksDisplay   *self,
     {
       g_clear_signal_handler (&priv->invalidate_contents_handler, priv->paintable);
       g_clear_signal_handler (&priv->invalidate_size_handler, priv->paintable);
+      g_clear_signal_handler (&priv->notify_cursor_handler, priv->paintable);
       g_clear_object (&priv->paintable);
     }
 
@@ -148,6 +166,12 @@ mks_display_set_paintable (MksDisplay   *self,
         g_signal_connect_object (paintable,
                                  "invalidate-size",
                                  G_CALLBACK (mks_display_invalidate_size_cb),
+                                 self,
+                                 G_CONNECT_SWAPPED);
+      priv->notify_cursor_handler =
+        g_signal_connect_object (paintable,
+                                 "notify::cursor",
+                                 G_CALLBACK (mks_display_notify_cursor_cb),
                                  self,
                                  G_CONNECT_SWAPPED);
     }
