@@ -37,6 +37,7 @@ if gtk_minor % 2 == 1
   gtk_minor = gtk_minor + 1
 endif
 
+libepoxy_dep = dependency('epoxy')
 libgio_dep = dependency('gio-2.0', version: glib_req)
 libgiounix_dep = dependency('gio-unix-2.0', version: glib_req)
 libgtk_dep = dependency('gtk4', version: gtk_req)

@@ -25,7 +25,9 @@ libmks_headers = [
 
 libmks_private_sources = [
   'mks-cairo-framebuffer.c',
+  'mks-dmabuf-paintable.c',
   'mks-css.c',
+  'mks-gl-context.c',
   'mks-read-only-list-model.c',
 
   gnome.gdbus_codegen('mks-qemu',
@@ -72,6 +74,7 @@ libmks_generated_sources = [
 ]
 
 libmks_deps = [
+  libepoxy_dep,
   libgio_dep,
   libgiounix_dep,
   libgtk_dep,

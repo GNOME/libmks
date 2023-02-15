@@ -28,24 +28,17 @@
 #include <pixman.h>
 
 #include "mks-cairo-framebuffer-private.h"
+#include "mks-dmabuf-paintable-private.h"
 #include "mks-paintable-private.h"
 #include "mks-qemu.h"
 
 struct _MksPaintable
 {
-  GObject              parent_instance;
-
-  MksQemuListener     *listener;
-  GDBusConnection     *connection;
-  MksCairoFramebuffer *framebuffer;
-
-  guint                mode : 2;
-};
-
-enum {
-  MODE_INITIAL = 0,
-  MODE_FRAMEBUFFER,
-  MODE_DMABUF,
+  GObject          parent_instance;
+  GdkGLContext    *gl_context;
+  MksQemuListener *listener;
+  GDBusConnection *connection;
+  GdkPaintable    *child;
 };
 
 static cairo_format_t
@@ -77,34 +70,25 @@ _pixman_format_to_cairo_format (guint pixman_format)
 static int
 mks_paintable_get_intrinsic_height (GdkPaintable *paintable)
 {
-  MksPaintable *self = MKS_PAINTABLE (paintable);
+  GdkPaintable *child = MKS_PAINTABLE (paintable)->child;
 
-  if (self->mode == MODE_FRAMEBUFFER)
-    return gdk_paintable_get_intrinsic_height (GDK_PAINTABLE (self->framebuffer));
-
-  return 0;
+  return child ? gdk_paintable_get_intrinsic_height (child) : 0;
 }
 
 static int
 mks_paintable_get_intrinsic_width (GdkPaintable *paintable)
 {
-  MksPaintable *self = MKS_PAINTABLE (paintable);
+  GdkPaintable *child = MKS_PAINTABLE (paintable)->child;
 
-  if (self->mode == MODE_FRAMEBUFFER)
-    return gdk_paintable_get_intrinsic_width (GDK_PAINTABLE (self->framebuffer));
-
-  return 0;
+  return child ? gdk_paintable_get_intrinsic_width (child) : 0;
 }
 
 static double
 mks_paintable_get_intrinsic_aspect_ratio (GdkPaintable *paintable)
 {
-  MksPaintable *self = MKS_PAINTABLE (paintable);
+  GdkPaintable *child = MKS_PAINTABLE (paintable)->child;
 
-  if (self->mode == MODE_FRAMEBUFFER)
-    return gdk_paintable_get_intrinsic_aspect_ratio (GDK_PAINTABLE (self->framebuffer));
-
-  return .0;
+  return child ? gdk_paintable_get_intrinsic_aspect_ratio (child) : .0;
 }
 
 static void
@@ -113,13 +97,10 @@ mks_paintable_snapshot (GdkPaintable *paintable,
                         double        width,
                         double        height)
 {
-  MksPaintable *self = (MksPaintable *)paintable;
+  GdkPaintable *child = MKS_PAINTABLE (paintable)->child;
 
-  g_assert (MKS_IS_PAINTABLE (self));
-  g_assert (GDK_IS_SNAPSHOT (snapshot));
-
-  if (self->mode == MODE_FRAMEBUFFER)
-    gdk_paintable_snapshot (GDK_PAINTABLE (self->framebuffer), snapshot, width, height);
+  if (child != NULL)
+    gdk_paintable_snapshot (child, snapshot, width, height);
 }
 
 static void
@@ -134,6 +115,23 @@ paintable_iface_init (GdkPaintableInterface *iface)
 G_DEFINE_FINAL_TYPE_WITH_CODE (MksPaintable, mks_paintable, G_TYPE_OBJECT,
                                G_IMPLEMENT_INTERFACE (GDK_TYPE_PAINTABLE, paintable_iface_init))
 
+static GdkGLContext *
+mks_paintable_get_gl_context (MksPaintable  *self,
+                              GError       **error)
+{
+  g_assert (MKS_IS_PAINTABLE (self));
+
+  if (self->gl_context == NULL)
+    {
+      GdkDisplay *display = gdk_display_get_default ();
+
+      if (!(self->gl_context = gdk_display_create_gl_context (display, error)))
+        return NULL;
+    }
+
+  return self->gl_context;
+}
+
 static void
 mks_paintable_dispose (GObject *object)
 {
@@ -141,7 +139,8 @@ mks_paintable_dispose (GObject *object)
 
   g_clear_object (&self->connection);
   g_clear_object (&self->listener);
-  g_clear_object (&self->framebuffer);
+  g_clear_object (&self->child);
+  g_clear_object (&self->gl_context);
 
   G_OBJECT_CLASS (mks_paintable_parent_class)->dispose (object);
 }
@@ -180,72 +179,52 @@ mks_paintable_invalidate_size_cb (MksPaintable *self,
 }
 
 static void
-mks_paintable_set_framebuffer (MksPaintable        *self,
-                               MksCairoFramebuffer *framebuffer)
+mks_paintable_set_child (MksPaintable *self,
+                         GdkPaintable *child)
 {
   gboolean size_changed;
 
   g_assert (MKS_IS_PAINTABLE (self));
-  g_assert (!framebuffer || MKS_IS_CAIRO_FRAMEBUFFER (framebuffer));
+  g_assert (!child || GDK_IS_PAINTABLE (child));
 
-  if (self->framebuffer == framebuffer)
+  if (self->child == child)
     return;
 
-  size_changed = self->framebuffer == NULL ||
-                 framebuffer == NULL ||
-                 mks_cairo_framebuffer_get_width (self->framebuffer) != mks_cairo_framebuffer_get_width (framebuffer) ||
-                 mks_cairo_framebuffer_get_height (self->framebuffer) != mks_cairo_framebuffer_get_height (framebuffer);
+  size_changed = self->child == NULL ||
+                 child == NULL ||
+                 gdk_paintable_get_intrinsic_width (self->child) != gdk_paintable_get_intrinsic_width (child) ||
+                 gdk_paintable_get_intrinsic_height (self->child) != gdk_paintable_get_intrinsic_height (child);
 
-  if (self->framebuffer != NULL)
+  if (self->child != NULL)
     {
-      g_signal_handlers_disconnect_by_func (self->framebuffer,
-                                            G_CALLBACK (gdk_paintable_invalidate_size),
+      g_signal_handlers_disconnect_by_func (self->child,
+                                            G_CALLBACK (mks_paintable_invalidate_size_cb),
                                             self);
-      g_signal_handlers_disconnect_by_func (self->framebuffer,
-                                            G_CALLBACK (gdk_paintable_invalidate_contents),
+      g_signal_handlers_disconnect_by_func (self->child,
+                                            G_CALLBACK (mks_paintable_invalidate_contents_cb),
                                             self);
-      g_clear_object (&self->framebuffer);
-      self->mode = MODE_INITIAL;
+      g_clear_object (&self->child);
     }
 
-  if (framebuffer != NULL)
+  if (child != NULL)
     {
-      self->framebuffer = g_object_ref (framebuffer);
-      g_signal_connect_object (self->framebuffer,
+      self->child = g_object_ref (child);
+      g_signal_connect_object (self->child,
                                "invalidate-size",
                                G_CALLBACK (mks_paintable_invalidate_size_cb),
                                self,
                                G_CONNECT_SWAPPED);
-      g_signal_connect_object (self->framebuffer,
+      g_signal_connect_object (self->child,
                                "invalidate-contents",
                                G_CALLBACK (mks_paintable_invalidate_contents_cb),
                                self,
                                G_CONNECT_SWAPPED);
-      self->mode = MODE_FRAMEBUFFER;
     }
 
   gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
 
   if (size_changed)
     gdk_paintable_invalidate_size (GDK_PAINTABLE (self));
-}
-
-static gboolean
-mks_paintable_listener_update_dmabuf (MksPaintable          *self,
-                                      GDBusMethodInvocation *invocation,
-                                      int                    x,
-                                      int                    y,
-                                      int                    width,
-                                      int                    height,
-                                      MksQemuListener       *listener)
-{
-  g_assert (MKS_IS_PAINTABLE (self));
-  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
-  g_assert (MKS_QEMU_IS_LISTENER (listener));
-
-  mks_qemu_listener_complete_update_dmabuf (listener, invocation);
-
-  return TRUE;
 }
 
 static gboolean
@@ -261,11 +240,65 @@ mks_paintable_listener_scanout_dmabuf (MksPaintable          *self,
                                        gboolean               y0_top,
                                        MksQemuListener       *listener)
 {
+  g_autoptr(MksDmabufPaintable) child = NULL;
+  g_autoptr(GError) error = NULL;
+  g_autofd int dmabuf_fd = -1;
+  GdkGLContext *gl_context;
+  guint handle;
+
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER (listener));
+  g_assert (g_variant_is_of_type (dmabuf, G_VARIANT_TYPE_HANDLE));
+
+  handle = g_variant_get_handle (dmabuf);
+
+  if (handle >= g_unix_fd_list_get_length (unix_fd_list))
+    {
+      g_dbus_method_invocation_return_error_literal (invocation,
+                                                     G_IO_ERROR,
+                                                     G_IO_ERROR_INVALID_ARGUMENT,
+                                                     "Invalid handle to DMA-BUF");
+      return TRUE;
+    }
+
+  if (-1 == (dmabuf_fd = g_unix_fd_list_get (unix_fd_list, handle, &error)) ||
+      !(gl_context = mks_paintable_get_gl_context (self, &error)) ||
+      !(child = mks_dmabuf_paintable_new (gl_context,
+                                          dmabuf_fd,
+                                          width, height,
+                                          stride, fourcc,
+                                          modifier, y0_top,
+                                          &error)))
+    {
+      g_dbus_method_invocation_return_gerror (invocation, error);
+      return TRUE;
+    }
+
+  mks_paintable_set_child (self, GDK_PAINTABLE (child));
+
+  mks_qemu_listener_complete_scanout_dmabuf (listener, invocation, NULL);
+
+  return TRUE;
+}
+
+static gboolean
+mks_paintable_listener_update_dmabuf (MksPaintable          *self,
+                                      GDBusMethodInvocation *invocation,
+                                      int                    x,
+                                      int                    y,
+                                      int                    width,
+                                      int                    height,
+                                      MksQemuListener       *listener)
+{
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
 
-  mks_qemu_listener_complete_scanout_dmabuf (listener, invocation, NULL);
+  if (MKS_IS_DMABUF_PAINTABLE (self->child))
+    mks_dmabuf_paintable_invalidate (MKS_DMABUF_PAINTABLE (self->child), x, y, width, height);
+
+  mks_qemu_listener_complete_update_dmabuf (listener, invocation);
 
   return TRUE;
 }
@@ -293,7 +326,7 @@ mks_paintable_listener_update (MksPaintable          *self,
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
 
-  if (self->mode != MODE_FRAMEBUFFER ||
+  if (!MKS_IS_CAIRO_FRAMEBUFFER (self->child) ||
       !(format = _pixman_format_to_cairo_format (pixman_format)))
     {
       g_dbus_method_invocation_return_error_literal (invocation,
@@ -328,19 +361,19 @@ mks_paintable_listener_update (MksPaintable          *self,
    *
    * Generally this is seen at startup during EFI/BIOS.
    */
-  if (x + width > mks_cairo_framebuffer_get_width (self->framebuffer) ||
-      y + height > mks_cairo_framebuffer_get_height (self->framebuffer))
+  if (x + width > gdk_paintable_get_intrinsic_width (self->child) ||
+      y + height > gdk_paintable_get_intrinsic_height (self->child))
     {
-      guint max_width = MAX (mks_cairo_framebuffer_get_width (self->framebuffer), x + width);
-      guint max_height = MAX (mks_cairo_framebuffer_get_height (self->framebuffer), y + height);
+      guint max_width = MAX (gdk_paintable_get_intrinsic_width (self->child), x + width);
+      guint max_height = MAX (gdk_paintable_get_intrinsic_height (self->child), y + height);
       g_autoptr(MksCairoFramebuffer) framebuffer = mks_cairo_framebuffer_new (format, max_width, max_height);
 
-      mks_cairo_framebuffer_copy_to (self->framebuffer, framebuffer);
-      mks_paintable_set_framebuffer (self, framebuffer);
+      mks_cairo_framebuffer_copy_to (MKS_CAIRO_FRAMEBUFFER (self->child), framebuffer);
+      mks_paintable_set_child (self, GDK_PAINTABLE (framebuffer));
     }
 
   source = cairo_image_surface_create_for_data ((guint8 *)data, format, width, height, stride);
-  cr = mks_cairo_framebuffer_update (self->framebuffer, x, y, width, height);
+  cr = mks_cairo_framebuffer_update (MKS_CAIRO_FRAMEBUFFER (self->child), x, y, width, height);
   cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
   cairo_set_source_surface (cr, source, 0, 0);
   cairo_rectangle (cr, 0, 0, width, height);
@@ -396,17 +429,18 @@ mks_paintable_listener_scanout (MksPaintable          *self,
       return TRUE;
     }
 
-  if (self->framebuffer == NULL ||
-      width != mks_cairo_framebuffer_get_width (self->framebuffer) ||
-      height != mks_cairo_framebuffer_get_height (self->framebuffer))
+  if (self->child == NULL ||
+      !MKS_IS_CAIRO_FRAMEBUFFER (self->child) ||
+      width != gdk_paintable_get_intrinsic_width (self->child) ||
+      height != gdk_paintable_get_intrinsic_height (self->child))
     {
-      g_autoptr(MksCairoFramebuffer) framebuffer = mks_cairo_framebuffer_new (format, width, height);
+      g_autoptr(MksCairoFramebuffer) child = mks_cairo_framebuffer_new (format, width, height);
 
-      mks_paintable_set_framebuffer (self, framebuffer);
+      mks_paintable_set_child (self, GDK_PAINTABLE (child));
     }
 
   source = cairo_image_surface_create_for_data ((guint8 *)data, format, width, height, stride);
-  cr = mks_cairo_framebuffer_update (self->framebuffer, 0, 0, width, height);
+  cr = mks_cairo_framebuffer_update (MKS_CAIRO_FRAMEBUFFER (self->child), 0, 0, width, height);
   cairo_set_source_surface (cr, source, 0, 0);
   cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
   cairo_rectangle (cr, 0, 0, width, height);
@@ -464,11 +498,8 @@ mks_paintable_listener_disable (MksPaintable          *self,
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
 
-  if (self->mode == MODE_FRAMEBUFFER)
-    {
-      if (self->framebuffer != NULL)
-        mks_cairo_framebuffer_clear (self->framebuffer);
-    }
+  if (MKS_IS_CAIRO_FRAMEBUFFER (self->child))
+    mks_cairo_framebuffer_clear (MKS_CAIRO_FRAMEBUFFER (self->child));
 
   gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
 
