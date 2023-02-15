@@ -29,9 +29,12 @@ G_BEGIN_DECLS
 
 G_DECLARE_FINAL_TYPE (MksPaintable, mks_paintable, MKS, PAINTABLE, GObject)
 
-GdkPaintable *_mks_paintable_new        (GCancellable  *cancellable,
-                                         int           *peer_fd,
-                                         GError       **error);
-GdkCursor    *_mks_paintable_get_cursor (MksPaintable  *self);
+GdkPaintable *_mks_paintable_new          (GCancellable  *cancellable,
+                                           int           *peer_fd,
+                                           GError       **error);
+GdkCursor    *_mks_paintable_get_cursor   (MksPaintable  *self);
+void          _mks_paintable_get_position (MksPaintable  *self,
+                                           int           *x,
+                                           int           *y);
 
 G_END_DECLS

@@ -32,6 +32,8 @@
 #include "mks-paintable-private.h"
 #include "mks-qemu.h"
 
+#include "mks-marshal.h"
+
 struct _MksPaintable
 {
   GObject          parent_instance;
@@ -40,6 +42,8 @@ struct _MksPaintable
   GDBusConnection *connection;
   GdkPaintable    *child;
   GdkCursor       *cursor;
+  int              mouse_x;
+  int              mouse_y;
 };
 
 enum {
@@ -49,7 +53,13 @@ enum {
   N_PROPS
 };
 
+enum {
+  MOUSE_SET,
+  N_SIGNALS
+};
+
 static GParamSpec *properties [N_PROPS];
+static guint signals [N_SIGNALS];
 
 static cairo_format_t
 _pixman_format_to_cairo_format (guint pixman_format)
@@ -198,6 +208,18 @@ mks_paintable_class_init (MksPaintableClass *klass)
                          (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_properties (object_class, N_PROPS, properties);
+
+  signals [MOUSE_SET] =
+    g_signal_new ("mouse-set",
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0,
+                  NULL, NULL,
+                  _mks_marshal_VOID__INT_INT,
+                  G_TYPE_NONE, 2, G_TYPE_INT, G_TYPE_INT);
+  g_signal_set_va_marshaller (signals [MOUSE_SET],
+                              G_TYPE_FROM_CLASS (klass),
+                              _mks_marshal_VOID__INT_INTv);
 }
 
 static void
@@ -563,7 +585,12 @@ mks_paintable_listener_mouse_set (MksPaintable          *self,
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
 
+  self->mouse_x = x;
+  self->mouse_y = y;
+
   mks_qemu_listener_complete_mouse_set (listener, invocation);
+
+  g_signal_emit (self, signals[MOUSE_SET], 0, x, y);
 
   return TRUE;
 }
