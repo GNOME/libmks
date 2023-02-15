@@ -29,6 +29,7 @@ libmks_private_sources = [
   'mks-css.c',
   'mks-gl-context.c',
   'mks-read-only-list-model.c',
+  'mks-util.c',
 
   gnome.gdbus_codegen('mks-qemu',
          autocleanup: 'all',
