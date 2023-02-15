@@ -39,6 +39,13 @@ libmks_private_sources = [
       object_manager: true,
   ),
 
+  gnome.genmarshal('mks-marshal',
+              internal: true,
+                prefix: '_mks_marshal',
+               sources: ['mks-marshal.defs'],
+    valist_marshallers: true,
+  ),
+
   gnome.compile_resources(
     'mks-resources',
     'mks.gresource.xml',
