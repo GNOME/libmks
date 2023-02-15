@@ -41,6 +41,14 @@ struct _MksPaintable
   GdkPaintable    *child;
 };
 
+enum {
+  PROP_0,
+  PROP_PAINTABLE,
+  N_PROPS
+};
+
+static GParamSpec *properties [N_PROPS];
+
 static cairo_format_t
 _pixman_format_to_cairo_format (guint pixman_format)
 {
@@ -146,11 +154,38 @@ mks_paintable_dispose (GObject *object)
 }
 
 static void
+mks_paintable_get_property (GObject    *object,
+                            guint       prop_id,
+                            GValue     *value,
+                            GParamSpec *pspec)
+{
+  MksPaintable *self = MKS_PAINTABLE (object);
+
+  switch (prop_id)
+    {
+    case PROP_PAINTABLE:
+      g_value_set_object (value, self->child);
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+    }
+}
+
+static void
 mks_paintable_class_init (MksPaintableClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
   object_class->dispose = mks_paintable_dispose;
+  object_class->get_property = mks_paintable_get_property;
+
+  properties [PROP_PAINTABLE] =
+    g_param_spec_object ("paintable", NULL, NULL,
+                         GDK_TYPE_PAINTABLE,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_properties (object_class, N_PROPS, properties);
 }
 
 static void
@@ -225,6 +260,8 @@ mks_paintable_set_child (MksPaintable *self,
 
   if (size_changed)
     gdk_paintable_invalidate_size (GDK_PAINTABLE (self));
+
+  g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_PAINTABLE]);
 }
 
 static gboolean

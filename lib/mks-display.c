@@ -67,6 +67,7 @@ typedef struct
 
 enum {
   PROP_0,
+  PROP_PAINTABLE,
   PROP_SCREEN,
   N_PROPS
 };
@@ -165,6 +166,8 @@ mks_display_set_paintable (MksDisplay   *self,
                                  self,
                                  G_CONNECT_SWAPPED);
     }
+
+  g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_PAINTABLE]);
 }
 
 static void
@@ -674,9 +677,14 @@ mks_display_get_property (GObject    *object,
                           GParamSpec *pspec)
 {
   MksDisplay *self = MKS_DISPLAY (object);
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
 
   switch (prop_id)
     {
+    case PROP_PAINTABLE:
+      g_value_set_object (value, priv->paintable);
+      break;
+
     case PROP_SCREEN:
       g_value_set_object (value, mks_display_get_screen (self));
       break;
@@ -718,6 +726,11 @@ mks_display_class_init (MksDisplayClass *klass)
   widget_class->get_request_mode = mks_display_get_request_mode;
   widget_class->measure = mks_display_measure;
   widget_class->snapshot = mks_display_snapshot;
+
+  properties [PROP_PAINTABLE] =
+    g_param_spec_object ("paintable", NULL, NULL,
+                         GDK_TYPE_PAINTABLE,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   properties[PROP_SCREEN] =
     g_param_spec_object ("screen", NULL, NULL,
