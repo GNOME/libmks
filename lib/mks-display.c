@@ -37,10 +37,10 @@ typedef struct
    */
   MksScreen *screen;
 
-  /* The picture widget in our template which is rendering the screens
-   * painable when available.
-   */
-  GtkPicture *picture;
+  /* The paintable containing the screen content */
+  GdkPaintable *paintable;
+  gulong invalidate_contents_handler;
+  gulong invalidate_size_handler;
 
   /* Used to update the cursor position by calling into the MksMouse
    * API using move_to/move_by.
@@ -67,7 +67,6 @@ typedef struct
 
 enum {
   PROP_0,
-  PROP_CONTENT_FIT,
   PROP_SCREEN,
   N_PROPS
 };
@@ -75,6 +74,98 @@ enum {
 G_DEFINE_TYPE_WITH_PRIVATE (MksDisplay, mks_display, GTK_TYPE_WIDGET)
 
 static GParamSpec *properties [N_PROPS];
+
+static void
+mks_display_get_paintable_area (MksDisplay      *self,
+                                graphene_rect_t *area)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  int x, y, width, height;
+  double display_ratio;
+  double ratio;
+  double w, h;
+
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (area != NULL);
+
+  width = gtk_widget_get_width (GTK_WIDGET (self));
+  height = gtk_widget_get_height (GTK_WIDGET (self));
+  display_ratio = (double)width / (double)height;
+  ratio = gdk_paintable_get_intrinsic_aspect_ratio (priv->paintable);
+
+  if (ratio > display_ratio)
+    {
+      w = width;
+      h = width / ratio;
+    }
+  else
+    {
+      w = height * ratio;
+      h = height;
+    }
+
+  x = (width - ceil (w)) / 2;
+  y = floor(height - ceil (h)) / 2;
+
+  *area = GRAPHENE_RECT_INIT (x, y, w, h);
+}
+
+static void
+mks_display_invalidate_contents_cb (MksDisplay   *self,
+                                    GdkPaintable *paintable)
+{
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (GDK_IS_PAINTABLE (paintable));
+
+  gtk_widget_queue_draw (GTK_WIDGET (self));
+}
+
+static void
+mks_display_invalidate_size_cb (MksDisplay   *self,
+                                GdkPaintable *paintable)
+{
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (GDK_IS_PAINTABLE (paintable));
+
+  gtk_widget_queue_resize (GTK_WIDGET (self));
+}
+
+static void
+mks_display_set_paintable (MksDisplay   *self,
+                           GdkPaintable *paintable)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (!paintable || GDK_IS_PAINTABLE (paintable));
+
+  if (priv->paintable == paintable)
+    return;
+
+  if (priv->paintable != NULL)
+    {
+      g_clear_signal_handler (&priv->invalidate_contents_handler, priv->paintable);
+      g_clear_signal_handler (&priv->invalidate_size_handler, priv->paintable);
+      g_clear_object (&priv->paintable);
+    }
+
+  if (paintable != NULL)
+    {
+      priv->paintable = g_object_ref (paintable);
+      priv->invalidate_contents_handler =
+        g_signal_connect_object (paintable,
+                                 "invalidate-contents",
+                                 G_CALLBACK (mks_display_invalidate_contents_cb),
+                                 self,
+                                 G_CONNECT_SWAPPED);
+      priv->invalidate_size_handler =
+        g_signal_connect_object (paintable,
+                                 "invalidate-size",
+                                 G_CALLBACK (mks_display_invalidate_size_cb),
+                                 self,
+                                 G_CONNECT_SWAPPED);
+    }
+}
 
 static void
 mks_display_translate_keycode (MksDisplay *self,
@@ -178,13 +269,36 @@ mks_display_key_key_released_cb (MksDisplay            *self,
                         g_object_ref (self));
 }
 
-static void
+static gboolean
 mks_display_translate_coordinate (MksDisplay *self,
                                   double     *x,
                                   double     *y)
 {
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  graphene_rect_t area;
+  int width;
+  int height;
+
   g_assert (MKS_IS_DISPLAY (self));
 
+  if (priv->paintable == NULL)
+    return FALSE;
+
+  mks_display_get_paintable_area (self, &area);
+
+  if (!graphene_rect_contains_point (&area, &GRAPHENE_POINT_INIT (*x, *y)))
+    return FALSE;
+
+  *x -= area.origin.x;
+  *y -= area.origin.y;
+
+  width = gdk_paintable_get_intrinsic_width (priv->paintable);
+  height = gdk_paintable_get_intrinsic_height (priv->paintable);
+
+  *x = *x / area.size.width * width;
+  *y = *y / area.size.height * height;
+
+  return TRUE;
 }
 
 static void
@@ -276,8 +390,8 @@ mks_display_motion_enter_cb (MksDisplay               *self,
   g_assert (MKS_IS_DISPLAY (self));
   g_assert (GTK_IS_EVENT_CONTROLLER_MOTION (motion));
 
-  mks_display_translate_coordinate (self, &x, &y);
-  mks_display_motion (self, x, y);
+  if (mks_display_translate_coordinate (self, &x, &y))
+    mks_display_motion (self, x, y);
 }
 
 static void
@@ -289,8 +403,8 @@ mks_display_motion_motion_cb (MksDisplay               *self,
   g_assert (MKS_IS_DISPLAY (self));
   g_assert (GTK_IS_EVENT_CONTROLLER_MOTION (motion));
 
-  mks_display_translate_coordinate (self, &x, &y);
-  mks_display_motion (self, x, y);
+  if (mks_display_translate_coordinate (self, &x, &y))
+    mks_display_motion (self, x, y);
 }
 
 static void
@@ -429,7 +543,7 @@ mks_display_attach_cb (GObject      *object,
   if (priv->screen != screen)
     return;
 
-  gtk_picture_set_paintable (priv->picture, paintable);
+  mks_display_set_paintable (self, paintable);
 }
 
 static void
@@ -457,7 +571,8 @@ mks_display_disconnect (MksDisplay *self)
   g_assert (MKS_IS_DISPLAY (self));
   g_assert (priv->screen != NULL);
 
-  gtk_picture_set_paintable (priv->picture, NULL);
+  mks_display_set_paintable (self, NULL);
+
   g_clear_object (&priv->screen);
 }
 
@@ -470,9 +585,86 @@ mks_display_dispose (GObject *object)
   if (priv->screen != NULL)
     mks_display_disconnect (self);
 
-  g_clear_pointer ((GtkWidget **)&priv->picture, gtk_widget_unparent);
-
   G_OBJECT_CLASS (mks_display_parent_class)->dispose (object);
+}
+
+static void
+mks_display_snapshot (GtkWidget   *widget,
+                      GtkSnapshot *snapshot)
+{
+  MksDisplay *self = (MksDisplay *)widget;
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  graphene_rect_t area;
+
+  if (priv->paintable == NULL)
+    return;
+
+  mks_display_get_paintable_area (self, &area);
+
+  gtk_snapshot_save (snapshot);
+  gtk_snapshot_translate (snapshot, &area.origin);
+  gdk_paintable_snapshot (priv->paintable, snapshot, area.size.width, area.size.height);
+  gtk_snapshot_restore (snapshot);
+}
+
+static GtkSizeRequestMode
+mks_display_get_request_mode (GtkWidget *widget)
+{
+  return GTK_SIZE_REQUEST_HEIGHT_FOR_WIDTH;
+}
+
+static void
+mks_display_measure (GtkWidget      *widget,
+                     GtkOrientation  orientation,
+                     int            for_size,
+                     int           *minimum,
+                     int           *natural,
+                     int           *minimum_baseline,
+                     int           *natural_baseline)
+{
+  MksDisplay *self = (MksDisplay *)widget;
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  double min_width, min_height, nat_width, nat_height;
+  int default_width;
+  int default_height;
+
+  g_assert (MKS_IS_DISPLAY (self));
+
+  if (priv->paintable == NULL || for_size == 0)
+    {
+      *minimum = 0;
+      *natural = 0;
+      return;
+    }
+
+  default_width = gdk_paintable_get_intrinsic_width (priv->paintable);
+  default_height = gdk_paintable_get_intrinsic_width (priv->paintable);
+
+  gdk_paintable_compute_concrete_size (priv->paintable,
+                                       0, 0,
+                                       default_width, default_height,
+                                       &min_width, &min_height);
+
+  if (orientation == GTK_ORIENTATION_HORIZONTAL)
+    {
+      gdk_paintable_compute_concrete_size (priv->paintable,
+                                           0,
+                                           for_size < 0 ? 0 : for_size,
+                                           default_width, default_height,
+                                           &nat_width, &nat_height);
+      *minimum = ceil (min_width);
+      *natural = ceil (nat_width);
+    }
+  else
+    {
+      gdk_paintable_compute_concrete_size (priv->paintable,
+                                           for_size < 0 ? 0 : for_size,
+                                           0,
+                                           default_width, default_height,
+                                           &nat_width, &nat_height);
+      *minimum = ceil (min_height);
+      *natural = ceil (nat_height);
+    }
 }
 
 static void
@@ -485,10 +677,6 @@ mks_display_get_property (GObject    *object,
 
   switch (prop_id)
     {
-    case PROP_CONTENT_FIT:
-      g_value_set_enum (value, mks_display_get_content_fit (self));
-      break;
-
     case PROP_SCREEN:
       g_value_set_object (value, mks_display_get_screen (self));
       break;
@@ -508,10 +696,6 @@ mks_display_set_property (GObject      *object,
 
   switch (prop_id)
     {
-    case PROP_CONTENT_FIT:
-      mks_display_set_content_fit (self, g_value_get_enum (value));
-      break;
-
     case PROP_SCREEN:
       mks_display_set_screen (self, g_value_get_object (value));
       break;
@@ -531,11 +715,9 @@ mks_display_class_init (MksDisplayClass *klass)
   object_class->get_property = mks_display_get_property;
   object_class->set_property = mks_display_set_property;
 
-  properties [PROP_CONTENT_FIT] =
-    g_param_spec_enum ("content-fit", NULL, NULL,
-                       GTK_TYPE_CONTENT_FIT,
-                       GTK_CONTENT_FIT_SCALE_DOWN,
-                       (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  widget_class->get_request_mode = mks_display_get_request_mode;
+  widget_class->measure = mks_display_measure;
+  widget_class->snapshot = mks_display_snapshot;
 
   properties[PROP_SCREEN] =
     g_param_spec_object ("screen", NULL, NULL,
@@ -550,7 +732,6 @@ mks_display_class_init (MksDisplayClass *klass)
   gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, click);
   gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, key);
   gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, motion);
-  gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, picture);
   gtk_widget_class_bind_template_callback (widget_class, mks_display_click_pressed_cb);
   gtk_widget_class_bind_template_callback (widget_class, mks_display_click_released_cb);
   gtk_widget_class_bind_template_callback (widget_class, mks_display_motion_enter_cb);
@@ -610,25 +791,4 @@ mks_display_set_screen (MksDisplay *self,
     mks_display_connect (self, screen);
 
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_SCREEN]);
-}
-
-GtkContentFit
-mks_display_get_content_fit (MksDisplay *self)
-{
-  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-
-  g_return_val_if_fail (MKS_IS_DISPLAY (self), 0);
-
-  return gtk_picture_get_content_fit (priv->picture);
-}
-
-void
-mks_display_set_content_fit (MksDisplay    *self,
-                             GtkContentFit  content_fit)
-{
-  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-
-  g_return_if_fail (MKS_IS_DISPLAY (self));
-
-  gtk_picture_set_content_fit (priv->picture, content_fit);
 }

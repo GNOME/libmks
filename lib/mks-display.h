@@ -41,16 +41,11 @@ struct _MksDisplayClass
 };
 
 MKS_AVAILABLE_IN_ALL
-GtkWidget     *mks_display_new             (void);
+GtkWidget *mks_display_new        (void);
 MKS_AVAILABLE_IN_ALL
-MksScreen     *mks_display_get_screen      (MksDisplay    *self);
+MksScreen *mks_display_get_screen (MksDisplay *self);
 MKS_AVAILABLE_IN_ALL
-void           mks_display_set_screen      (MksDisplay    *self,
-                                            MksScreen     *screen);
-MKS_AVAILABLE_IN_ALL
-GtkContentFit  mks_display_get_content_fit (MksDisplay    *self);
-MKS_AVAILABLE_IN_ALL
-void           mks_display_set_content_fit (MksDisplay    *self,
-                                            GtkContentFit  content_fit);
+void       mks_display_set_screen (MksDisplay *self,
+                                   MksScreen  *screen);
 
 G_END_DECLS
