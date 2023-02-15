@@ -90,6 +90,7 @@ mks_dmabuf_paintable_snapshot (GdkPaintable *paintable,
                                double        height)
 {
   MksDmabufPaintable *self = (MksDmabufPaintable *)paintable;
+  graphene_rect_t area;
 
   g_assert (MKS_IS_DMABUF_PAINTABLE (self));
   g_assert (GDK_IS_SNAPSHOT (snapshot));
@@ -99,12 +100,16 @@ mks_dmabuf_paintable_snapshot (GdkPaintable *paintable,
                       width / (double)self->width,
                       height / (double)self->height);
 
+  area = GRAPHENE_RECT_INIT (0, 0, self->width, self->height);
+
   for (guint i = 0; i < self->tiles->len; i++)
     {
       MksDmabufTile *tile = &g_array_index (self->tiles, MksDmabufTile, i);
       GdkTexture *texture = self->textures[tile->texture];
 
-      gtk_snapshot_append_texture (snapshot, texture, &tile->area);
+      gtk_snapshot_push_clip (snapshot, &tile->area);
+      gtk_snapshot_append_texture (snapshot, texture, &area);
+      gtk_snapshot_pop (snapshot);
     }
 
   gtk_snapshot_restore (snapshot);
