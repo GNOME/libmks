@@ -27,6 +27,7 @@
 #include "mks-keyboard.h"
 #include "mks-mouse.h"
 #include "mks-screen.h"
+#include "mks-util-private.h"
 
 #include "mks-keymap-xorgevdev2qnum-private.h"
 
@@ -42,24 +43,8 @@ typedef struct
   gulong invalidate_contents_handler;
   gulong invalidate_size_handler;
 
-  /* Used to update the cursor position by calling into the MksMouse
-   * API using move_to/move_by.
-   */
-  GtkEventControllerMotion *motion;
-
-  /* Used to send key press/release events by calling into MksKeyboard
-   * API using press/release and the hardware keycode.
-   */
-  GtkEventControllerKey *key;
-
-  /* Used to send mouse press/release events translated from the current
-   * button in the gesture. X,Y coordinates are expected to already be
-   * updated from GtkEventControllerMotion::motion events.
-   */
-  GtkGestureClick *click;
-
   /* Tracking the last known positions of mouse events so that we may
-   * emulate mks_mouse_move_by() using GtkEventControllerMotion.
+   * do something "reasonable" if the pointer is not absolute.
    */
   double last_mouse_x;
   double last_mouse_y;
@@ -204,32 +189,6 @@ mks_display_keyboard_press_cb (GObject      *object,
 }
 
 static void
-mks_display_key_key_pressed_cb (MksDisplay            *self,
-                                guint                  keyval,
-                                guint                  keycode,
-                                GdkModifierType        state,
-                                GtkEventControllerKey *key)
-{
-  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-  MksKeyboard *keyboard;
-  guint qkeycode;
-
-  g_assert (MKS_IS_DISPLAY (self));
-  g_assert (GTK_IS_EVENT_CONTROLLER_KEY (key));
-
-  if (priv->screen == NULL)
-    return;
-
-  keyboard = mks_screen_get_keyboard (priv->screen);
-  mks_display_translate_keycode (self, keyval, keycode, &qkeycode);
-  mks_keyboard_press (keyboard,
-                      qkeycode,
-                      NULL,
-                      mks_display_keyboard_press_cb,
-                      g_object_ref (self));
-}
-
-static void
 mks_display_keyboard_release_cb (GObject      *object,
                                  GAsyncResult *result,
                                  gpointer      user_data)
@@ -244,64 +203,6 @@ mks_display_keyboard_release_cb (GObject      *object,
 
   if (!mks_keyboard_release_finish (keyboard, result, &error))
     g_warning ("Keyboard release failed: %s", error->message);
-}
-
-static void
-mks_display_key_key_released_cb (MksDisplay            *self,
-                                 guint                  keyval,
-                                 guint                  keycode,
-                                 GdkModifierType        state,
-                                 GtkEventControllerKey *key)
-{
-  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-  MksKeyboard *keyboard;
-  guint qkeycode;
-
-  g_assert (MKS_IS_DISPLAY (self));
-  g_assert (GTK_IS_EVENT_CONTROLLER_KEY (key));
-
-  if (priv->screen == NULL)
-    return;
-
-  keyboard = mks_screen_get_keyboard (priv->screen);
-  mks_display_translate_keycode (self, keyval, keycode, &qkeycode);
-  mks_keyboard_release (keyboard,
-                        qkeycode,
-                        NULL,
-                        mks_display_keyboard_release_cb,
-                        g_object_ref (self));
-}
-
-static gboolean
-mks_display_translate_coordinate (MksDisplay *self,
-                                  double     *x,
-                                  double     *y)
-{
-  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-  graphene_rect_t area;
-  int width;
-  int height;
-
-  g_assert (MKS_IS_DISPLAY (self));
-
-  if (priv->paintable == NULL)
-    return FALSE;
-
-  mks_display_get_paintable_area (self, &area);
-
-  if (!graphene_rect_contains_point (&area, &GRAPHENE_POINT_INIT (*x, *y)))
-    return FALSE;
-
-  *x -= area.origin.x;
-  *y -= area.origin.y;
-
-  width = gdk_paintable_get_intrinsic_width (priv->paintable);
-  height = gdk_paintable_get_intrinsic_height (priv->paintable);
-
-  *x = *x / area.size.width * width;
-  *y = *y / area.size.height * height;
-
-  return TRUE;
 }
 
 static void
@@ -336,86 +237,6 @@ mks_display_mouse_move_by_cb (GObject      *object,
 
   if (!mks_mouse_move_by_finish (mouse, result, &error))
     g_warning ("Failed move_by: %s", error->message);
-}
-
-static void
-mks_display_motion (MksDisplay *self,
-                    double      x,
-                    double      y)
-{
-  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-  MksMouse *mouse;
-
-  g_assert (MKS_IS_DISPLAY (self));
-  g_assert (!priv->screen || MKS_IS_SCREEN (priv->screen));
-
-  if (priv->screen == NULL)
-    return;
-
-  /* TODO:
-   *
-   * This is pretty crappy right now because as you enter and
-   * leave you never really reset your position within the remote
-   * display.
-   *
-   * To fix this, we need real grabs or some other mechanism so
-   * that we can hide the local cursor and warp it to where we
-   * discover the cursor in the remote display upon entering
-   * the picture widget.
-   */
-
-  mouse = mks_screen_get_mouse (priv->screen);
-
-  if (mks_mouse_get_is_absolute (mouse))
-    mks_mouse_move_to (mouse,
-                       x, y,
-                       NULL,
-                       mks_display_mouse_move_to_cb,
-                       g_object_ref (self));
-  else
-    mks_mouse_move_by (mouse,
-                       x - priv->last_mouse_x,
-                       y - priv->last_mouse_y,
-                       NULL,
-                       mks_display_mouse_move_by_cb,
-                       g_object_ref (self));
-
-  priv->last_mouse_x = x;
-  priv->last_mouse_y = y;
-}
-
-static void
-mks_display_motion_enter_cb (MksDisplay               *self,
-                             double                    x,
-                             double                    y,
-                             GtkEventControllerMotion *motion)
-{
-  g_assert (MKS_IS_DISPLAY (self));
-  g_assert (GTK_IS_EVENT_CONTROLLER_MOTION (motion));
-
-  if (mks_display_translate_coordinate (self, &x, &y))
-    mks_display_motion (self, x, y);
-}
-
-static void
-mks_display_motion_motion_cb (MksDisplay               *self,
-                              double                    x,
-                              double                    y,
-                              GtkEventControllerMotion *motion)
-{
-  g_assert (MKS_IS_DISPLAY (self));
-  g_assert (GTK_IS_EVENT_CONTROLLER_MOTION (motion));
-
-  if (mks_display_translate_coordinate (self, &x, &y))
-    mks_display_motion (self, x, y);
-}
-
-static void
-mks_display_motion_leave_cb (MksDisplay               *self,
-                             GtkEventControllerMotion *motion)
-{
-  g_assert (MKS_IS_DISPLAY (self));
-  g_assert (GTK_IS_EVENT_CONTROLLER_MOTION (motion));
 }
 
 static void
@@ -454,34 +275,6 @@ mks_display_mouse_press_cb (GObject      *object,
 }
 
 static void
-mks_display_click_pressed_cb (MksDisplay      *self,
-                              int              n_press,
-                              double           x,
-                              double           y,
-                              GtkGestureClick *click)
-{
-  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-  MksMouse *mouse;
-  int button;
-
-  g_assert (MKS_IS_DISPLAY (self));
-  g_assert (GTK_IS_GESTURE_CLICK (click));
-
-  if (priv->screen == NULL)
-    return;
-
-  mouse = mks_screen_get_mouse (priv->screen);
-
-  button = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (click));
-  mks_display_translate_button (self, &button);
-  mks_mouse_press (mouse,
-                   button,
-                   NULL,
-                   mks_display_mouse_press_cb,
-                   g_object_ref (self));
-}
-
-static void
 mks_display_mouse_release_cb (GObject      *object,
                               GAsyncResult *result,
                               gpointer      user_data)
@@ -498,32 +291,200 @@ mks_display_mouse_release_cb (GObject      *object,
     g_warning ("Mouse release failed: %s", error->message);
 }
 
-static void
-mks_display_click_released_cb (MksDisplay      *self,
-                               int              n_press,
-                               double           x,
-                               double           y,
-                               GtkGestureClick *click)
+static gboolean
+mks_display_legacy_event_cb (MksDisplay               *self,
+                             GdkEvent                 *event,
+                             GtkEventControllerLegacy *controller)
 {
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-  MksMouse *mouse;
-  int button;
+  GdkEventType event_type;
 
   g_assert (MKS_IS_DISPLAY (self));
-  g_assert (GTK_IS_GESTURE_CLICK (click));
+  g_assert (event != NULL);
+  g_assert (GTK_IS_EVENT_CONTROLLER_LEGACY (controller));
 
-  if (priv->screen == NULL)
-    return;
+  if (priv->screen == NULL || priv->paintable == NULL)
+    return GDK_EVENT_PROPAGATE;
 
-  mouse = mks_screen_get_mouse (priv->screen);
+  event_type = gdk_event_get_event_type (event);
 
-  button = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (click));
-  mks_display_translate_button (self, &button);
-  mks_mouse_release (mouse,
-                     button,
-                     NULL,
-                     mks_display_mouse_release_cb,
-                     g_object_ref (self));
+  switch ((int)event_type)
+    {
+    case GDK_MOTION_NOTIFY:
+      {
+        MksMouse *mouse = mks_screen_get_mouse (priv->screen);
+        GdkSurface *surface = gdk_event_get_surface (event);
+        GtkNative *native = gtk_widget_get_native (GTK_WIDGET (self));
+        int guest_width = gdk_paintable_get_intrinsic_width (priv->paintable);
+        int guest_height = gdk_paintable_get_intrinsic_height (priv->paintable);
+        graphene_rect_t area;
+        double translate_x;
+        double translate_y;
+
+        g_assert (MKS_IS_MOUSE (mouse));
+        g_assert (GDK_IS_SURFACE (surface));
+
+        mks_display_get_paintable_area (self, &area);
+
+        gtk_native_get_surface_transform (native, &translate_x, &translate_y);
+
+        if (mks_mouse_get_is_absolute (mouse))
+          {
+            gdouble x, y;
+
+            if (gdk_event_get_position (event, &x, &y))
+              {
+                x -= translate_x;
+                y -= translate_y;
+
+                gtk_widget_translate_coordinates (GTK_WIDGET (native),
+                                                  GTK_WIDGET (self),
+                                                  x, y, &x, &y);
+
+                if (graphene_rect_contains_point (&area, &GRAPHENE_POINT_INIT (x, y)))
+                  {
+                    double guest_x = floor (x) / area.size.width * guest_width;
+                    double guest_y = floor (y) / area.size.height * guest_height;
+
+                    mks_mouse_move_to (mouse,
+                                       guest_x,
+                                       guest_y,
+                                       NULL,
+                                       mks_display_mouse_move_to_cb,
+                                       g_object_ref (self));
+
+                    return GDK_EVENT_STOP;
+                  }
+              }
+          }
+        else
+          {
+            double x, y;
+
+            if (gdk_event_get_axis (event, GDK_AXIS_X, &x) &&
+                gdk_event_get_axis (event, GDK_AXIS_Y, &y))
+              {
+                double delta_x = floor (x - priv->last_mouse_x) / area.size.width * guest_width;
+                double delta_y = floor (y - priv->last_mouse_y) / area.size.height * guest_height;
+
+                priv->last_mouse_x = x;
+                priv->last_mouse_y = y;
+
+                mks_mouse_move_by (mouse,
+                                   delta_x,
+                                   delta_y,
+                                   NULL,
+                                   mks_display_mouse_move_by_cb,
+                                   g_object_ref (self));
+
+                return GDK_EVENT_STOP;
+              }
+          }
+
+        break;
+      }
+
+    case GDK_BUTTON_PRESS:
+    case GDK_BUTTON_RELEASE:
+      {
+        MksMouse *mouse = mks_screen_get_mouse (priv->screen);
+        int button = gdk_button_event_get_button (event);
+
+        mks_display_translate_button (self, &button);
+
+        if (event_type == GDK_BUTTON_PRESS)
+          mks_mouse_press (mouse,
+                           button,
+                           NULL,
+                           mks_display_mouse_press_cb,
+                           g_object_ref (self));
+        else
+          mks_mouse_release (mouse,
+                             button,
+                             NULL,
+                             mks_display_mouse_release_cb,
+                             g_object_ref (self));
+
+        return GDK_EVENT_STOP;
+      }
+
+    case GDK_KEY_PRESS:
+    case GDK_KEY_RELEASE:
+      {
+        MksKeyboard *keyboard = mks_screen_get_keyboard (priv->screen);
+        guint keycode = gdk_key_event_get_keycode (event);
+        guint keyval = gdk_key_event_get_keycode (event);
+        guint qkeycode;
+
+        mks_display_translate_keycode (self, keyval, keycode, &qkeycode);
+
+        if (event_type == GDK_KEY_PRESS)
+          mks_keyboard_press (keyboard,
+                              qkeycode,
+                              NULL,
+                              mks_display_keyboard_press_cb,
+                              g_object_ref (self));
+        else
+          mks_keyboard_release (keyboard,
+                                qkeycode,
+                                NULL,
+                                mks_display_keyboard_release_cb,
+                                g_object_ref (self));
+
+        return GDK_EVENT_STOP;
+      }
+
+    case GDK_SCROLL:
+      {
+        MksMouse *mouse = mks_screen_get_mouse (priv->screen);
+        GdkScrollDirection direction = gdk_scroll_event_get_direction (event);
+        gboolean inverted = mks_scroll_event_is_inverted (event);
+        int button = -1;
+
+        switch (direction)
+          {
+          case GDK_SCROLL_UP:
+            button = MKS_MOUSE_BUTTON_WHEEL_UP;
+            break;
+
+          case GDK_SCROLL_DOWN:
+            button = MKS_MOUSE_BUTTON_WHEEL_DOWN;
+            break;
+
+          case GDK_SCROLL_LEFT:
+          case GDK_SCROLL_RIGHT:
+          case GDK_SCROLL_SMOOTH:
+          default:
+            break;
+          }
+
+        if (button != -1)
+          {
+            if (inverted)
+              {
+                if (button == MKS_MOUSE_BUTTON_WHEEL_UP)
+                  button = MKS_MOUSE_BUTTON_WHEEL_DOWN;
+                else if (button == MKS_MOUSE_BUTTON_WHEEL_DOWN)
+                  button = MKS_MOUSE_BUTTON_WHEEL_UP;
+              }
+
+            mks_mouse_press (mouse,
+                             button,
+                             NULL,
+                             mks_display_mouse_press_cb,
+                             g_object_ref (self));
+
+            return GDK_EVENT_STOP;
+          }
+
+        break;
+      }
+
+    default:
+      break;
+    }
+
+  return GDK_EVENT_PROPAGATE;
 }
 
 static void
@@ -643,6 +604,12 @@ mks_display_measure (GtkWidget      *widget,
   default_width = gdk_paintable_get_intrinsic_width (priv->paintable);
   default_height = gdk_paintable_get_intrinsic_width (priv->paintable);
 
+  if (default_width <= 0)
+    default_width = 640;
+
+  if (default_height <= 0)
+    default_height = 480;
+
   gdk_paintable_compute_concrete_size (priv->paintable,
                                        0, 0,
                                        default_width, default_height,
@@ -740,18 +707,6 @@ mks_display_class_init (MksDisplayClass *klass)
   g_object_class_install_properties (object_class, N_PROPS, properties);
 
   gtk_widget_class_set_css_name (widget_class, "MksDisplay");
-  gtk_widget_class_set_layout_manager_type (widget_class, GTK_TYPE_BIN_LAYOUT);
-  gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/libmks/mks-display.ui");
-  gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, click);
-  gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, key);
-  gtk_widget_class_bind_template_child_private (widget_class, MksDisplay, motion);
-  gtk_widget_class_bind_template_callback (widget_class, mks_display_click_pressed_cb);
-  gtk_widget_class_bind_template_callback (widget_class, mks_display_click_released_cb);
-  gtk_widget_class_bind_template_callback (widget_class, mks_display_motion_enter_cb);
-  gtk_widget_class_bind_template_callback (widget_class, mks_display_motion_motion_cb);
-  gtk_widget_class_bind_template_callback (widget_class, mks_display_motion_leave_cb);
-  gtk_widget_class_bind_template_callback (widget_class, mks_display_key_key_pressed_cb);
-  gtk_widget_class_bind_template_callback (widget_class, mks_display_key_key_released_cb);
 
   _mks_css_init ();
 }
@@ -759,7 +714,15 @@ mks_display_class_init (MksDisplayClass *klass)
 static void
 mks_display_init (MksDisplay *self)
 {
-  gtk_widget_init_template (GTK_WIDGET (self));
+  GtkEventController *controller;
+
+  controller = gtk_event_controller_legacy_new ();
+  g_signal_connect_object (controller,
+                           "event",
+                           G_CALLBACK (mks_display_legacy_event_cb),
+                           self,
+                           G_CONNECT_SWAPPED);
+  gtk_widget_add_controller (GTK_WIDGET (self), controller);
 }
 
 GtkWidget *
