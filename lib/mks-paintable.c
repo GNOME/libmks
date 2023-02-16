@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 
 #include <glib/gstdio.h>
+#include <gtk/gtk.h>
 #include <pixman.h>
 
 #include "mks-cairo-framebuffer-private.h"
@@ -44,6 +45,7 @@ struct _MksPaintable
   GdkCursor       *cursor;
   int              mouse_x;
   int              mouse_y;
+  guint            y_inverted : 1;
 };
 
 enum {
@@ -117,10 +119,23 @@ mks_paintable_snapshot (GdkPaintable *paintable,
                         double        width,
                         double        height)
 {
-  GdkPaintable *child = MKS_PAINTABLE (paintable)->child;
+  MksPaintable *self = MKS_PAINTABLE (paintable);
 
-  if (child != NULL)
-    gdk_paintable_snapshot (child, snapshot, width, height);
+  if (self->child != NULL)
+    {
+      if (MKS_IS_DMABUF_PAINTABLE (self->child) && !self->y_inverted)
+        {
+          gtk_snapshot_save (snapshot);
+          gtk_snapshot_translate (snapshot, &GRAPHENE_POINT_INIT (0, height));
+          gtk_snapshot_scale (snapshot, 1, -1);
+          gdk_paintable_snapshot (self->child, snapshot, width, height);
+          gtk_snapshot_restore (snapshot);
+        }
+      else
+        {
+          gdk_paintable_snapshot (self->child, snapshot, width, height);
+        }
+    }
 }
 
 static void
@@ -346,6 +361,8 @@ mks_paintable_listener_scanout_dmabuf (MksPaintable          *self,
       return TRUE;
     }
 
+  self->y_inverted = !y0_top;
+
   mks_paintable_set_child (self, GDK_PAINTABLE (child));
 
   mks_qemu_listener_complete_scanout_dmabuf (listener, invocation, NULL);
@@ -509,6 +526,8 @@ mks_paintable_listener_scanout (MksPaintable          *self,
 
       mks_paintable_set_child (self, GDK_PAINTABLE (child));
     }
+
+  self->y_inverted = FALSE;
 
   source = cairo_image_surface_create_for_data ((guint8 *)data, format, width, height, stride);
   cr = mks_cairo_framebuffer_update (MKS_CAIRO_FRAMEBUFFER (self->child), 0, 0, width, height);
