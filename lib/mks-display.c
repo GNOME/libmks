@@ -670,7 +670,7 @@ mks_display_measure (GtkWidget      *widget,
                                            for_size < 0 ? 0 : for_size,
                                            default_width, default_height,
                                            &nat_width, &nat_height);
-      *minimum = ceil (min_width);
+      *minimum = 0;
       *natural = ceil (nat_width);
     }
   else
@@ -680,7 +680,7 @@ mks_display_measure (GtkWidget      *widget,
                                            0,
                                            default_width, default_height,
                                            &nat_width, &nat_height);
-      *minimum = ceil (min_height);
+      *minimum = 0;
       *natural = ceil (nat_height);
     }
 }
