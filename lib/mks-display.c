@@ -393,6 +393,10 @@ mks_display_legacy_event_cb (MksDisplay               *self,
                     double guest_x = floor (x) / area.size.width * guest_width;
                     double guest_y = floor (y) / area.size.height * guest_height;
 
+                    if (guest_x < 0 || guest_y < 0 ||
+                        guest_x >= guest_width || guest_y >= guest_height)
+                      return GDK_EVENT_PROPAGATE;
+
                     mks_mouse_move_to (mouse,
                                        guest_x,
                                        guest_y,
