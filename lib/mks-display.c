@@ -390,8 +390,8 @@ mks_display_legacy_event_cb (MksDisplay               *self,
 
                 if (graphene_rect_contains_point (&area, &GRAPHENE_POINT_INIT (x, y)))
                   {
-                    double guest_x = floor (x) / area.size.width * guest_width;
-                    double guest_y = floor (y) / area.size.height * guest_height;
+                    double guest_x = floor (x - area.origin.x) / area.size.width * guest_width;
+                    double guest_y = floor (y - area.origin.y) / area.size.height * guest_height;
 
                     if (guest_x < 0 || guest_y < 0 ||
                         guest_x >= guest_width || guest_y >= guest_height)
