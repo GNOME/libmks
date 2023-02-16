@@ -770,6 +770,7 @@ mks_display_init (MksDisplay *self)
                            G_CALLBACK (mks_display_legacy_event_cb),
                            self,
                            G_CONNECT_SWAPPED);
+  gtk_event_controller_set_propagation_phase (controller, GTK_PHASE_CAPTURE);
   gtk_widget_add_controller (GTK_WIDGET (self), controller);
 
   gtk_widget_set_focusable (GTK_WIDGET (self), TRUE);
