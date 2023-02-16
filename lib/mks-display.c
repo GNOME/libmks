@@ -773,7 +773,6 @@ mks_display_init (MksDisplay *self)
   gtk_widget_add_controller (GTK_WIDGET (self), controller);
 
   gtk_widget_set_focusable (GTK_WIDGET (self), TRUE);
-  gtk_widget_set_cursor_from_name (GTK_WIDGET (self), "none");
 }
 
 GtkWidget *
