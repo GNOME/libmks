@@ -29,6 +29,7 @@ libmks_private_sources = [
   'mks-display-picture.c',
   'mks-css.c',
   'mks-gl-context.c',
+  'mks-inhibitor.c',
   'mks-read-only-list-model.c',
   'mks-util.c',
 
