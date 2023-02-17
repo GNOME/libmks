@@ -142,6 +142,7 @@ mks_display_disconnect (MksDisplay *self)
   g_assert (MKS_IS_DISPLAY (self));
 
   g_clear_object (&priv->screen);
+  g_clear_object (&priv->inhibitor);
 
   if (priv->picture != NULL)
     {
