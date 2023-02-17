@@ -355,9 +355,33 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
             button = MKS_MOUSE_BUTTON_WHEEL_DOWN;
             break;
 
+          case GDK_SCROLL_SMOOTH:
+            {
+              double delta_x;
+              double delta_y;
+
+              /*
+               * Currently there is no touchpad D-Bus interface to communicate
+               * with Qemu. That is something we would very much want to have
+               * in the future so that we can do this properly.
+               *
+               * For now, we just "emulate" scroll events by looking at direction
+               * and sending that across as wheel events. It's enough to be useful
+               * but far from what we would really want in the long run.
+               */
+
+              gdk_scroll_event_get_deltas (event, &delta_x, &delta_y);
+
+              if (delta_y < 0)
+                button = MKS_MOUSE_BUTTON_WHEEL_DOWN;
+              else if (delta_y > 0)
+                button = MKS_MOUSE_BUTTON_WHEEL_UP;
+
+              break;
+            }
+
           case GDK_SCROLL_LEFT:
           case GDK_SCROLL_RIGHT:
-          case GDK_SCROLL_SMOOTH:
           default:
             break;
           }
