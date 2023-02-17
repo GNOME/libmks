@@ -25,6 +25,7 @@
 #include "mks-css-private.h"
 #include "mks-display.h"
 #include "mks-display-picture-private.h"
+#include "mks-inhibitor-private.h"
 #include "mks-keyboard.h"
 #include "mks-mouse.h"
 #include "mks-paintable-private.h"
@@ -34,6 +35,7 @@ typedef struct
 {
   MksScreen         *screen;
   MksDisplayPicture *picture;
+  MksInhibitor      *inhibitor;
 } MksDisplayPrivate;
 
 enum {
@@ -147,6 +149,31 @@ mks_display_disconnect (MksDisplay *self)
       mks_display_picture_set_keyboard (priv->picture, NULL);
       mks_display_picture_set_mouse (priv->picture, NULL);
     }
+}
+
+static gboolean
+mks_display_legacy_event_cb (MksDisplay               *self,
+                             GdkEvent                 *event,
+                             GtkEventControllerLegacy *legacy)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  GdkEventType event_type;
+
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (GTK_IS_EVENT_CONTROLLER_LEGACY (legacy));
+
+  event_type = gdk_event_get_event_type (event);
+
+  if (priv->screen == NULL)
+    return GDK_EVENT_PROPAGATE;
+
+  if (event_type == GDK_BUTTON_PRESS)
+    {
+      if (priv->inhibitor == NULL)
+        priv->inhibitor = mks_inhibitor_new (GTK_WIDGET (priv->picture), event);
+    }
+
+  return GDK_EVENT_PROPAGATE;
 }
 
 static void
@@ -294,9 +321,19 @@ static void
 mks_display_init (MksDisplay *self)
 {
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  GtkEventController *controller;
 
   priv->picture = g_object_new (MKS_TYPE_DISPLAY_PICTURE, NULL);
   gtk_widget_set_parent (GTK_WIDGET (priv->picture), GTK_WIDGET (self));
+
+  controller = gtk_event_controller_legacy_new ();
+  gtk_event_controller_set_propagation_phase (controller, GTK_PHASE_CAPTURE);
+  g_signal_connect_object (controller,
+                           "event",
+                           G_CALLBACK (mks_display_legacy_event_cb),
+                           self,
+                           G_CONNECT_SWAPPED);
+  gtk_widget_add_controller (GTK_WIDGET (self), controller);
 }
 
 GtkWidget *
