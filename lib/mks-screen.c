@@ -129,6 +129,24 @@ mks_screen_console_notify_cb (MksScreen      *self,
     _mks_screen_set_height (self, mks_qemu_console_get_height (console));
   else if (strcmp (pspec->name, "number") == 0)
     _mks_screen_set_number (self, mks_qemu_console_get_head (console));
+  else if (strcmp (pspec->name, "type") == 0)
+    {
+      const char *type;
+
+      if ((type = mks_qemu_console_get_type_ ((console))))
+        {
+          MksScreenKind kind = MKS_SCREEN_KIND_TEXT;
+
+          if (strcmp (type, "Graphic") == 0)
+            kind = MKS_SCREEN_KIND_GRAPHIC;
+
+          if (kind != self->kind)
+            {
+              self->kind = kind;
+              g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_KIND]);
+            }
+        }
+    }
 }
 
 static void
