@@ -26,6 +26,7 @@ libmks_headers = [
 libmks_private_sources = [
   'mks-cairo-framebuffer.c',
   'mks-dmabuf-paintable.c',
+  'mks-display-picture.c',
   'mks-css.c',
   'mks-gl-context.c',
   'mks-read-only-list-model.c',
