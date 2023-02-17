@@ -41,11 +41,16 @@ struct _MksDisplayClass
 };
 
 MKS_AVAILABLE_IN_ALL
-GtkWidget *mks_display_new        (void);
+GtkWidget          *mks_display_new                (void);
 MKS_AVAILABLE_IN_ALL
-MksScreen *mks_display_get_screen (MksDisplay *self);
+GtkShortcutTrigger *mks_display_get_ungrab_trigger (MksDisplay         *self);
 MKS_AVAILABLE_IN_ALL
-void       mks_display_set_screen (MksDisplay *self,
-                                   MksScreen  *screen);
+void                mks_display_set_ungrab_trigger (MksDisplay         *self,
+                                                    GtkShortcutTrigger *trigger);
+MKS_AVAILABLE_IN_ALL
+MksScreen          *mks_display_get_screen         (MksDisplay         *self);
+MKS_AVAILABLE_IN_ALL
+void                mks_display_set_screen         (MksDisplay         *self,
+                                                    MksScreen          *screen);
 
 G_END_DECLS

@@ -31,16 +31,20 @@
 #include "mks-paintable-private.h"
 #include "mks-screen.h"
 
+#define DEFAULT_UNGRAB_TRIGGER "<Control><Alt>g"
+
 typedef struct
 {
-  MksScreen         *screen;
-  MksDisplayPicture *picture;
-  MksInhibitor      *inhibitor;
+  MksScreen          *screen;
+  MksDisplayPicture  *picture;
+  MksInhibitor       *inhibitor;
+  GtkShortcutTrigger *ungrab_trigger;
 } MksDisplayPrivate;
 
 enum {
   PROP_0,
   PROP_SCREEN,
+  PROP_UNGRAB_TRIGGER,
   N_PROPS
 };
 
@@ -168,10 +172,28 @@ mks_display_legacy_event_cb (MksDisplay               *self,
   if (priv->screen == NULL)
     return GDK_EVENT_PROPAGATE;
 
-  if (event_type == GDK_BUTTON_PRESS)
+  if (FALSE) {}
+  else if (event_type == GDK_BUTTON_PRESS)
     {
       if (priv->inhibitor == NULL)
         priv->inhibitor = mks_inhibitor_new (GTK_WIDGET (priv->picture), event);
+    }
+  else if (event_type == GDK_KEY_PRESS)
+    {
+      GdkKeyMatch match;
+
+      match = gtk_shortcut_trigger_trigger (priv->ungrab_trigger, event, FALSE);
+
+      if (match == GDK_KEY_MATCH_EXACT)
+        {
+          if (priv->inhibitor != NULL)
+            {
+              mks_inhibitor_uninhibit (priv->inhibitor);
+              g_clear_object (&priv->inhibitor);
+            }
+
+          return GDK_EVENT_STOP;
+        }
     }
 
   return GDK_EVENT_PROPAGATE;
@@ -267,6 +289,10 @@ mks_display_get_property (GObject    *object,
       g_value_set_object (value, mks_display_get_screen (self));
       break;
 
+    case PROP_UNGRAB_TRIGGER:
+      g_value_set_object (value, mks_display_get_ungrab_trigger (self));
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     }
@@ -284,6 +310,10 @@ mks_display_set_property (GObject      *object,
     {
     case PROP_SCREEN:
       mks_display_set_screen (self, g_value_get_object (value));
+      break;
+
+    case PROP_UNGRAB_TRIGGER:
+      mks_display_set_ungrab_trigger (self, g_value_get_object (value));
       break;
 
     default:
@@ -311,6 +341,11 @@ mks_display_class_init (MksDisplayClass *klass)
                          MKS_TYPE_SCREEN,
                          (G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS));
 
+  properties [PROP_UNGRAB_TRIGGER] =
+    g_param_spec_object ("ungrab-trigger", NULL, NULL,
+                         GTK_TYPE_SHORTCUT_TRIGGER,
+                         (G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_properties (object_class, N_PROPS, properties);
 
   gtk_widget_class_set_css_name (widget_class, "MksDisplay");
@@ -335,6 +370,8 @@ mks_display_init (MksDisplay *self)
                            self,
                            G_CONNECT_SWAPPED);
   gtk_widget_add_controller (GTK_WIDGET (self), controller);
+
+  priv->ungrab_trigger = gtk_shortcut_trigger_parse_string (DEFAULT_UNGRAB_TRIGGER);
 }
 
 GtkWidget *
@@ -379,4 +416,39 @@ mks_display_set_screen (MksDisplay *self,
     mks_display_connect (self, screen);
 
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_SCREEN]);
+}
+
+/**
+ * mks_display_get_ungrab_trigger:
+ * @self: a #MksDisplay
+ *
+ * Gets the #GtkShortcutTrigger that will ungrab the display.
+ *
+ * Returns: (transfer none): a #GtkShortcutTrigger
+ */
+GtkShortcutTrigger *
+mks_display_get_ungrab_trigger (MksDisplay *self)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+
+  g_return_val_if_fail (MKS_IS_DISPLAY (self), NULL);
+
+  return priv->ungrab_trigger;
+}
+
+void
+mks_display_set_ungrab_trigger (MksDisplay         *self,
+                                GtkShortcutTrigger *ungrab_trigger)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+
+  g_return_if_fail (MKS_IS_DISPLAY (self));
+  g_return_if_fail (!ungrab_trigger || GTK_IS_SHORTCUT_TRIGGER (ungrab_trigger));
+
+  if (g_set_object (&priv->ungrab_trigger, ungrab_trigger))
+    {
+      if (priv->ungrab_trigger == NULL)
+        priv->ungrab_trigger = gtk_shortcut_trigger_parse_string (DEFAULT_UNGRAB_TRIGGER);
+      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_UNGRAB_TRIGGER]);
+    }
 }
