@@ -36,9 +36,4 @@ typedef struct _MksScreen              MksScreen;
 typedef struct _MksSession             MksSession;
 typedef struct _MksScreenAttributes    MksScreenAttributes;
 
-typedef struct _MksAudio     MksAudio;
-typedef struct _MksChardev   MksChardev;
-typedef struct _MksClipboard MksClipboard;
-typedef struct _MksUsb       MksUsb;
-
 G_END_DECLS
