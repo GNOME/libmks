@@ -684,7 +684,6 @@ mks_display_picture_init (MksDisplayPicture *self)
                                  G_CONNECT_SWAPPED);
 
   gtk_widget_set_focusable (GTK_WIDGET (self), TRUE);
-  gtk_widget_set_cursor_from_name (GTK_WIDGET (self), "none");
 }
 
 GtkWidget *
