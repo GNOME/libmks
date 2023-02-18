@@ -35,5 +35,6 @@ typedef struct _MksMouse               MksMouse;
 typedef struct _MksScreen              MksScreen;
 typedef struct _MksSession             MksSession;
 typedef struct _MksScreenAttributes    MksScreenAttributes;
+typedef struct _MksSpeaker             MksSpeaker;
 
 G_END_DECLS

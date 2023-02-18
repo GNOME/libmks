@@ -8,6 +8,7 @@ libmks_sources = [
   'mks-screen.c',
   'mks-screen-attributes.c',
   'mks-session.c',
+  'mks-speaker.c',
 ]
 
 libmks_headers = [
@@ -20,6 +21,7 @@ libmks_headers = [
   'mks-screen.h',
   'mks-screen-attributes.h',
   'mks-session.h',
+  'mks-speaker.h',
   'mks-types.h',
 ]
 
