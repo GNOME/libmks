@@ -32,6 +32,7 @@
 #include "mks-dmabuf-paintable-private.h"
 #include "mks-paintable-private.h"
 #include "mks-qemu.h"
+#include "mks-util-private.h"
 
 #include "mks-marshal.h"
 
@@ -68,10 +69,13 @@ _pixman_format_to_cairo_format (guint pixman_format)
 {
   switch (pixman_format)
     {
+#if _CAIRO_CHECK_VERSION(1, 17, 2)
     case PIXMAN_rgba_float:
       return CAIRO_FORMAT_RGBA128F;
     case PIXMAN_rgb_float:
       return CAIRO_FORMAT_RGB96F;
+#endif
+
     case PIXMAN_a8r8g8b8:
       return CAIRO_FORMAT_ARGB32;
     case PIXMAN_x2r10g10b10:

@@ -20,9 +20,16 @@
 
 #pragma once
 
+#include <cairo.h>
 #include <gdk/gdk.h>
 
 G_BEGIN_DECLS
+
+#define _CAIRO_CHECK_VERSION(major, minor, micro) \
+  (CAIRO_VERSION_MAJOR > (major) || \
+   (CAIRO_VERSION_MAJOR == (major) && CAIRO_VERSION_MINOR > (minor)) || \
+   (CAIRO_VERSION_MAJOR == (major) && CAIRO_VERSION_MINOR == (minor) && \
+    CAIRO_VERSION_MICRO >= (micro)))
 
 gboolean mks_scroll_event_is_inverted (GdkEvent *event);
 

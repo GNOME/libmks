@@ -24,6 +24,7 @@
 #include <gtk/gtk.h>
 
 #include "mks-cairo-framebuffer-private.h"
+#include "mks-util-private.h"
 
 #define TILE_WIDTH  128
 #define TILE_HEIGHT 128
@@ -216,8 +217,10 @@ mks_cairo_framebuffer_constructed (GObject *object)
     case CAIRO_FORMAT_A1:
     case CAIRO_FORMAT_RGB16_565:
     case CAIRO_FORMAT_RGB30:
+#if _CAIRO_CHECK_VERSION(1, 17, 2)
     case CAIRO_FORMAT_RGB96F:
     case CAIRO_FORMAT_RGBA128F:
+#endif
     case CAIRO_FORMAT_INVALID:
     default:
       g_warning ("Unsupported memory format from cairo format: 0x%x",
