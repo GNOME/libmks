@@ -36,6 +36,24 @@ create_connection (int      argc,
     return g_dbus_connection_new_for_address_sync (argv[1], 0, NULL, NULL, error);
 }
 
+static gboolean
+update_title_binding (GBinding     *binding,
+                      const GValue *from_value,
+                      GValue       *to_value,
+                      gpointer      user_data)
+{
+  MksDisplay *display = user_data;
+  GtkShortcutTrigger *trigger = mks_display_get_ungrab_trigger (display);
+  g_autofree char *label = gtk_shortcut_trigger_to_label (trigger, gtk_widget_get_display (GTK_WIDGET (display)));
+
+  if (g_value_get_boolean (from_value))
+    g_value_take_string (to_value, g_strdup_printf ("MKS (%s to ungrab)", label));
+  else
+    g_value_set_static_string (to_value, "MKS");
+
+  return TRUE;
+}
+
 int
 main (int   argc,
       char *argv[])
@@ -48,6 +66,7 @@ main (int   argc,
   g_autoptr(GError) error = NULL;
   GtkWindow *window;
   GtkWidget *display;
+  GdkSurface *surface;
 
   gtk_init ();
   mks_init ();
@@ -87,6 +106,13 @@ main (int   argc,
   mks_display_set_screen (MKS_DISPLAY (display), screen);
 
   gtk_window_present (window);
+
+  surface = gtk_native_get_surface (GTK_NATIVE (window));
+  g_object_bind_property_full (surface, "shortcuts-inhibited",
+                               window, "title",
+                               G_BINDING_SYNC_CREATE,
+                               update_title_binding, NULL, display, NULL);
+
   g_main_loop_run (main_loop);
 
   return EXIT_SUCCESS;
