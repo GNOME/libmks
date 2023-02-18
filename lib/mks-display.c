@@ -176,7 +176,14 @@ mks_display_legacy_event_cb (MksDisplay               *self,
   else if (event_type == GDK_BUTTON_PRESS)
     {
       if (priv->inhibitor == NULL)
-        priv->inhibitor = mks_inhibitor_new (GTK_WIDGET (priv->picture), event);
+        {
+          /* Don't allow click to pass through or the user may get
+           * a dialog in their face while something in the guest
+           * is grabbed.
+           */
+          priv->inhibitor = mks_inhibitor_new (GTK_WIDGET (priv->picture), event);
+          return GDK_EVENT_STOP;
+        }
     }
   else if (event_type == GDK_KEY_PRESS)
     {
