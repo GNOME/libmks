@@ -88,6 +88,8 @@ libmks_deps = [
   libgio_dep,
   libgiounix_dep,
   libgtk_dep,
+
+  cc.find_library('m', required: false),
 ]
 
 libmks = shared_library('mks-' + api_version,
