@@ -31,9 +31,14 @@ _mks_css_init (void)
 
   if G_UNLIKELY (provider == NULL)
     {
+      GdkDisplay *display = gdk_display_get_default ();
+
+      if (display == NULL)
+        return;
+
       provider = gtk_css_provider_new ();
       gtk_css_provider_load_from_resource (provider, "/org/gnome/libmks/style.css");
-      gtk_style_context_add_provider_for_display (gdk_display_get_default (),
+      gtk_style_context_add_provider_for_display (display,
                                                   GTK_STYLE_PROVIDER (provider),
                                                   GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     }
