@@ -59,7 +59,6 @@ main (int   argc,
       char *argv[])
 {
   g_autoptr(GDBusConnection) connection = NULL;
-  g_autoptr(GdkPaintable) paintable = NULL;
   g_autoptr(MksSession) session = NULL;
   g_autoptr(MksScreen) screen = NULL;
   g_autoptr(GMainLoop) main_loop = NULL;
