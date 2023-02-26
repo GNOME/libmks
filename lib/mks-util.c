@@ -20,6 +20,9 @@
 
 #include "config.h"
 
+#include <glib/gstdio.h>
+#include <sys/socket.h>
+
 #include "mks-util-private.h"
 
 static GSettings *mouse_settings;
@@ -85,4 +88,133 @@ mks_scroll_event_is_inverted (GdkEvent *event)
     default:
       return FALSE;
     }
+}
+
+static gboolean
+create_socketpair (int     *us,
+                   int     *them,
+                   GError **error)
+{
+  int fds[2];
+  int rv;
+
+  rv = socketpair (AF_UNIX, SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, 0, fds);
+
+  if (rv != 0)
+    {
+      int errsv = errno;
+      g_set_error_literal (error,
+                           G_IO_ERROR,
+                           g_io_error_from_errno (errsv),
+                           g_strerror (errsv));
+      return FALSE;
+    }
+
+  *us = fds[0];
+  *them = fds[1];
+
+  return TRUE;
+}
+
+static void
+fdptr_clear (gpointer data)
+{
+  int *fdptr = data;
+  if (*fdptr != -1)
+    close (*fdptr);
+  *fdptr = -1;
+  g_free (fdptr);
+}
+
+static void
+mks_socketpair_connection_cb (GObject      *object,
+                              GAsyncResult *result,
+                              gpointer      user_data)
+{
+  g_autoptr(GTask) task = user_data;
+  g_autoptr(GDBusConnection) ret = NULL;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (G_IS_TASK (task));
+
+  if (!(ret = g_dbus_connection_new_finish (result, &error)))
+    g_task_return_error (task, g_steal_pointer (&error));
+  else
+    g_task_return_pointer (task, g_steal_pointer (&ret), g_object_unref);
+}
+
+void
+mks_socketpair_connection_new (GDBusConnectionFlags  flags,
+                               GCancellable         *cancellable,
+                               GAsyncReadyCallback   callback,
+                               gpointer              user_data)
+{
+  g_autoptr(GSocketConnection) io_stream = NULL;
+  g_autoptr(GSocket) socket = NULL;
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GTask) task = NULL;
+  g_autofd int us = -1;
+  g_autofd int them = -1;
+  int *fdptr;
+
+  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
+
+  task = g_task_new (NULL, cancellable, callback, user_data);
+  g_task_set_source_tag (task, mks_socketpair_connection_new);
+  g_task_set_task_data (task, GINT_TO_POINTER (-1), NULL);
+
+  if (!create_socketpair (&us, &them, &error) ||
+      !(socket = g_socket_new_from_fd (us, &error)))
+    {
+      g_task_return_error (task, g_steal_pointer (&error));
+      return;
+    }
+
+  io_stream = g_socket_connection_factory_create_connection (socket);
+  fdptr = g_memdup2 (&them, sizeof them);
+  g_task_set_task_data (task, fdptr, fdptr_clear);
+
+  us = -1;
+  them = -1;
+
+  g_dbus_connection_new (G_IO_STREAM (io_stream),
+                         NULL,
+                         flags | G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING,
+                         NULL,
+                         cancellable,
+                         mks_socketpair_connection_cb,
+                         g_steal_pointer (&task));
+
+}
+
+/**
+ * mks_socketpair_connection_new_finish:
+ * @result: a #GAsyncResult
+ * @peer_fd: (out): a location for a socketpair file-descriptor
+ * @error: (out): a location for a #GError, or %NULL
+ *
+ * Completes the asynchronous request to create a socketpair()-based
+ * D-Bus connection.
+ *
+ * Returns: (transfer full): a #GDBusConnection and @peer_fd is set
+ *   if successful; otherwise %NULL and @error is set.
+ */
+GDBusConnection *
+mks_socketpair_connection_new_finish (GAsyncResult  *result,
+                                      int           *peer_fd,
+                                      GError       **error)
+{
+  GDBusConnection *ret;
+  int *fdptr;
+
+  g_return_val_if_fail (G_IS_TASK (result), NULL);
+  g_return_val_if_fail (peer_fd != NULL, NULL);
+
+  fdptr = g_task_get_task_data (G_TASK (result));
+
+  if ((ret = g_task_propagate_pointer (G_TASK (result), error)))
+    *peer_fd = g_steal_fd (fdptr);
+
+  return ret;
 }

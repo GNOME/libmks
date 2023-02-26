@@ -22,6 +22,7 @@
 
 #include <cairo.h>
 #include <gdk/gdk.h>
+#include <gio/gio.h>
 
 G_BEGIN_DECLS
 
@@ -31,6 +32,13 @@ G_BEGIN_DECLS
    (CAIRO_VERSION_MAJOR == (major) && CAIRO_VERSION_MINOR == (minor) && \
     CAIRO_VERSION_MICRO >= (micro)))
 
-gboolean mks_scroll_event_is_inverted (GdkEvent *event);
+gboolean         mks_scroll_event_is_inverted         (GdkEvent              *event);
+void             mks_socketpair_connection_new        (GDBusConnectionFlags   flags,
+                                                       GCancellable          *cancellable,
+                                                       GAsyncReadyCallback    callback,
+                                                       gpointer               user_data);
+GDBusConnection *mks_socketpair_connection_new_finish (GAsyncResult          *result,
+                                                       int                   *peer_fd,
+                                                       GError               **error);
 
 G_END_DECLS
