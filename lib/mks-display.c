@@ -30,6 +30,7 @@
 #include "mks-mouse.h"
 #include "mks-paintable-private.h"
 #include "mks-screen.h"
+#include "mks-util-private.h"
 
 #define DEFAULT_UNGRAB_TRIGGER "<Control><Alt>g"
 
@@ -103,6 +104,8 @@ mks_display_attach_cb (GObject      *object,
   g_autoptr(GdkPaintable) paintable = NULL;
   g_autoptr(GError) error = NULL;
 
+  MKS_ENTRY;
+
   g_assert (MKS_IS_SCREEN (screen));
   g_assert (G_IS_ASYNC_RESULT (result));
   g_assert (MKS_IS_DISPLAY (self));
@@ -110,9 +113,11 @@ mks_display_attach_cb (GObject      *object,
   paintable = mks_screen_attach_finish (screen, result, &error);
 
   if (priv->screen != screen)
-    return;
+    MKS_EXIT;
 
   mks_display_picture_set_paintable (priv->picture, MKS_PAINTABLE (paintable));
+
+  MKS_EXIT;
 }
 
 static void
@@ -120,6 +125,8 @@ mks_display_connect (MksDisplay *self,
                      MksScreen  *screen)
 {
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+
+  MKS_ENTRY;
 
   g_assert (MKS_IS_DISPLAY (self));
   g_assert (!screen || MKS_IS_SCREEN (screen));
@@ -136,12 +143,16 @@ mks_display_connect (MksDisplay *self,
 
       g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_SCREEN]);
     }
+
+  MKS_EXIT;
 }
 
 static void
 mks_display_disconnect (MksDisplay *self)
 {
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+
+  MKS_ENTRY;
 
   g_assert (MKS_IS_DISPLAY (self));
 
@@ -154,6 +165,8 @@ mks_display_disconnect (MksDisplay *self)
       mks_display_picture_set_keyboard (priv->picture, NULL);
       mks_display_picture_set_mouse (priv->picture, NULL);
     }
+
+  MKS_EXIT;
 }
 
 static gboolean
@@ -411,10 +424,12 @@ mks_display_set_screen (MksDisplay *self,
 {
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
 
+  MKS_ENTRY;
+
   g_return_if_fail (MKS_IS_DISPLAY (self));
 
   if (priv->screen == screen)
-    return;
+    MKS_EXIT;
 
   if (priv->screen != NULL)
     mks_display_disconnect (self);
@@ -423,6 +438,8 @@ mks_display_set_screen (MksDisplay *self,
     mks_display_connect (self, screen);
 
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_SCREEN]);
+
+  MKS_EXIT;
 }
 
 /**
@@ -449,6 +466,8 @@ mks_display_set_ungrab_trigger (MksDisplay         *self,
 {
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
 
+  MKS_ENTRY;
+
   g_return_if_fail (MKS_IS_DISPLAY (self));
   g_return_if_fail (!ungrab_trigger || GTK_IS_SHORTCUT_TRIGGER (ungrab_trigger));
 
@@ -458,4 +477,6 @@ mks_display_set_ungrab_trigger (MksDisplay         *self,
         priv->ungrab_trigger = gtk_shortcut_trigger_parse_string (DEFAULT_UNGRAB_TRIGGER);
       g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_UNGRAB_TRIGGER]);
     }
+
+  MKS_EXIT;
 }

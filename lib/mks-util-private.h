@@ -32,6 +32,16 @@ G_BEGIN_DECLS
    (CAIRO_VERSION_MAJOR == (major) && CAIRO_VERSION_MINOR == (minor) && \
     CAIRO_VERSION_MICRO >= (micro)))
 
+#ifdef MKS_DEBUG
+# define MKS_ENTRY      G_STMT_START { g_debug("ENTRY: %s():%u", G_STRFUNC, __LINE__) } G_STMT_END
+# define MKS_EXIT       G_STMT_START { g_debug(" EXIT: %s():%u", G_STRFUNC, __LINE__); return; } G_STMT_END
+# define MKS_RETURN(_r) G_STMT_START { g_debug(" EXIT: %s():%u", G_STRFUNC, __LINE__); return (_r); } G_STMT_END
+#else
+# define MKS_ENTRY      G_STMT_START { } G_STMT_END
+# define MKS_EXIT       G_STMT_START { return; } G_STMT_END
+# define MKS_RETURN(_r) G_STMT_START { return (_r); } G_STMT_END
+#endif
+
 gboolean         mks_scroll_event_is_inverted         (GdkEvent              *event);
 void             mks_socketpair_connection_new        (GDBusConnectionFlags   flags,
                                                        GCancellable          *cancellable,
