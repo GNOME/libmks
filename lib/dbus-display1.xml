@@ -493,6 +493,7 @@
         :dbus:iface:`org.qemu.Display1.AudioOutListener` interface.
     -->
     <method name="RegisterOutListener">
+      <annotation name="org.gtk.GDBus.C.UnixFD" value="true"/>
       <arg type="h" name="listener" direction="in"/>
     </method>
 
@@ -508,6 +509,7 @@
         :dbus:iface:`org.qemu.Display1.AudioInListener` interface.
     -->
     <method name="RegisterInListener">
+      <annotation name="org.gtk.GDBus.C.UnixFD" value="true"/>
       <arg type="h" name="listener" direction="in"/>
     </method>
   </interface>
