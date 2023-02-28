@@ -21,13 +21,19 @@
 
 #include "config.h"
 
+#include <glib/gstdio.h>
+
 #include "mks-device-private.h"
 #include "mks-qemu.h"
 #include "mks-speaker.h"
+#include "mks-util-private.h"
 
 struct _MksSpeaker
 {
   MksDevice parent_instance;
+  MksQemuAudio *audio;
+  MksQemuAudioOutListener *listener;
+  GDBusConnection *connection;
   guint muted : 1;
 };
 
@@ -47,8 +53,112 @@ enum {
 static GParamSpec *properties [N_PROPS];
 
 static void
+mks_speaker_register_cb (GObject      *object,
+                         GAsyncResult *result,
+                         gpointer      user_data)
+{
+  MksQemuAudio *audio = (MksQemuAudio *)object;
+  g_autoptr(MksSpeaker) self = user_data;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (MKS_QEMU_IS_AUDIO (audio));
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (MKS_IS_SPEAKER (self));
+
+  if (!mks_qemu_audio_call_register_out_listener_finish (audio, NULL, result, &error))
+    g_warning ("Failed to register audio out listener: %s", error->message);
+}
+
+static void
+mks_speaker_connection_cb (GObject      *object,
+                           GAsyncResult *result,
+                           gpointer      user_data)
+{
+  g_autoptr(GDBusConnection) connection = NULL;
+  g_autoptr(MksSpeaker) self = user_data;
+  g_autoptr(GUnixFDList) fd_list = NULL;
+  g_autoptr(GError) error = NULL;
+  g_autofd int peer_fd = -1;
+
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (MKS_IS_SPEAKER (self));
+
+  if (!(connection = mks_socketpair_connection_new_finish (result, &peer_fd, &error)))
+    {
+      g_warning ("Failed to create socketpair D-Bus connection: %s", error->message);
+      return;
+    }
+
+  g_set_object (&self->connection, connection);
+
+  self->listener = mks_qemu_audio_out_listener_skeleton_new ();
+
+  /* TODO: Handle various skeleton methods */
+
+  /* SetVolume */
+  /* SetEnabled */
+  /* Init */
+  /* Fini */
+  /* Write */
+
+  if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self->listener),
+                                         connection,
+                                         "/org/qemu/Display1/AudioOutListener",
+                                         &error))
+
+    {
+      g_warning ("Failed to export AudioOutListener on D-Bus connection: %s",
+                 error->message);
+      return;
+    }
+
+  fd_list = g_unix_fd_list_new_from_array (&peer_fd, 1);
+  peer_fd = -1;
+
+  mks_qemu_audio_call_register_out_listener (self->audio,
+                                             g_variant_new_handle (0),
+                                             fd_list,
+                                             NULL,
+                                             mks_speaker_register_cb,
+                                             g_object_ref (self));
+}
+
+static gboolean
+mks_speaker_setup (MksDevice     *device,
+                   MksQemuObject *object)
+{
+  MksSpeaker *self = (MksSpeaker *)object;
+
+  g_assert (MKS_IS_SPEAKER (self));
+  g_assert (MKS_QEMU_IS_OBJECT (object));
+
+  if (MKS_QEMU_IS_AUDIO (object))
+    {
+      g_set_object (&self->audio, MKS_QEMU_AUDIO (object));
+      mks_socketpair_connection_new (G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT,
+                                     NULL,
+                                     mks_speaker_connection_cb,
+                                     g_object_ref (self));
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
+static void
 mks_speaker_dispose (GObject *object)
 {
+  MksSpeaker *self = (MksSpeaker *)object;
+
+  if (self->listener != NULL)
+    {
+      g_dbus_interface_skeleton_unexport (G_DBUS_INTERFACE_SKELETON (self->listener));
+      g_clear_object (&self->listener);
+    }
+
+  g_clear_object (&self->connection);
+  g_clear_object (&self->audio);
+
   G_OBJECT_CLASS (mks_speaker_parent_class)->dispose (object);
 }
 
@@ -94,10 +204,13 @@ static void
 mks_speaker_class_init (MksSpeakerClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+  MksDeviceClass *device_class = MKS_DEVICE_CLASS (klass);
 
   object_class->dispose = mks_speaker_dispose;
   object_class->get_property = mks_speaker_get_property;
   object_class->set_property = mks_speaker_set_property;
+
+  device_class->setup = mks_speaker_setup;
 
   /**
    * MksSpeaker:muted:
