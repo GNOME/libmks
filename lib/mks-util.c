@@ -57,7 +57,7 @@ _mks_util_init (void)
  * directoin we can use that instead of checking the GSetting.
  *
  * TODO: This won't handle Flatpak because we won't have access to the
- * host setting for the GSetting. Additionally, it wont work with jhbuild
+ * host setting for the GSetting. Additionally, it won't work with jhbuild
  * for the same reasons (likely using alternate GSettings/dconf).
  *
  * But this is better than nothing for the time being and provides an
