@@ -24,6 +24,7 @@
 #include "mks-device-private.h"
 #include "mks-enums.h"
 #include "mks-keyboard.h"
+#include "mks-util-private.h"
 
 struct _MksKeyboard
 {
@@ -52,6 +53,8 @@ mks_keyboard_keyboard_notify_cb (MksKeyboard     *self,
                                  GParamSpec      *pspec,
                                  MksQemuKeyboard *keyboard)
 {
+  MKS_ENTRY;
+
   g_assert (MKS_IS_KEYBOARD (self));
   g_assert (pspec != NULL);
   g_assert (MKS_QEMU_IS_KEYBOARD (keyboard));
@@ -62,6 +65,8 @@ mks_keyboard_keyboard_notify_cb (MksKeyboard     *self,
       self->modifiers = mks_qemu_keyboard_get_modifiers (keyboard);
       g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_MODIFIERS]);
     }
+
+  MKS_EXIT;
 }
 
 static void
@@ -192,6 +197,8 @@ mks_keyboard_press_cb (GObject      *object,
   g_autoptr(GTask) task = user_data;
   g_autoptr(GError) error = NULL;
 
+  MKS_ENTRY;
+
   g_assert (MKS_QEMU_IS_KEYBOARD (keyboard));
   g_assert (G_IS_ASYNC_RESULT (result));
   g_assert (G_IS_TASK (task));
@@ -200,6 +207,8 @@ mks_keyboard_press_cb (GObject      *object,
     g_task_return_error (task, g_steal_pointer (&error));
   else
     g_task_return_boolean (task, TRUE);
+
+  MKS_EXIT;
 }
 
 /**
@@ -222,6 +231,8 @@ mks_keyboard_press (MksKeyboard         *self,
   g_autoptr(GTask) task = NULL;
   g_autoptr(GError) error = NULL;
 
+  MKS_ENTRY;
+
   g_return_if_fail (MKS_IS_KEYBOARD (self));
   g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
 
@@ -236,6 +247,8 @@ mks_keyboard_press (MksKeyboard         *self,
                                   cancellable,
                                   mks_keyboard_press_cb,
                                   g_steal_pointer (&task));
+
+  MKS_EXIT;
 }
 
 gboolean
@@ -243,10 +256,16 @@ mks_keyboard_press_finish (MksKeyboard   *self,
                            GAsyncResult  *result,
                            GError       **error)
 {
+  gboolean ret;
+
+  MKS_ENTRY;
+
   g_return_val_if_fail (MKS_IS_KEYBOARD (self), FALSE);
   g_return_val_if_fail (g_task_is_valid (result, self), FALSE);
 
-  return g_task_propagate_boolean (G_TASK (result), error);
+  ret = g_task_propagate_boolean (G_TASK (result), error);
+
+  MKS_RETURN (ret);
 }
 
 gboolean
@@ -255,13 +274,19 @@ mks_keyboard_press_sync (MksKeyboard   *self,
                          GCancellable  *cancellable,
                          GError       **error)
 {
+  gboolean ret;
+
+  MKS_ENTRY;
+
   g_return_val_if_fail (MKS_IS_KEYBOARD (self), FALSE);
   g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
 
   if (!check_keyboard (self, error))
-    return FALSE;
+    MKS_RETURN (FALSE);
 
-  return mks_qemu_keyboard_call_press_sync (self->keyboard, keycode, cancellable, error);
+  ret = mks_qemu_keyboard_call_press_sync (self->keyboard, keycode, cancellable, error);
+
+  MKS_RETURN (ret);
 }
 
 static void
@@ -273,6 +298,8 @@ mks_keyboard_release_cb (GObject      *object,
   g_autoptr(GTask) task = user_data;
   g_autoptr(GError) error = NULL;
 
+  MKS_ENTRY;
+
   g_assert (MKS_QEMU_IS_KEYBOARD (keyboard));
   g_assert (G_IS_ASYNC_RESULT (result));
   g_assert (G_IS_TASK (task));
@@ -281,6 +308,8 @@ mks_keyboard_release_cb (GObject      *object,
     g_task_return_error (task, g_steal_pointer (&error));
   else
     g_task_return_boolean (task, TRUE);
+
+  MKS_EXIT;
 }
 
 /**
@@ -303,6 +332,8 @@ mks_keyboard_release (MksKeyboard         *self,
   g_autoptr(GTask) task = NULL;
   g_autoptr(GError) error = NULL;
 
+  MKS_ENTRY;
+
   g_return_if_fail (MKS_IS_KEYBOARD (self));
   g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
 
@@ -317,6 +348,8 @@ mks_keyboard_release (MksKeyboard         *self,
                                     cancellable,
                                     mks_keyboard_release_cb,
                                     g_steal_pointer (&task));
+
+  MKS_EXIT;
 }
 
 gboolean
@@ -324,10 +357,16 @@ mks_keyboard_release_finish (MksKeyboard   *self,
                              GAsyncResult  *result,
                              GError       **error)
 {
+  gboolean ret;
+
+  MKS_ENTRY;
+
   g_return_val_if_fail (MKS_IS_KEYBOARD (self), FALSE);
   g_return_val_if_fail (g_task_is_valid (result, self), FALSE);
 
-  return g_task_propagate_boolean (G_TASK (result), error);
+  ret = g_task_propagate_boolean (G_TASK (result), error);
+
+  MKS_RETURN (ret);
 }
 
 gboolean
@@ -336,11 +375,17 @@ mks_keyboard_release_sync (MksKeyboard   *self,
                            GCancellable  *cancellable,
                            GError       **error)
 {
+  gboolean ret;
+
+  MKS_ENTRY;
+
   g_return_val_if_fail (MKS_IS_KEYBOARD (self), FALSE);
   g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
 
   if (!check_keyboard (self, error))
-    return FALSE;
+    MKS_RETURN (FALSE);
 
-  return mks_qemu_keyboard_call_release_sync (self->keyboard, keycode, cancellable, error);
+  ret = mks_qemu_keyboard_call_release_sync (self->keyboard, keycode, cancellable, error);
+
+  MKS_RETURN (ret);
 }
