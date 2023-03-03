@@ -52,6 +52,83 @@ enum {
 
 static GParamSpec *properties [N_PROPS];
 
+static gboolean
+mks_speaker_handle_init (MksSpeaker            *self,
+                         GDBusMethodInvocation *invocation,
+                         guint64                id,
+                         guchar                 bits,
+                         gboolean               is_signed,
+                         gboolean               is_float,
+                         guint                  freq,
+                         guchar                 nchannels,
+                         guint                  bytes_per_frame,
+                         guint                  bytes_per_second,
+                         gboolean               be)
+{
+  MKS_ENTRY;
+
+  g_assert (MKS_IS_SPEAKER (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+
+  MKS_RETURN (FALSE);
+}
+
+static gboolean
+mks_speaker_handle_fini (MksSpeaker            *self,
+                         GDBusMethodInvocation *invocation,
+                         guint64                id)
+{
+  MKS_ENTRY;
+
+  g_assert (MKS_IS_SPEAKER (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+
+  MKS_RETURN (FALSE);
+}
+
+static gboolean
+mks_speaker_handle_set_enabled (MksSpeaker            *self,
+                                GDBusMethodInvocation *invocation,
+                                guint64                id,
+                                gboolean               enbled)
+{
+  MKS_ENTRY;
+
+  g_assert (MKS_IS_SPEAKER (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+
+  MKS_RETURN (FALSE);
+}
+
+static gboolean
+mks_speaker_handle_set_volume (MksSpeaker            *self,
+                               GDBusMethodInvocation *invocation,
+                               guint64                id,
+                               gboolean               mute,
+                               GVariant              *volume)
+{
+  MKS_ENTRY;
+
+  g_assert (MKS_IS_SPEAKER (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+
+  MKS_RETURN (FALSE);
+}
+
+static gboolean
+mks_speaker_handle_write (MksSpeaker            *self,
+                          GDBusMethodInvocation *invocation,
+                          guint64                id,
+                          GVariant              *data)
+{
+  MKS_ENTRY;
+
+  g_assert (MKS_IS_SPEAKER (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+
+  MKS_RETURN (FALSE);
+}
+
 static void
 mks_speaker_register_cb (GObject      *object,
                          GAsyncResult *result,
@@ -93,13 +170,31 @@ mks_speaker_connection_cb (GObject      *object,
 
   self->listener = mks_qemu_audio_out_listener_skeleton_new ();
 
-  /* TODO: Handle various skeleton methods */
-
-  /* SetVolume */
-  /* SetEnabled */
-  /* Init */
-  /* Fini */
-  /* Write */
+  g_signal_connect_object (self->listener,
+                           "handle-init",
+                           G_CALLBACK (mks_speaker_handle_init),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->listener,
+                           "handle-fini",
+                           G_CALLBACK (mks_speaker_handle_fini),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->listener,
+                           "handle-set-enabled",
+                           G_CALLBACK (mks_speaker_handle_set_enabled),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->listener,
+                           "handle-set-volume",
+                           G_CALLBACK (mks_speaker_handle_set_volume),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->listener,
+                           "handle-write",
+                           G_CALLBACK (mks_speaker_handle_write),
+                           self,
+                           G_CONNECT_SWAPPED);
 
   if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self->listener),
                                          connection,
