@@ -492,7 +492,7 @@ mks_cairo_framebuffer_copy_to (MksCairoFramebuffer *self,
   cr = cairo_create (dest->surface);
   cairo_set_source_surface (cr, self->surface, 0, 0);
   cairo_rectangle (cr, 0, 0, self->width, self->height);
-  //cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
+  cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
   cairo_fill (cr);
   cairo_destroy (cr);
 }
