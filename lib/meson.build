@@ -23,6 +23,7 @@ libmks_headers = [
   'mks-session.h',
   'mks-speaker.h',
   'mks-types.h',
+  'mks-version-macros.h',
 ]
 
 libmks_private_sources = [
@@ -60,7 +61,7 @@ libmks_private_sources = [
 libmks_enums = gnome.mkenums_simple('mks-enums',
             sources: libmks_headers,
      install_header: true,
-        install_dir: join_paths(get_option('libdir'), 'libmks-@0@'.format(api_version)),
+        install_dir: join_paths(get_option('includedir'), 'libmks-@0@'.format(api_version)),
   identifier_prefix: 'Mks',
       symbol_prefix: 'mks',
 )
