@@ -4,6 +4,8 @@ include:
 
 stages:
   - test
+  - docs
+  - deploy
 
 flatpak:
   variables:
@@ -13,3 +15,32 @@ flatpak:
     RUNTIME_REPO: "https://nightly.gnome.org/gnome-nightly.flatpakrepo"
     APP_ID: "org.gnome.libmks.mks"
   extends: ".flatpak"
+
+reference:
+  image: fedora:38
+  stage: docs
+  needs: []
+  variables:
+    MESON_FLAGS: "-Dwerror=true --buildtype=release"
+  before_script:
+    - sudo dnf install -y gtk4-devel meson gcc gi-docgen gobject-introspection-devel
+  script:
+    - mkdir -p pfx/
+    - meson ${MESON_FLAGS} --prefix=${PWD}/pfx -Ddocs=true _build
+    - ninja -C _build install
+    - mkdir -p _reference/
+    - mv pfx/share/doc/libmks1/ _reference/
+  artifacts:
+    paths:
+      - _reference
+
+pages:
+  stage: deploy
+  needs: ["reference"]
+  script:
+    - mv _reference public/
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
