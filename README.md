@@ -14,7 +14,7 @@ program `./tools/mks`.
 qemu-img create -f qcow2 fedora.img 30G
 qemu-system-x86_64 \
     -enable-kvm \
-    -cpu host
+    -cpu host \
     -device virtio-vga-gl,xres=1920,yres=1080 \
     -m 8G \
     -smp 4 \
