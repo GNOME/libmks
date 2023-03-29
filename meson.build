@@ -155,4 +155,8 @@ add_project_link_arguments(project_link_args, language: 'c')
 subdir('lib')
 subdir('tools')
 
+if get_option('docs')
+  subdir('docs')
+endif
+
 configure_file(output: 'config.h', configuration: config_h)
