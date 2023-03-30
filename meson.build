@@ -155,7 +155,7 @@ add_project_link_arguments(project_link_args, language: 'c')
 subdir('lib')
 subdir('tools')
 
-if get_option('docs')
+if get_option('docs') and get_option('introspection').allowed()
   subdir('docs')
 endif
 
