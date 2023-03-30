@@ -137,7 +137,7 @@ test_link_args = [
   '-Wl,-z,relro',
   '-Wl,-z,now',
 ]
-if not get_option('buildtype').startswith('debug')
+if not get_option('buildtype').startswith('debug') and not meson.is_subproject()
   add_global_arguments(['-DG_DISABLE_CAST_CHECKS'], language: 'c')
   release_args += [ '-DG_DISABLE_ASSERT' ]
   test_link_args += [
