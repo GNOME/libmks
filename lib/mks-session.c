@@ -502,7 +502,7 @@ mks_session_async_initable_init_async (GAsyncInitable      *async_initable,
     mks_qemu_object_manager_client_new (self->connection,
                                         G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
                                         "org.qemu",
-                                        "/org/qemu/Display1/VM",
+                                        "/org/qemu/Display1",
                                         cancellable,
                                         mks_session_async_initable_vm_cb,
                                         g_steal_pointer (&task));
