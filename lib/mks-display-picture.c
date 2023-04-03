@@ -314,7 +314,7 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
     case GDK_KEY_RELEASE:
       {
         guint keycode = gdk_key_event_get_keycode (event);
-        guint keyval = gdk_key_event_get_keycode (event);
+        guint keyval = gdk_key_event_get_keyval (event);
         guint qkeycode;
 
         g_assert (MKS_IS_KEYBOARD (self->keyboard));
