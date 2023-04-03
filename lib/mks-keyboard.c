@@ -26,6 +26,9 @@
 #include "mks-keyboard.h"
 #include "mks-util-private.h"
 
+
+#include "mks-keymap-xorgevdev2qnum-private.h"
+
 struct _MksKeyboard
 {
   MksDevice        parent_instance;
@@ -388,4 +391,26 @@ mks_keyboard_release_sync (MksKeyboard   *self,
   ret = mks_qemu_keyboard_call_release_sync (self->keyboard, keycode, cancellable, error);
 
   MKS_RETURN (ret);
+}
+
+/**
+ * mks_keyboard_translate:
+ * @keyval: the keyval
+ * @keycode: the hardware keycode
+ * @translated: (out): the translated keycode
+ *
+ * Translate a keycode to a QEMU compatible one.
+ */
+void
+mks_keyboard_translate (guint              keyval,
+                        guint              keycode,
+                        guint             *translated)
+{
+  g_assert (translated != NULL);
+
+  if (keycode < xorgevdev_to_qnum_len &&
+      xorgevdev_to_qnum[keycode] != 0)
+    *translated = xorgevdev_to_qnum[keycode];
+  else
+    *translated = keycode;
 }

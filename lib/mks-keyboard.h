@@ -85,4 +85,9 @@ gboolean            mks_keyboard_release_sync   (MksKeyboard          *self,
                                                  GCancellable         *cancellable,
                                                  GError              **error);
 
+MKS_AVAILABLE_IN_ALL
+void                mks_keyboard_translate      (guint              keyval,
+                                                 guint              keycode,
+                                                 guint             *translated);
+
 G_END_DECLS
