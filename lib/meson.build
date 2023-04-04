@@ -121,12 +121,14 @@ pkg.generate(
   install_dir: join_paths(get_option('libdir'), 'pkgconfig')
 )
 
-libmks_gir = gnome.generate_gir(libmks,
-              sources: libmks_sources + libmks_headers,
-            nsversion: api_version,
-            namespace: 'Mks',
-        symbol_prefix: 'mks',
-    identifier_prefix: 'Mks',
-             includes: ['Gio-2.0', 'Gtk-4.0'],
-              install: true,
-)
+if get_option('introspection').allowed()
+  libmks_gir = gnome.generate_gir(libmks,
+                sources: libmks_sources + libmks_headers,
+              nsversion: api_version,
+              namespace: 'Mks',
+          symbol_prefix: 'mks',
+      identifier_prefix: 'Mks',
+              includes: ['Gio-2.0', 'Gtk-4.0'],
+                install: true,
+  )
+endif
