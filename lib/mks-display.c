@@ -245,6 +245,16 @@ mks_display_snapshot (GtkWidget   *widget,
   gtk_widget_snapshot_child (widget, GTK_WIDGET (priv->picture), snapshot);
 }
 
+static gboolean
+mks_display_grab_focus (GtkWidget *widget)
+{
+  MksDisplay *self = (MksDisplay *)widget;
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+
+  g_assert (MKS_IS_DISPLAY (self));
+  return gtk_widget_grab_focus (GTK_WIDGET (priv->picture));
+}
+
 static GtkSizeRequestMode
 mks_display_get_request_mode (GtkWidget *widget)
 {
@@ -355,6 +365,7 @@ mks_display_class_init (MksDisplayClass *klass)
   widget_class->measure = mks_display_measure;
   widget_class->size_allocate = mks_display_size_allocate;
   widget_class->snapshot = mks_display_snapshot;
+  widget_class->grab_focus = mks_display_grab_focus;
 
   properties[PROP_SCREEN] =
     g_param_spec_object ("screen", NULL, NULL,
