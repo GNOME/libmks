@@ -27,8 +27,6 @@
 #include "mks-mouse.h"
 #include "mks-util-private.h"
 
-#include "mks-keymap-xorgevdev2qnum-private.h"
-
 struct _MksDisplayPicture
 {
   GtkWidget     parent_instance;
@@ -53,22 +51,6 @@ enum {
 G_DEFINE_FINAL_TYPE (MksDisplayPicture, mks_display_picture, GTK_TYPE_WIDGET)
 
 static GParamSpec *properties [N_PROPS];
-
-static void
-mks_display_picture_translate_keycode (MksDisplayPicture *self,
-                                       guint              keyval,
-                                       guint              keycode,
-                                       guint             *translated)
-{
-  g_assert (MKS_IS_DISPLAY_PICTURE (self));
-  g_assert (translated != NULL);
-
-  if (keycode < xorgevdev_to_qnum_len &&
-      xorgevdev_to_qnum[keycode] != 0)
-    *translated = xorgevdev_to_qnum[keycode];
-  else
-    *translated = keycode;
-}
 
 static void
 mks_display_picture_keyboard_press_cb (GObject      *object,
@@ -319,7 +301,7 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
 
         g_assert (MKS_IS_KEYBOARD (self->keyboard));
 
-        mks_display_picture_translate_keycode (self, keyval, keycode, &qkeycode);
+        mks_keyboard_translate (keyval, keycode, &qkeycode);
 
         if (event_type == GDK_KEY_PRESS)
           mks_keyboard_press (self->keyboard,
