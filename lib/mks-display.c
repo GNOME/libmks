@@ -185,8 +185,7 @@ mks_display_legacy_event_cb (MksDisplay               *self,
   if (priv->screen == NULL)
     return GDK_EVENT_PROPAGATE;
 
-  if (FALSE) {}
-  else if (event_type == GDK_BUTTON_PRESS)
+  if (event_type == GDK_BUTTON_PRESS)
     {
       if (priv->inhibitor == NULL)
         {
