@@ -33,7 +33,7 @@ create_connection (int      argc,
   if (argc < 2)
     return g_bus_get_sync (G_BUS_TYPE_SESSION, NULL, error);
   else
-    return g_dbus_connection_new_for_address_sync (argv[1], 0, NULL, NULL, error);
+    return g_dbus_connection_new_for_address_sync (argv[1], G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT | G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION, NULL, NULL, error);
 }
 
 static gboolean
