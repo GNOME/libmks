@@ -7,3 +7,5 @@ option('docs',
 option('introspection',
        type: 'feature', value: 'auto',
        description: 'Generate gir data')
+
+option('vapi', type: 'boolean', value: true)
