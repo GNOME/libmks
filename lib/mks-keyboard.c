@@ -62,8 +62,7 @@ mks_keyboard_keyboard_notify_cb (MksKeyboard     *self,
   g_assert (pspec != NULL);
   g_assert (MKS_QEMU_IS_KEYBOARD (keyboard));
 
-  if (FALSE) {}
-  else if (strcmp (pspec->name, "modifiers") == 0)
+  if (strcmp (pspec->name, "modifiers") == 0)
     {
       self->modifiers = mks_qemu_keyboard_get_modifiers (keyboard);
       g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_MODIFIERS]);

@@ -456,7 +456,7 @@ mks_display_picture_measure (GtkWidget      *widget,
 {
   MksDisplayPicture *self = (MksDisplayPicture *)widget;
   GdkPaintable *paintable;
-  double min_width, min_height, nat_width, nat_height;
+  double nat_width, nat_height;
   int default_width;
   int default_height;
 
@@ -479,11 +479,6 @@ mks_display_picture_measure (GtkWidget      *widget,
 
   if (default_height <= 0)
     default_height = 480;
-
-  gdk_paintable_compute_concrete_size (paintable,
-                                       0, 0,
-                                       default_width, default_height,
-                                       &min_width, &min_height);
 
   if (orientation == GTK_ORIENTATION_HORIZONTAL)
     {
