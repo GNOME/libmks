@@ -128,7 +128,16 @@ if get_option('introspection').allowed()
               namespace: 'Mks',
           symbol_prefix: 'mks',
       identifier_prefix: 'Mks',
-              includes: ['Gio-2.0', 'Gtk-4.0'],
+               includes: ['Gio-2.0', 'Gtk-4.0'],
                 install: true,
+                 header: 'libmks-1.h'
   )
+
+  if get_option('vapi')
+    libmks_vapi = gnome.generate_vapi('libmks-' + api_version,
+                   sources: libmks_gir[0],
+                  packages: [ 'gio-2.0', 'gtk4'],
+                   install: true,
+    )
+  endif
 endif

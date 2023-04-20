@@ -23,7 +23,7 @@ reference:
   variables:
     MESON_FLAGS: "-Dwerror=true --buildtype=release"
   before_script:
-    - sudo dnf install -y gtk4-devel meson gcc gi-docgen gobject-introspection-devel
+    - sudo dnf install -y gtk4-devel meson gcc gi-docgen gobject-introspection-devel vala
   script:
     - mkdir -p pfx/
     - meson ${MESON_FLAGS} --prefix=${PWD}/pfx -Ddocs=true _build
