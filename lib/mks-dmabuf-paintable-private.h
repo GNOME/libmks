@@ -1,6 +1,7 @@
 /* mks-dmabuf-paintable-private.h
  *
  * Copyright 2023 Christian Hergert <chergert@redhat.com>
+ * Copyright 2023 Bilal Elmoussaoui <belmouss@redhat.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,23 +25,25 @@
 
 G_BEGIN_DECLS
 
+typedef struct _MksDmabufScanoutData
+{
+  guint                  width;
+  guint                  height;
+  guint                  stride;
+  guint                  fourcc;
+  guint64                modifier;
+  int                    dmabuf_fd;
+} MksDmabufScanoutData;
+
 #define MKS_TYPE_DMABUF_PAINTABLE (mks_dmabuf_paintable_get_type())
 
 G_DECLARE_FINAL_TYPE (MksDmabufPaintable, mks_dmabuf_paintable, MKS, DMABUF_PAINTABLE, GObject)
 
-MksDmabufPaintable *mks_dmabuf_paintable_new        (GdkGLContext        *gl_context,
-                                                     int                  dmabuf_fd,
-                                                     guint                width,
-                                                     guint                height,
-                                                     guint                stride,
-                                                     guint                fourcc,
-                                                     guint64              modifier,
-                                                     gboolean             y0_top,
-                                                     GError             **error);
-void                mks_dmabuf_paintable_invalidate (MksDmabufPaintable  *self,
-                                                     guint                x,
-                                                     guint                y,
-                                                     guint                width,
-                                                     guint                height);
+MksDmabufPaintable *mks_dmabuf_paintable_new        (void);
+gboolean            mks_dmabuf_paintable_import     (MksDmabufPaintable   *self,
+                                                     GdkGLContext         *gl_context,
+                                                     MksDmabufScanoutData *data,
+                                                     cairo_region_t       *region,
+                                                     GError              **error);
 
 G_END_DECLS

@@ -38,15 +38,16 @@
 
 struct _MksPaintable
 {
-  GObject          parent_instance;
-  GdkGLContext    *gl_context;
-  MksQemuListener *listener;
-  GDBusConnection *connection;
-  GdkPaintable    *child;
-  GdkCursor       *cursor;
-  int              mouse_x;
-  int              mouse_y;
-  guint            y_inverted : 1;
+  GObject               parent_instance;
+  GdkGLContext         *gl_context;
+  MksQemuListener      *listener;
+  GDBusConnection      *connection;
+  GdkPaintable         *child;
+  GdkCursor            *cursor;
+  MksDmabufScanoutData *scanout_data;
+  int                   mouse_x;
+  int                   mouse_y;
+  guint                 y_inverted : 1;
 };
 
 enum {
@@ -332,8 +333,8 @@ mks_paintable_listener_scanout_dmabuf (MksPaintable          *self,
 {
   g_autoptr(MksDmabufPaintable) child = NULL;
   g_autoptr(GError) error = NULL;
-  g_autofd int dmabuf_fd = -1;
-  GdkGLContext *gl_context;
+  int dmabuf_fd = -1;
+  MksDmabufScanoutData *scanout_data;
   guint handle;
 
   g_assert (MKS_IS_PAINTABLE (self));
@@ -352,22 +353,29 @@ mks_paintable_listener_scanout_dmabuf (MksPaintable          *self,
       return TRUE;
     }
 
-  if (-1 == (dmabuf_fd = g_unix_fd_list_get (unix_fd_list, handle, &error)) ||
-      !(gl_context = mks_paintable_get_gl_context (self, &error)) ||
-      !(child = mks_dmabuf_paintable_new (gl_context,
-                                          dmabuf_fd,
-                                          width, height,
-                                          stride, fourcc,
-                                          modifier, y0_top,
-                                          &error)))
+  if (!MKS_IS_DMABUF_PAINTABLE (self->child))
+    {
+      child = mks_dmabuf_paintable_new ();
+      mks_paintable_set_child (self, GDK_PAINTABLE (child));
+    }
+
+  if (-1 == (dmabuf_fd = g_unix_fd_list_get (unix_fd_list, handle, &error)))
     {
       g_dbus_method_invocation_return_gerror (invocation, error);
       return TRUE;
     }
 
   self->y_inverted = !y0_top;
-
-  mks_paintable_set_child (self, GDK_PAINTABLE (child));
+  scanout_data = g_new0 (MksDmabufScanoutData, 1);
+  
+  scanout_data->dmabuf_fd = dmabuf_fd;
+  scanout_data->width = width;
+  scanout_data->height = height;
+  scanout_data->stride = stride;
+  scanout_data->fourcc = fourcc;
+  scanout_data->modifier = modifier;
+  g_clear_pointer (&self->scanout_data, g_free);
+  self->scanout_data = scanout_data;
 
   mks_qemu_listener_complete_scanout_dmabuf (listener, invocation, NULL);
 
@@ -383,14 +391,36 @@ mks_paintable_listener_update_dmabuf (MksPaintable          *self,
                                       int                    height,
                                       MksQemuListener       *listener)
 {
+  cairo_region_t *region = NULL;
+  g_autoptr(GError) error = NULL;
+  GdkGLContext *gl_context;
+
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
   g_assert (MKS_QEMU_IS_LISTENER (listener));
 
   if (MKS_IS_DMABUF_PAINTABLE (self->child))
-    mks_dmabuf_paintable_invalidate (MKS_DMABUF_PAINTABLE (self->child), x, y, width, height);
+    { 
+      g_assert (self->scanout_data != NULL);
+      if (!self->y_inverted)
+        y = self->scanout_data->height - y - height;
 
+      region = cairo_region_create_rectangle (&(cairo_rectangle_int_t) { x, y, width, height });
+      if (!(gl_context = mks_paintable_get_gl_context (self, &error)) ||
+          !mks_dmabuf_paintable_import (MKS_DMABUF_PAINTABLE (self->child),
+                                        gl_context,
+                                        self->scanout_data,
+                                        region,
+                                        &error))
+        {
+          g_dbus_method_invocation_return_gerror (invocation, error);
+          goto cleanup;
+        }
+    }
+  
   mks_qemu_listener_complete_update_dmabuf (listener, invocation);
+cleanup:
+  g_clear_pointer (&region, cairo_region_destroy);
 
   return TRUE;
 }
