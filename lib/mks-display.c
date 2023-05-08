@@ -30,6 +30,8 @@
 #include "mks-mouse.h"
 #include "mks-paintable-private.h"
 #include "mks-screen.h"
+#include "mks-screen-attributes.h"
+#include "mks-screen-resizer-private.h"
 #include "mks-util-private.h"
 
 #define DEFAULT_UNGRAB_TRIGGER "<Control><Alt>g"
@@ -37,6 +39,7 @@
 typedef struct
 {
   MksScreen          *screen;
+  MksScreenResizer   *resizer;
   MksDisplayPicture  *picture;
   MksInhibitor       *inhibitor;
   GtkShortcutTrigger *ungrab_trigger;
@@ -135,6 +138,7 @@ mks_display_connect (MksDisplay *self,
     {
       mks_display_picture_set_keyboard (priv->picture, mks_screen_get_keyboard (screen));
       mks_display_picture_set_mouse (priv->picture, mks_screen_get_mouse (screen));
+      mks_screen_resizer_set_screen (priv->resizer, screen);
 
       mks_screen_attach (screen,
                          NULL,
@@ -157,6 +161,7 @@ mks_display_disconnect (MksDisplay *self)
   g_assert (MKS_IS_DISPLAY (self));
 
   g_clear_object (&priv->screen);
+  mks_screen_resizer_set_screen (priv->resizer, NULL);
   g_clear_object (&priv->inhibitor);
 
   if (priv->picture != NULL)
@@ -228,6 +233,7 @@ mks_display_dispose (GObject *object)
   mks_display_disconnect (self);
 
   g_clear_pointer ((GtkWidget **)&priv->picture, gtk_widget_unparent);
+  g_clear_object (&priv->resizer);
 
   G_OBJECT_CLASS (mks_display_parent_class)->dispose (object);
 }
@@ -288,12 +294,20 @@ mks_display_size_allocate (GtkWidget *widget,
   MksDisplay *self = (MksDisplay *)widget;
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
   graphene_rect_t area;
+  MksScreenAttributes *attributes;
 
   g_assert (MKS_IS_DISPLAY (self));
 
   GTK_WIDGET_CLASS (mks_display_parent_class)->size_allocate (widget, width, height, baseline);
 
   mks_display_get_paintable_area (self, &area);
+
+  attributes = mks_screen_attributes_new ();
+  mks_screen_attributes_set_width (attributes, width);
+  mks_screen_attributes_set_height (attributes, height);
+
+  mks_screen_resizer_queue_resize (priv->resizer,
+                                   g_steal_pointer (&attributes));
 
   gtk_widget_size_allocate (GTK_WIDGET (priv->picture),
                             &(GtkAllocation) {
@@ -303,6 +317,7 @@ mks_display_size_allocate (GtkWidget *widget,
                               area.size.height
                             },
                             -1);
+  mks_screen_attributes_free (attributes);
 }
 
 static void
@@ -391,6 +406,7 @@ mks_display_init (MksDisplay *self)
   GtkEventController *controller;
 
   priv->picture = g_object_new (MKS_TYPE_DISPLAY_PICTURE, NULL);
+  priv->resizer = mks_screen_resizer_new ();
   gtk_widget_set_parent (GTK_WIDGET (priv->picture), GTK_WIDGET (self));
 
   controller = gtk_event_controller_legacy_new ();
