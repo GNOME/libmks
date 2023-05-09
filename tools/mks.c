@@ -33,7 +33,7 @@ create_connection (int      argc,
   if (argc < 2)
     return g_bus_get_sync (G_BUS_TYPE_SESSION, NULL, error);
   else
-    return g_dbus_connection_new_for_address_sync (argv[1], 0, NULL, NULL, error);
+    return g_dbus_connection_new_for_address_sync (argv[1], G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT | G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION, NULL, NULL, error);
 }
 
 static gboolean
@@ -65,6 +65,7 @@ main (int   argc,
   g_autoptr(GError) error = NULL;
   GtkWindow *window;
   GtkWidget *display;
+  GtkSettings *settings;
   GdkSurface *surface;
 
   gtk_init ();
@@ -79,10 +80,15 @@ main (int   argc,
   main_loop = g_main_loop_new (NULL, FALSE);
 
   window = g_object_new (GTK_TYPE_WINDOW,
-                         "default-width", 640,
-                         "default-height", 480,
+                         "default-width", 1280,
+                         "default-height", 768,
                          "title", "Mouse, Keyboard, Screen",
                          NULL);
+
+  settings = gtk_settings_get_default ();
+  g_object_set (settings, "gtk-application-prefer-dark-theme", TRUE, NULL);
+  gtk_widget_add_css_class (GTK_WIDGET (window), "dark");
+
   display = mks_display_new ();
   gtk_window_set_child (window, display);
   g_signal_connect_swapped (window,
