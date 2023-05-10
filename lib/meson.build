@@ -154,6 +154,7 @@ if get_option('introspection').allowed()
               namespace: 'Mks',
           symbol_prefix: 'mks',
       identifier_prefix: 'Mks',
+        export_packages: 'libmks-@0@'.format(api_version),
     include_directories: libmks_include_directories,
                includes: ['Gio-2.0', 'Gtk-4.0'],
                 install: true,
