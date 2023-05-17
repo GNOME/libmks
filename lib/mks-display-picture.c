@@ -200,15 +200,15 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
         int guest_width = gdk_paintable_get_intrinsic_width (paintable);
         int guest_height = gdk_paintable_get_intrinsic_height (paintable);
         graphene_rect_t area;
-        GtkAllocation alloc;
         double translate_x;
         double translate_y;
 
         g_assert (MKS_IS_MOUSE (self->mouse));
         g_assert (GDK_IS_SURFACE (surface));
 
-        gtk_widget_get_allocation (GTK_WIDGET (self), &alloc);
-        area = GRAPHENE_RECT_INIT (0, 0, alloc.width, alloc.height);
+        area = GRAPHENE_RECT_INIT (0, 0,
+                                   gtk_widget_get_width (GTK_WIDGET (self)),
+                                   gtk_widget_get_height (GTK_WIDGET (self)));
 
         gtk_native_get_surface_transform (native, &translate_x, &translate_y);
 
@@ -513,16 +513,14 @@ mks_display_picture_snapshot (GtkWidget   *widget,
                               GtkSnapshot *snapshot)
 {
   MksDisplayPicture *self = (MksDisplayPicture *)widget;
-  GtkAllocation alloc;
 
   if (self->paintable == NULL)
     return;
 
-  gtk_widget_get_allocation (widget, &alloc);
   gdk_paintable_snapshot (GDK_PAINTABLE (self->paintable),
                           snapshot,
-                          alloc.width,
-                          alloc.height);
+                          gtk_widget_get_width (GTK_WIDGET (self)),
+                          gtk_widget_get_height (GTK_WIDGET (self)));
 }
 
 static void
