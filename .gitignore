@@ -1,3 +1,6 @@
 .flatpak
 .flatpak-builder
 .vscode
+subprojects/gtk
+subprojects/libsass
+subprojects/sassc
