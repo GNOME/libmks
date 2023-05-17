@@ -140,7 +140,7 @@ on_screen_configure_cb (GObject      *object,
   self->in_progress = FALSE;
   attributes = g_steal_pointer (&self->next_op);
 
-  if (!mks_screen_attributes_equal (attributes, self->previous_op))
+  if (attributes && !mks_screen_attributes_equal (attributes, self->previous_op))
     mks_screen_resizer_reconfigure (self, g_steal_pointer (&attributes));
 
   MKS_EXIT;
