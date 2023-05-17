@@ -218,17 +218,20 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
 
             if (gdk_event_get_position (event, &x, &y))
               {
+                graphene_point_t translated;
                 double guest_x, guest_y;
 
                 x -= translate_x;
                 y -= translate_y;
 
-                gtk_widget_translate_coordinates (GTK_WIDGET (native),
-                                                  GTK_WIDGET (self),
-                                                  x, y, &x, &y);
+                if (!gtk_widget_compute_point (GTK_WIDGET (native),
+                                               GTK_WIDGET (self),
+                                               &GRAPHENE_POINT_INIT (x, y),
+                                               &translated))
+                  break;
 
-                guest_x = floor (x) / area.size.width * guest_width;
-                guest_y = floor (y) / area.size.height * guest_height;
+                guest_x = floor (translated.x) / area.size.width * guest_width;
+                guest_y = floor (translated.y) / area.size.height * guest_height;
 
                 guest_x = CLAMP (guest_x, 0, guest_width);
                 guest_y = CLAMP (guest_y, 0, guest_width);
