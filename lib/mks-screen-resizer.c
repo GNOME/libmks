@@ -19,24 +19,26 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "config.h"
+
 #include "mks-screen-attributes.h"
 #include "mks-screen-resizer-private.h"
 #include "mks-util-private.h"
 
-static void
-mks_screen_resizer_reconfigure (MksScreenResizer    *self,
-                                MksScreenAttributes *attributes);
+static void mks_screen_resizer_reconfigure (MksScreenResizer    *self,
+                                            MksScreenAttributes *attributes);
 
 struct _MksScreenResizer
 {
-  GObject parent_instance;
+  GObject              parent_instance;
 
   MksScreen           *screen;
 
   /* Remember our last operation */
   MksScreenAttributes *next_op;
   MksScreenAttributes *previous_op;
-  gboolean             in_progress;
+
+  guint                in_progress : 1;
 };
 
 enum {
@@ -62,6 +64,7 @@ mks_screen_resizer_get_property (GObject    *object,
     case PROP_SCREEN:
       g_value_set_object (value, self->screen);
       break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
     }
@@ -102,6 +105,7 @@ static void
 mks_screen_resizer_class_init (MksScreenResizerClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
   object_class->dispose = mks_screen_resizer_dispose;
   object_class->get_property = mks_screen_resizer_get_property;
   object_class->set_property = mks_screen_resizer_set_property;
@@ -120,9 +124,9 @@ on_screen_configure_cb (GObject      *object,
                         gpointer      user_data)
 {
   MksScreen *screen = (MksScreen *)object;
+  g_autoptr(MksScreenAttributes) attributes = NULL;
   g_autoptr(MksScreenResizer) self = user_data;
   g_autoptr(GError) error = NULL;
-  g_autoptr(MksScreenAttributes) attributes = NULL;
 
   MKS_ENTRY;
 
@@ -135,12 +139,10 @@ on_screen_configure_cb (GObject      *object,
 
   self->in_progress = FALSE;
   attributes = g_steal_pointer (&self->next_op);
-  if (attributes != NULL && 
-      !mks_screen_attributes_equal (attributes, self->previous_op))
-    { 
-      mks_screen_resizer_reconfigure (self,
-                                      g_steal_pointer (&attributes));
-    }
+
+  if (!mks_screen_attributes_equal (attributes, self->previous_op))
+    mks_screen_resizer_reconfigure (self, g_steal_pointer (&attributes));
+
   MKS_EXIT;
 }
 
@@ -152,13 +154,7 @@ on_screen_configure_cb (GObject      *object,
 MksScreenResizer *
 mks_screen_resizer_new (void)
 {
-  MksScreenResizer *self;
-
-  self = g_object_new (MKS_TYPE_SCREEN_RESIZER, NULL);
-  self->next_op = NULL;
-  self->previous_op = NULL;
-  self->in_progress = FALSE;
-  return self;
+  return g_object_new (MKS_TYPE_SCREEN_RESIZER, NULL);
 }
 
 
@@ -171,68 +167,81 @@ mks_screen_resizer_init (MksScreenResizer *self)
  * mks_screen_resizer_set_screen:
  * @self: A `MksScreenResizer`
  * @screen: A `MksScreen`
- * 
+ *
  * Sets the screen to resize when a resize is queued.
 */
 void
 mks_screen_resizer_set_screen (MksScreenResizer *self,
                                MksScreen        *screen)
 {
+  MKS_ENTRY;
+
   g_return_if_fail (MKS_IS_SCREEN_RESIZER (self));
   g_return_if_fail (!screen || MKS_IS_SCREEN (screen));
 
   if (g_set_object (&self->screen, screen))
-    {
-      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_SCREEN]);
-    }
+    g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_SCREEN]);
+
+  MKS_EXIT;
 }
 
 /**
  * mks_screen_resizer_queue_resize:
  * @self: A `MksScreenResizer`
  * @attributes: (transfer full): The new attributes to queue
- * 
- * Schedule the VM display configuration with the passed attributes if 
- * there is no ongoing operation. Otherwise, add the attributes to 
+ *
+ * Schedule the VM display configuration with the passed attributes if
+ * there is no ongoing operation. Otherwise, add the attributes to
  * a queue of updates.
 */
 void
 mks_screen_resizer_queue_resize (MksScreenResizer    *self,
                                  MksScreenAttributes *attributes)
 {
+  MKS_ENTRY;
+
   g_return_if_fail (MKS_IS_SCREEN_RESIZER (self));
 
   if (mks_screen_attributes_equal (attributes, self->previous_op))
-    return;
+    MKS_EXIT;
 
   if (self->in_progress)
     {
       g_clear_pointer (&self->next_op, mks_screen_attributes_free);
       self->next_op = g_steal_pointer (&attributes);
-      return;
+      MKS_EXIT;
     }
+
   mks_screen_resizer_reconfigure (self, attributes);
+
+  MKS_EXIT;
 }
 
 /**
  * mks_screen_resizer_reconfigure:
  * @self: A `MksScreenResizer`
  * @attributes: (transfer full): The attributes to reconfigure
- * 
+ *
  * Configure the screen with the passed attributes.
 */
 static void
 mks_screen_resizer_reconfigure (MksScreenResizer    *self,
                                 MksScreenAttributes *attributes)
 {
+  MKS_ENTRY;
+
   g_assert (MKS_IS_SCREEN_RESIZER (self));
 
   self->in_progress = TRUE;
-  mks_screen_configure (self->screen, 
+
+  g_clear_pointer (&self->previous_op, mks_screen_attributes_free);
+  self->previous_op = mks_screen_attributes_copy (attributes);
+
+  mks_screen_configure (self->screen,
                         g_steal_pointer (&attributes),
                         NULL,
                         on_screen_configure_cb,
                         g_object_ref (self));
-  g_clear_pointer (&self->previous_op, mks_screen_attributes_free);
-  self->previous_op = g_steal_pointer (&attributes);
+
+  MKS_EXIT;
 }
