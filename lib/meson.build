@@ -1,3 +1,10 @@
+libmks_headers_dir = get_option('includedir') / 'libmks-@0@'.format(api_version)
+
+libmks_include_directories = [
+  include_directories('.'),
+  include_directories('..'),
+]
+
 libmks_sources = [
   'mks-init.c',
   'mks-device.c',
@@ -26,6 +33,12 @@ libmks_headers = [
   'mks-version-macros.h',
 ]
 
+libmks_enum_headers = [
+  'mks-mouse.h',
+  'mks-screen.h',
+  'mks-keyboard.h',
+]
+
 libmks_private_sources = [
   'mks-cairo-framebuffer.c',
   'mks-dmabuf-paintable.c',
@@ -35,33 +48,12 @@ libmks_private_sources = [
   'mks-inhibitor.c',
   'mks-read-only-list-model.c',
   'mks-util.c',
-
-  gnome.gdbus_codegen('mks-qemu',
-         autocleanup: 'all',
-    interface_prefix: 'org.qemu.Display1.',
-           namespace: 'MksQemu',
-             sources: 'dbus-display1.xml',
-      object_manager: true,
-  ),
-
-  gnome.genmarshal('mks-marshal',
-              internal: true,
-                prefix: '_mks_marshal',
-               sources: ['mks-marshal.defs'],
-    valist_marshallers: true,
-  ),
-
-  gnome.compile_resources(
-    'mks-resources',
-    'mks.gresource.xml',
-    c_name: 'mks',
-  ),
 ]
 
 libmks_enums = gnome.mkenums_simple('mks-enums',
-            sources: libmks_headers,
+            sources: libmks_enum_headers,
      install_header: true,
-        install_dir: join_paths(get_option('includedir'), 'libmks-@0@'.format(api_version)),
+        install_dir: libmks_headers_dir,
   identifier_prefix: 'Mks',
       symbol_prefix: 'mks',
 )
@@ -78,12 +70,42 @@ mks_version_h = configure_file(
          output: 'mks-version.h',
   configuration: version_conf,
         install: true,
-    install_dir: join_paths(get_option('includedir'), 'libmks-@0@'.format(api_version))
+    install_dir: libmks_headers_dir,
+)
+
+libmks_qemu = gnome.gdbus_codegen('mks-qemu',
+       autocleanup: 'all',
+  interface_prefix: 'org.qemu.Display1.',
+         namespace: 'MksQemu',
+           sources: 'dbus-display1.xml',
+    object_manager: true,
+)
+libmks_private_sources += libmks_qemu
+
+libmks_marshal = gnome.genmarshal('mks-marshal',
+            internal: true,
+              prefix: '_mks_marshal',
+             sources: ['mks-marshal.defs'],
+  valist_marshallers: true,
+)
+
+libmks_gresources = gnome.compile_resources(
+  'mks-resources',
+  'mks.gresource.xml',
+  c_name: 'mks',
 )
 
 libmks_generated_sources = [
-  libmks_enums,
+  libmks_enums[0],
+  libmks_gresources[0],
+  libmks_marshal[0],
+]
+
+libmks_generated_headers = [
   mks_version_h,
+  libmks_enums[1],
+  libmks_gresources[1],
+  libmks_marshal[1],
 ]
 
 libmks_deps = [
@@ -96,16 +118,20 @@ libmks_deps = [
 ]
 
 libmks = shared_library('mks-' + api_version,
-  libmks_sources + libmks_generated_sources + libmks_private_sources,
-  dependencies: libmks_deps,
-       install: true,
+    libmks_generated_headers +
+    libmks_generated_sources +
+    libmks_private_sources +
+    libmks_sources,
+  include_directories: libmks_include_directories,
+         dependencies: libmks_deps,
+              install: true,
 )
 
 libmks_dep = declare_dependency(
-              sources: libmks_generated_sources,
+              sources: libmks_generated_headers,
             link_with: libmks,
          dependencies: libmks_deps,
-  include_directories: include_directories('.'),
+  include_directories: libmks_include_directories,
 )
 
 install_headers(libmks_headers, subdir: 'libmks-@0@'.format(api_version))
@@ -128,6 +154,8 @@ if get_option('introspection').allowed()
               namespace: 'Mks',
           symbol_prefix: 'mks',
       identifier_prefix: 'Mks',
+        export_packages: 'libmks-@0@'.format(api_version),
+    include_directories: libmks_include_directories,
                includes: ['Gio-2.0', 'Gtk-4.0'],
                 install: true,
                  header: 'libmks-1.h'
