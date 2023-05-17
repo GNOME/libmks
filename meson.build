@@ -23,7 +23,7 @@ add_project_arguments(['-I' + meson.project_build_root()], language: 'c')
 
 # Check dependencies
 glib_req_version = '2.75.0'
-gtk_req_version = '4.8'
+gtk_req_version = '4.11'
 
 glib_req = '>= @0@'.format(glib_req_version)
 gtk_req = '>= @0@'.format(gtk_req_version)
@@ -43,7 +43,7 @@ endif
 libepoxy_dep = dependency('epoxy')
 libgio_dep = dependency('gio-2.0', version: glib_req)
 libgiounix_dep = dependency('gio-unix-2.0', version: glib_req)
-libgtk_dep = dependency('gtk4', version: gtk_req)
+libgtk_dep = dependency('gtk4', version: gtk_req, fallback: ['gtk'])
 
 # Ensure we restrict ABI usage to what we claim
 project_c_args += [
@@ -141,7 +141,7 @@ test_link_args = [
   '-Wl,-z,now',
 ]
 if not get_option('buildtype').startswith('debug') and not meson.is_subproject()
-  add_global_arguments(['-DG_DISABLE_CAST_CHECKS'], language: 'c')
+  add_project_arguments(['-DG_DISABLE_CAST_CHECKS'], language: 'c')
   release_args += [ '-DG_DISABLE_ASSERT' ]
   test_link_args += [
     '-Wl,-Bsymbolic',

@@ -1,6 +1,7 @@
 /* mks-dmabuf-paintable.c
  *
  * Copyright 2023 Christian Hergert <chergert@redhat.com>
+ * Copyright 2023 Bilal Elmoussaoui <belmouss@redhat.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,25 +29,17 @@
 #include "mks-gl-context-private.h"
 
 /*
- * MksDmabufPaintable is a GdkPaintable for a single dmabuf_fd which is then
- * imported into OpenGL. This has an advantage over just using a single
- * GdkGLTexture for such a situation in that we can take advantage of how
- * GskGLRenderer and GdkTexture work.
- *
- * First, by swapping between 2 GdkGLTextures, gsk_render_node_diff()
- * will see a pointer difference and ensure the tile region is damaged.
- * Since it is a dmabuf, we can already assume the contents are available
- * to the GPU by layers beneath us.
+ * MksDmabufPaintable is a GdkPaintable that gets created the first time
+ * `ScanoutDMABUF` is called.
+ * 
+ * The scanout data is then stored until we receive a `UpdateDMABUF` call
+ * so we can pass the damage region to `GdkGLTextureBuilder`.
  */
-
-#define TILE_WIDTH  128
-#define TILE_HEIGHT 128
 
 struct _MksDmabufPaintable
 {
   GObject parent_instance;
-  GdkTexture *textures[2];
-  GArray *tiles;
+  GdkTexture *texture;
   guint width;
   guint height;
 };
@@ -56,12 +49,6 @@ typedef struct _MksDmabufTextureData
   GdkGLContext *gl_context;
   GLuint texture_id;
 } MksDmabufTextureData;
-
-typedef struct _MksDmabufTile
-{
-  graphene_rect_t area;
-  guint16 texture : 1;
-} MksDmabufTile;
 
 static int
 mks_dmabuf_paintable_get_intrinsic_width (GdkPaintable *paintable)
@@ -95,24 +82,8 @@ mks_dmabuf_paintable_snapshot (GdkPaintable *paintable,
   g_assert (MKS_IS_DMABUF_PAINTABLE (self));
   g_assert (GDK_IS_SNAPSHOT (snapshot));
 
-  gtk_snapshot_save (snapshot);
-  gtk_snapshot_scale (snapshot,
-                      width / (double)self->width,
-                      height / (double)self->height);
-
-  area = GRAPHENE_RECT_INIT (0, 0, self->width, self->height);
-
-  for (guint i = 0; i < self->tiles->len; i++)
-    {
-      MksDmabufTile *tile = &g_array_index (self->tiles, MksDmabufTile, i);
-      GdkTexture *texture = self->textures[tile->texture];
-
-      gtk_snapshot_push_clip (snapshot, &tile->area);
-      gtk_snapshot_append_texture (snapshot, texture, &area);
-      gtk_snapshot_pop (snapshot);
-    }
-
-  gtk_snapshot_restore (snapshot);
+  area = GRAPHENE_RECT_INIT (0, 0, width, height);
+  gtk_snapshot_append_texture (snapshot, self->texture, &area);
 }
 
 static void
@@ -174,9 +145,7 @@ mks_dmabuf_paintable_dispose (GObject *object)
 {
   MksDmabufPaintable *self = (MksDmabufPaintable *)object;
 
-  g_clear_pointer (&self->tiles, g_array_unref);
-  g_clear_object (&self->textures[0]);
-  g_clear_object (&self->textures[1]);
+  g_clear_object (&self->texture);
 
   G_OBJECT_CLASS (mks_dmabuf_paintable_parent_class)->dispose (object);
 }
@@ -192,112 +161,93 @@ mks_dmabuf_paintable_class_init (MksDmabufPaintableClass *klass)
 static void
 mks_dmabuf_paintable_init (MksDmabufPaintable *self)
 {
-  self->tiles = g_array_new (FALSE, FALSE, sizeof (MksDmabufTile));
 }
 
-MksDmabufPaintable *
-mks_dmabuf_paintable_new (GdkGLContext  *gl_context,
-                          int            dmabuf_fd,
-                          guint          width,
-                          guint          height,
-                          guint          stride,
-                          guint          fourcc,
-                          guint64        modifier,
-                          gboolean       y0_top,
-                          GError       **error)
+gboolean
+mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
+                             GdkGLContext         *gl_context,
+                             MksDmabufScanoutData *data,
+                             cairo_region_t       *region,
+                             GError              **error)
 {
   g_autoptr(MksDmabufTextureData) texture_data = NULL;
-  g_autoptr(MksDmabufPaintable) self = NULL;
   GLuint texture_id;
+  g_autoptr(GdkGLTextureBuilder) builder = NULL;
   guint zero = 0;
 
-  if (dmabuf_fd < 0)
+  g_return_val_if_fail (MKS_IS_DMABUF_PAINTABLE (self), FALSE);
+
+  if (data->dmabuf_fd < 0)
     {
       g_set_error  (error,
                     G_IO_ERROR,
                     G_IO_ERROR_INVALID_ARGUMENT,
                     "invalid dmabuf_fd (%d)",
-                    dmabuf_fd);
-      return NULL;
+                    data->dmabuf_fd);
+      return FALSE;
     }
 
-  if (width == 0 || height == 0 || stride == 0)
+  if (data->width == 0 || data->height == 0 || data->stride == 0)
     {
       g_set_error  (error,
                     G_IO_ERROR,
                     G_IO_ERROR_INVALID_ARGUMENT,
                     "invalid width/height/stride (%u/%u/%u)",
-                    width, height, stride);
-      return NULL;
+                    data->width, data->height, data->stride);
+      return FALSE;
     }
 
-  self = g_object_new (MKS_TYPE_DMABUF_PAINTABLE, NULL);
-  self->width = width;
-  self->height = height;
+  if (self->width != data->width || self->height != data->height)
+    {
+      self->width = data->width;
+      self->height = data->height;
+      gdk_paintable_invalidate_size (GDK_PAINTABLE (self));
+    }
+
 
   if (!(texture_id = mks_gl_context_import_dmabuf (gl_context,
-                                                   fourcc, width, height,
-                                                   1, &dmabuf_fd, &stride, &zero, &modifier)))
+                                                   data->fourcc, data->width, data->height,
+                                                   1, &data->dmabuf_fd, &data->stride, &zero, 
+                                                   &data->modifier)))
     {
       g_set_error (error,
                    G_IO_ERROR,
                    G_IO_ERROR_FAILED,
                    "Failed to import dmabuf into GL texture");
-      return NULL;
+      return FALSE;
+    }
+
+  builder = gdk_gl_texture_builder_new ();
+  gdk_gl_texture_builder_set_id (builder, texture_id);
+  gdk_gl_texture_builder_set_width (builder, self->width);
+  gdk_gl_texture_builder_set_height (builder, self->height);
+  gdk_gl_texture_builder_set_context (builder, gl_context);
+  
+  if (region)
+    {
+      gdk_gl_texture_builder_set_update_region (builder, region);
+      gdk_gl_texture_builder_set_update_texture (builder, self->texture);
     }
 
   texture_data = mks_dmabuf_texture_data_new (gl_context, texture_id);
-
-  self->textures[0] = gdk_gl_texture_new (gl_context, texture_id, width, height,
-                                          (GDestroyNotify) mks_dmabuf_texture_data_unref,
-                                          mks_dmabuf_texture_data_ref (texture_data));
-  self->textures[1] = gdk_gl_texture_new (gl_context, texture_id, width, height,
-                                          (GDestroyNotify) mks_dmabuf_texture_data_unref,
-                                          mks_dmabuf_texture_data_ref (texture_data));
-
-  for (guint y = 0; y < height; y += TILE_HEIGHT)
-    {
-      guint tile_height = MIN (TILE_HEIGHT, height - y);
-
-      for (guint x = 0; x < width; x += TILE_WIDTH)
-        {
-          MksDmabufTile tile;
-          guint tile_width = MIN (TILE_WIDTH, width - x);
-
-          tile.area = GRAPHENE_RECT_INIT (x, y, tile_width, tile_height);
-          tile.texture = 0;
-
-          g_array_append_val (self->tiles, tile);
-        }
-    }
-
-  return g_steal_pointer (&self);
-}
-
-void
-mks_dmabuf_paintable_invalidate (MksDmabufPaintable *self,
-                                 guint               x,
-                                 guint               y,
-                                 guint               width,
-                                 guint               height)
-{
-  graphene_rect_t area;
-
-  g_return_if_fail (MKS_IS_DMABUF_PAINTABLE (self));
-
-  if (width == 0 || height == 0)
-    return;
-
-  area = GRAPHENE_RECT_INIT (x, y, width, height);
-
-  for (guint i = 0; i < self->tiles->len; i++)
-    {
-      MksDmabufTile *tile = &g_array_index (self->tiles, MksDmabufTile, i);
-      G_GNUC_UNUSED graphene_rect_t res;
-
-      if (graphene_rect_intersection (&area, &tile->area, &res))
-        tile->texture = !tile->texture;
-    }
+  g_clear_object (&self->texture); 
+  self->texture = gdk_gl_texture_builder_build (builder, 
+                                                (GDestroyNotify) mks_dmabuf_texture_data_unref,
+                                                mks_dmabuf_texture_data_ref (texture_data)
+                                               );
 
   gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
+  return TRUE;
+}
+
+
+MksDmabufPaintable *
+mks_dmabuf_paintable_new (void)
+{
+  g_autoptr(MksDmabufPaintable) self = NULL;
+
+  self = g_object_new (MKS_TYPE_DMABUF_PAINTABLE, NULL);
+  self->width = 0;
+  self->height = 0;
+  return g_steal_pointer (&self);
 }
