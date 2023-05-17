@@ -47,6 +47,7 @@ libmks_private_sources = [
   'mks-gl-context.c',
   'mks-inhibitor.c',
   'mks-read-only-list-model.c',
+  'mks-screen-resizer.c',
   'mks-util.c',
 ]
 

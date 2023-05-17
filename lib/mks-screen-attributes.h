@@ -43,6 +43,9 @@ MksScreenAttributes *mks_screen_attributes_copy          (MksScreenAttributes *s
 MKS_AVAILABLE_IN_ALL
 void                 mks_screen_attributes_free          (MksScreenAttributes *self);
 MKS_AVAILABLE_IN_ALL
+gboolean             mks_screen_attributes_equal         (MksScreenAttributes *self,
+                                                          MksScreenAttributes *other);
+MKS_AVAILABLE_IN_ALL
 void                 mks_screen_attributes_set_width_mm  (MksScreenAttributes *self,
                                                           guint16              width_mm);
 MKS_AVAILABLE_IN_ALL

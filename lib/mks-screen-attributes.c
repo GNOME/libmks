@@ -72,6 +72,28 @@ mks_screen_attributes_free (MksScreenAttributes *self)
   g_free (self);
 }
 
+/**
+ * mks_screen_attributes_equal:
+ * @self: a #MksScreenAttributes
+ * @other: a #MksScreenAttributes
+ *
+ * Returns `true` if the two attributes are equal, `false` otherwise.
+ */
+gboolean
+mks_screen_attributes_equal (MksScreenAttributes *self,
+                             MksScreenAttributes *other)
+{
+  if (self == NULL || other == NULL)
+    return FALSE;
+
+  return (self->width == other->width &&
+          self->height == other->height &&
+          self->x_offset == other->x_offset &&
+          self->y_offset == other->y_offset &&
+          self->width_mm == other->width_mm &&
+          self->height_mm == other->height_mm);
+}
+
 void
 mks_screen_attributes_set_width_mm (MksScreenAttributes *self,
                                     guint16              width_mm)
