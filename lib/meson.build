@@ -132,7 +132,7 @@ libmks_dep = declare_dependency(
               sources: libmks_generated_headers,
             link_with: libmks,
          dependencies: libmks_deps,
-  include_directories: libmks_include_directories,
+  include_directories: [include_directories('.')],
 )
 
 install_headers(libmks_headers, subdir: 'libmks-@0@'.format(api_version))
