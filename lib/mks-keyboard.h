@@ -42,6 +42,15 @@ G_BEGIN_DECLS
 
 typedef struct _MksKeyboardClass MksKeyboardClass;
 
+/**
+ * MksKeyboardModifier:
+ * @MKS_KEYBOARD_MODIFIER_NONE: No modifier.
+ * @MKS_KEYBOARD_MODIFIER_SCROLL_LOCK: Scroll lock.
+ * @MKS_KEYBOARD_MODIFIER_NUM_LOCK: Numeric lock.
+ * @MKS_KEYBOARD_MODIFIER_CAPS_LOCK: Caps lock.
+ * 
+ * The active keyboard modifiers.
+ */
 typedef enum _MksKeyboardModifier
 {
   MKS_KEYBOARD_MODIFIER_NONE        = 0,

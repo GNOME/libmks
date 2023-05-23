@@ -70,7 +70,7 @@ int
 main (int argc,
       char *argv[])
 {
-  g_autoptr(GOptionContext) context = g_option_context_new ("DBUS_ADDRESS - Connect to Qemu at DBUS_ADDRESS");
+  g_autoptr(GOptionContext) context = g_option_context_new ("DBUS_ADDRESS - Connect to QEMU at DBUS_ADDRESS");
   g_autoptr(GDBusConnection) connection = NULL;
   g_autoptr(MksSession) session = NULL;
   g_autoptr(GError) error = NULL;

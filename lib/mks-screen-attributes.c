@@ -23,6 +23,15 @@
 
 #include "mks-screen-attributes-private.h"
 
+/**
+ * MksScreenAttributes:
+ * 
+ * Screen attributes.
+ * 
+ * The attributes are used to reconfigure the QEMU instance with
+ * [method@Mks.Screen.configure] or [method@Mks.Screen.configure_sync].
+ */
+
 G_DEFINE_BOXED_TYPE (MksScreenAttributes,
                      mks_screen_attributes,
                      mks_screen_attributes_copy,
@@ -63,8 +72,10 @@ mks_screen_attributes_copy (MksScreenAttributes *self)
  * mks_screen_attributes_free:
  * @self: a #MksScreenAttributes
  *
- * Frees a #MksScreenAttributes allocated using mks_screen_attributes_new()
- * or mks_screen_attributes_copy().
+ * Frees a #MksScreenAttributes.
+ * 
+ * Allocated using [ctor@Mks.ScreenAttributes.new]
+ * or [method@Mks.ScreenAttributes.copy].
  */
 void
 mks_screen_attributes_free (MksScreenAttributes *self)
@@ -94,6 +105,13 @@ mks_screen_attributes_equal (MksScreenAttributes *self,
           self->height_mm == other->height_mm);
 }
 
+/**
+ * mks_screen_attributes_set_width_mm:
+ * @self: A MksScreenAttributes.
+ * @width_mm: The screen width. 
+ * 
+ * Set the screen width in millimeters.
+ */
 void
 mks_screen_attributes_set_width_mm (MksScreenAttributes *self,
                                     guint16              width_mm)
@@ -101,6 +119,13 @@ mks_screen_attributes_set_width_mm (MksScreenAttributes *self,
   self->width_mm = width_mm;
 }
 
+/**
+ * mks_screen_attributes_set_height_mm:
+ * @self: A MksScreenAttributes.
+ * @height_mm: The screen height. 
+ * 
+ * Set the screen height in millimeters.
+ */
 void
 mks_screen_attributes_set_height_mm (MksScreenAttributes *self,
                                      guint16              height_mm)
@@ -108,6 +133,13 @@ mks_screen_attributes_set_height_mm (MksScreenAttributes *self,
   self->height_mm = height_mm;
 }
 
+/**
+ * mks_screen_attributes_set_x_offset:
+ * @self: A MksScreenAttributes.
+ * @x_offset: The screen's horizontal offset. 
+ * 
+ * Set the screen's horizontal offset in pixels.
+ */
 void
 mks_screen_attributes_set_x_offset (MksScreenAttributes *self,
                                     int                  x_offset)
@@ -115,6 +147,13 @@ mks_screen_attributes_set_x_offset (MksScreenAttributes *self,
   self->x_offset = x_offset;
 }
 
+/**
+ * mks_screen_attributes_set_y_offset:
+ * @self: A MksScreenAttributes.
+ * @y_offset: The screen's vertical offset. 
+ * 
+ * Set the screen's vertical offset in pixels.
+ */
 void
 mks_screen_attributes_set_y_offset (MksScreenAttributes *self,
                                     int                  y_offset)
@@ -122,6 +161,13 @@ mks_screen_attributes_set_y_offset (MksScreenAttributes *self,
   self->y_offset = y_offset;
 }
 
+/**
+ * mks_screen_attributes_set_width:
+ * @self: A MksScreenAttributes.
+ * @width: The screen width. 
+ * 
+ * Set the screen width in pixels.
+ */
 void
 mks_screen_attributes_set_width (MksScreenAttributes *self,
                                  guint                width)
@@ -129,6 +175,13 @@ mks_screen_attributes_set_width (MksScreenAttributes *self,
   self->width = width;
 }
 
+/**
+ * mks_screen_attributes_set_height:
+ * @self: A MksScreenAttributes.
+ * @height: The screen height. 
+ * 
+ * Set the screen height in pixels.
+ */
 void
 mks_screen_attributes_set_height (MksScreenAttributes *self,
                                   guint                height)

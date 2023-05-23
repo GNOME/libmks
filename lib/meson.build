@@ -138,7 +138,7 @@ libmks_dep = declare_dependency(
 install_headers(libmks_headers, subdir: 'libmks-@0@'.format(api_version))
 
 pkg.generate(
-  description: 'A shared library for Mouse, Keyboard, and Screen to Qemu',
+  description: 'A shared library for Mouse, Keyboard, and Screen to QEMU',
     libraries: libmks,
          name: 'libmks',
      filebase: 'libmks-' + api_version,

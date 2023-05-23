@@ -29,6 +29,12 @@
 
 #include "mks-keymap-xorgevdev2qnum-private.h"
 
+/**
+ * MksKeyboard:
+ * 
+ * A virtualized QEMU keyboard.
+ */
+
 struct _MksKeyboard
 {
   MksDevice        parent_instance;
@@ -152,6 +158,11 @@ mks_keyboard_class_init (MksKeyboardClass *klass)
   object_class->dispose = mks_keyboard_dispose;
   object_class->get_property = mks_keyboard_get_property;
 
+  /**
+   * MksKeyboard:modifiers:
+   * 
+   * Active keyboard modifiers.
+   */
   properties [PROP_MODIFIERS] =
     g_param_spec_flags ("modifiers", NULL, NULL,
                         MKS_TYPE_KEYBOARD_MODIFIER,
@@ -166,6 +177,12 @@ mks_keyboard_init (MksKeyboard *self)
 {
 }
 
+/**
+ * mks_keyboard_get_modifiers:
+ * @self: an #MksKeyboard
+ * 
+ * Get the active keyboard modifiers.
+ */
 MksKeyboardModifier
 mks_keyboard_get_modifiers (MksKeyboard *self)
 {
@@ -221,7 +238,7 @@ mks_keyboard_press_cb (GObject      *object,
  * @callback: a #GAsyncReadyCallback to execute upon completion
  * @user_data: closure data for @callback
  *
- * Asynchronously presses @keycode.
+ * Presses @keycode.
  */
 void
 mks_keyboard_press (MksKeyboard         *self,
@@ -253,6 +270,17 @@ mks_keyboard_press (MksKeyboard         *self,
   MKS_EXIT;
 }
 
+/**
+ * mks_keyboard_press_finish:
+ * @self: a `MksKeyboard`
+ * @result: a #GAsyncResult provided to callback
+ * @error: a location for a #GError, or %NULL
+ *
+ * Completes a call to [method@Mks.Keyboard.press].
+ *
+ * Returns: %TRUE if the operation completed successfully; otherwise %FALSE
+ *   and @error is set.
+ */
 gboolean
 mks_keyboard_press_finish (MksKeyboard   *self,
                            GAsyncResult  *result,
@@ -270,6 +298,19 @@ mks_keyboard_press_finish (MksKeyboard   *self,
   MKS_RETURN (ret);
 }
 
+
+/**
+ * mks_keyboard_press_sync:
+ * @self: an #MksKeyboard
+ * @keycode: the hardware keycode
+ * @cancellable: (nullable): a #GCancellable
+ * @error: a location for a #GError, or %NULL
+ *
+ * Synchronously press the `keycode`.
+ *
+ * Returns: %TRUE if the operation was acknowledged by the QEMU instance;
+ *   otherwise %FALSE and @error is set.
+ */
 gboolean
 mks_keyboard_press_sync (MksKeyboard   *self,
                          guint          keycode,
@@ -322,7 +363,7 @@ mks_keyboard_release_cb (GObject      *object,
  * @callback: a #GAsyncReadyCallback to execute upon completion
  * @user_data: closure data for @callback
  *
- * Asynchronously releases @keycode.
+ * Releases @keycode.
  */
 void
 mks_keyboard_release (MksKeyboard         *self,
@@ -354,6 +395,17 @@ mks_keyboard_release (MksKeyboard         *self,
   MKS_EXIT;
 }
 
+/**
+ * mks_keyboard_release_finish:
+ * @self: a `MksKeyboard`
+ * @result: a #GAsyncResult provided to callback
+ * @error: a location for a #GError, or %NULL
+ *
+ * Completes a call to [method@Mks.Keyboard.release].
+ *
+ * Returns: %TRUE if the operation completed successfully; otherwise %FALSE
+ *   and @error is set.
+ */
 gboolean
 mks_keyboard_release_finish (MksKeyboard   *self,
                              GAsyncResult  *result,
@@ -371,6 +423,18 @@ mks_keyboard_release_finish (MksKeyboard   *self,
   MKS_RETURN (ret);
 }
 
+/**
+ * mks_keyboard_release_sync:
+ * @self: an #MksKeyboard
+ * @keycode: the hardware keycode
+ * @cancellable: (nullable): a #GCancellable
+ * @error: a location for a #GError, or %NULL
+ *
+ * Synchronously release the `keycode`.
+ *
+ * Returns: %TRUE if the operation was acknowledged by the QEMU instance;
+ *   otherwise %FALSE and @error is set.
+ */
 gboolean
 mks_keyboard_release_sync (MksKeyboard   *self,
                            guint          keycode,

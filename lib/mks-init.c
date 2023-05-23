@@ -41,7 +41,7 @@ mks_init_gtypes (void)
 {
   g_resources_register (mks_get_resource ());
 
-  /* First register GTypes for Qemu IPC */
+  /* First register GTypes for QEMU IPC */
   g_type_ensure (MKS_QEMU_TYPE_AUDIO);
   g_type_ensure (MKS_QEMU_TYPE_AUDIO_IN_LISTENER);
   g_type_ensure (MKS_QEMU_TYPE_AUDIO_OUT_LISTENER);
@@ -66,6 +66,13 @@ mks_init_gtypes (void)
   g_type_ensure (MKS_TYPE_SESSION);
 }
 
+/**
+ * mks_init:
+ *
+ * Initializes the library.
+ * 
+ * The function must be called before using any of the library functions.
+ */
 void
 mks_init (void)
 {
@@ -86,18 +93,33 @@ _mks_init (void)
   mks_init ();
 }
 
+/**
+ * mks_get_major_version:
+ * 
+ * The major version the library.
+ */
 int
 mks_get_major_version (void)
 {
   return MKS_MAJOR_VERSION;
 }
 
+/**
+ * mks_get_minor_version:
+ * 
+ * The minor version the library.
+ */
 int
 mks_get_minor_version (void)
 {
   return MKS_MINOR_VERSION;
 }
 
+/**
+ * mks_get_micro_version:
+ * 
+ * The micro version the library.
+ */
 int
 mks_get_micro_version (void)
 {

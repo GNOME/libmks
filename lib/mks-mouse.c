@@ -25,6 +25,12 @@
 #include "mks-mouse.h"
 #include "mks-util-private.h"
 
+/**
+ * MksMouse:
+ * 
+ * A virtualized QEMU mouse.
+ */
+
 struct _MksMouse
 {
   MksDevice parent_instance;
@@ -121,6 +127,11 @@ mks_mouse_class_init (MksMouseClass *klass)
 
   device_class->setup = mks_mouse_setup;
 
+  /**
+   * MksMouse:is-absolute:
+   * 
+   * Whether the mouse is using absolute movements.
+   */
   properties [PROP_IS_ABSOLUTE] =
     g_param_spec_boolean ("is-absolute", NULL, NULL,
                           FALSE,
@@ -134,6 +145,12 @@ mks_mouse_init (MksMouse *self)
 {
 }
 
+/**
+ * mks_mouse_get_is_absolute:
+ * @self: A `MksMouse`.
+ * 
+ * Whether the mouse is using absolute movements.
+ */
 gboolean
 mks_mouse_get_is_absolute (MksMouse *self)
 {
@@ -224,6 +241,17 @@ mks_mouse_press (MksMouse            *self,
   MKS_EXIT;
 }
 
+/**
+ * mks_mouse_press_finish:
+ * @self: a `MksMouse`
+ * @result: a #GAsyncResult provided to callback
+ * @error: a location for a #GError, or %NULL
+ *
+ * Completes a call to [method@Mks.Mouse.press].
+ *
+ * Returns: %TRUE if the operation completed successfully; otherwise %FALSE
+ *   and @error is set.
+ */
 gboolean
 mks_mouse_press_finish (MksMouse      *self,
                         GAsyncResult  *result,
@@ -241,6 +269,18 @@ mks_mouse_press_finish (MksMouse      *self,
   MKS_RETURN (ret);
 }
 
+/**
+ * mks_mouse_press_sync:
+ * @self: an #MksMouse
+ * @button: the #MksMouseButton that was released
+ * @cancellable: (nullable): a #GCancellable
+ * @error: a location for a #GError, or %NULL
+ *
+ * Synchronously press a mouse button.
+ *
+ * Returns: %TRUE if the operation was acknowledged by the QEMU instance;
+ *   otherwise %FALSE and @error is set.
+ */
 gboolean
 mks_mouse_press_sync (MksMouse        *self,
                       MksMouseButton   button,
@@ -288,7 +328,7 @@ mks_mouse_release_cb (GObject      *object,
 /**
  * mks_mouse_release:
  * @self: an #MksMouse
- * @button: the #MksMouseButton that was releaseed
+ * @button: the #MksMouseButton that was released
  * @cancellable: (nullable): a #GCancellable
  * @callback: a #GAsyncReadyCallback to execute upon completion
  * @user_data: closure data for @callback
@@ -325,6 +365,17 @@ mks_mouse_release (MksMouse            *self,
   MKS_EXIT;
 }
 
+/**
+ * mks_mouse_release_finish:
+ * @self: a `MksMouse`
+ * @result: a #GAsyncResult provided to callback
+ * @error: a location for a #GError, or %NULL
+ *
+ * Completes a call to [method@Mks.Mouse.release].
+ *
+ * Returns: %TRUE if the operation completed successfully; otherwise %FALSE
+ *   and @error is set.
+ */
 gboolean
 mks_mouse_release_finish (MksMouse      *self,
                           GAsyncResult  *result,
@@ -342,6 +393,18 @@ mks_mouse_release_finish (MksMouse      *self,
   MKS_RETURN (ret);
 }
 
+/**
+ * mks_mouse_release_sync:
+ * @self: an #MksMouse
+ * @button: the #MksMouseButton that was released
+ * @cancellable: (nullable): a #GCancellable
+ * @error: a location for a #GError, or %NULL
+ *
+ * Synchronously releases a mouse button.
+ *
+ * Returns: %TRUE if the operation was acknowledged by the QEMU instance;
+ *   otherwise %FALSE and @error is set.
+ */
 gboolean
 mks_mouse_release_sync (MksMouse        *self,
                         MksMouseButton   button,
@@ -431,6 +494,17 @@ mks_mouse_move_to (MksMouse            *self,
   MKS_EXIT;
 }
 
+/**
+ * mks_mouse_move_to_finish:
+ * @self: a `MksMouse`
+ * @result: a #GAsyncResult provided to callback
+ * @error: a location for a #GError, or %NULL
+ *
+ * Completes a call to [method@Mks.Mouse.move_to].
+ *
+ * Returns: %TRUE if the operation completed successfully; otherwise %FALSE
+ *   and @error is set.
+ */
 gboolean
 mks_mouse_move_to_finish (MksMouse      *self,
                           GAsyncResult  *result,
@@ -456,9 +530,9 @@ mks_mouse_move_to_finish (MksMouse      *self,
  * @cancellable: (nullable): a #GCancellable
  * @error: a location for a #GError, or %NULL
  *
- * Moves to the absolute position at coordinates (x,y).
+ * Synchronously moves to the absolute position at coordinates (x,y).
  *
- * Returns: %TRUE if the operation was acknowledged by the Qemu instance;
+ * Returns: %TRUE if the operation was acknowledged by the QEMU instance;
  *   otherwise %FALSE and @error is set.
  */
 gboolean
@@ -554,6 +628,17 @@ mks_mouse_move_by (MksMouse            *self,
   MKS_EXIT;
 }
 
+/**
+ * mks_mouse_move_by_finish:
+ * @self: a `MksMouse`
+ * @result: a #GAsyncResult provided to callback
+ * @error: a location for a #GError, or %NULL
+ *
+ * Completes a call to [method@Mks.Mouse.move_by].
+ *
+ * Returns: %TRUE if the operation completed successfully; otherwise %FALSE
+ *   and @error is set.
+ */
 gboolean
 mks_mouse_move_by_finish (MksMouse      *self,
                           GAsyncResult  *result,
@@ -579,9 +664,9 @@ mks_mouse_move_by_finish (MksMouse      *self,
  * @cancellable: (nullable): a #GCancellable
  * @error: a location for a #GError, or %NULL
  *
- * Moves the mouse by delta_x and delta_y.
+ * Synchronously moves the mouse by delta_x and delta_y.
  *
- * Returns: %TRUE if the operation was acknowledged by the Qemu instance;
+ * Returns: %TRUE if the operation was acknowledged by the QEMU instance;
  *   otherwise %FALSE and @error is set.
  */
 gboolean
