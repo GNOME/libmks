@@ -1,7 +1,7 @@
 # libmks
 
-This library provides a "Mouse, Keyboard, and Screen" to Qemu using the
-D-Bus device support in Qemu and GTK 4.
+This library provides a "Mouse, Keyboard, and Screen" to QEMU using the
+D-Bus device support in QEMU and GTK 4.
 
 # Documentation
 
@@ -9,9 +9,9 @@ Nightly documentation can be found [here](https://chergert.pages.gitlab.gnome.or
 
 # Testing
 
-By default, Qemu will connect to your user session D-Bus if you do not
+By default, QEMU will connect to your user session D-Bus if you do not
 provide an address for `-display dbus`. Therefore, it is pretty easy to
-test things by running Qemu manually and then connecting with the test
+test things by running QEMU manually and then connecting with the test
 program `./tools/mks`.
 
 ```sh

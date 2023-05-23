@@ -347,7 +347,7 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
 
               /*
                * Currently there is no touchpad D-Bus interface to communicate
-               * with Qemu. That is something we would very much want to have
+               * with QEMU. That is something we would very much want to have
                * in the future so that we can do this properly.
                *
                * For now, we just "emulate" scroll events by looking at direction

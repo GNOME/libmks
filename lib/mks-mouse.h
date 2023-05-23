@@ -42,6 +42,18 @@ G_BEGIN_DECLS
 
 typedef struct _MksMouseClass MksMouseClass;
 
+/**
+ * MksMouseButton:
+ * @MKS_MOUSE_BUTTON_LEFT: Left button.
+ * @MKS_MOUSE_BUTTON_MIDDLE: Middle button.
+ * @MKS_MOUSE_BUTTON_RIGHT: Right button.
+ * @MKS_MOUSE_BUTTON_WHEEL_UP: Wheel-up button.
+ * @MKS_MOUSE_BUTTON_WHEEL_DOWN: Wheel-down button.
+ * @MKS_MOUSE_BUTTON_SIDE: Side button.
+ * @MKS_MOUSE_BUTTON_EXTRA: Extra button.
+ * 
+ * A mouse button.
+ */
 typedef enum _MksMouseButton
 {
   MKS_MOUSE_BUTTON_LEFT       = 0,

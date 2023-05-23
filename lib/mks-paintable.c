@@ -820,7 +820,7 @@ _mks_paintable_new (GCancellable  *cancellable,
  * _mks_paintable_get_cursor:
  * @self: a #MksPaintable
  *
- * Gets the cursor as defined by the Qemu instance.
+ * Gets the cursor as defined by the QEMU instance.
  *
  * Returns: (transfer none) (nullable): a #GdkCursor or %NULL
  */

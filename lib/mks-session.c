@@ -28,32 +28,32 @@
 #include "mks-session.h"
 
 /**
- * SECTION:mks-session
- * @Title: MksSession
- * @Short_description: Session connected to a Qemu VM
+ * MksSession:
+ * 
+ * Session connected to a QEMU VM
  *
- * The #MksSession represents a connection to a Qemu VM instance. It contains
+ * The `MksSession` represents a connection to a QEMU VM instance. It contains
  * devices such as the mouse, keyboard, and screen which can be used with GTK.
  *
- * You may monitor #MksSession:devices using #GListModel:items-changed to be
+ * You may monitor [property@Mks.Session:devices] using [signal@Gio.ListModel::items-changed] to be
  * notified of changes to available devices in the session.
  *
- * # Connecting To Qemu
+ * # Connecting To QEMU
  *
- * To use #MksSession, you should create your Qemu instance using `dbus` for
+ * To use `MksSession`, you should create your QEMU instance using `dbus` for
  * the various devices that support it. You'll need to provide your P2P D-Bus
- * address when connecting to Qemu.
+ * address when connecting to QEMU.
  *
- * Using the same #GDBusConnection, create a #MksSession with
- * mks_session_new_for_connection(). The #MksSession instance will negotiate
+ * Using the same [class@Gio.DBusConnection], create a `MksSession` with
+ * [func@Mks.Session.new_for_connection]. The `MksSession` instance will negotiate
  * with the peer to determine what devices are available and expose them
- * via the #MksSession:devices #GListModel.
+ * via the [property@Mks.Session:devices] [iface@Gio.ListModel].
  *
  * # Creating Widgets
  *
- * You can create a new widget to embed in your application by waiting for
- * a #MksScreen to become available in the list model or connecting to the
- * #GObject::notify signal for the #MksSession:screen property.
+ * You can create a new widget to embed in your application by calling
+ * [method@Mks.Session.ref_screen] and set the screen for the [class@Mks.Display]
+ * with [method@Mks.Display.set_screen].
  */
 
 static gboolean mks_session_initable_init              (GInitable            *initable,
@@ -72,15 +72,15 @@ struct _MksSession
 {
   GObject parent_instance;
 
-  /* @connection is used to communicate with the Qemu instance. It is expected
+  /* @connection is used to communicate with the QEMU instance. It is expected
    * to be a private point-to-point connection over a Unix socket, socketpair(),
    * or other channel capable of passing FDs between peers.
    */
   GDBusConnection *connection;
 
-  /* As devices are discovered from the Qemu instance, MksDevice-based objects
+  /* As devices are discovered from the QEMU instance, MksDevice-based objects
    * are created for them and stored in @devices. Applications will work with
-   * these objects to perform operations on the Qemu instance. When we discover
+   * these objects to perform operations on the QEMU instance. When we discover
    * the devices have been removed, we drop them from the listmodel.
    */
   GListStore *devices;
@@ -93,7 +93,7 @@ struct _MksSession
   GListModel *devices_read_only;
 
   /* An object manager client is used to monitor for new objects exported by
-   * the Qemu instance. Those objects are then wrapped by MksDevice objects
+   * the QEMU instance. Those objects are then wrapped by MksDevice objects
    * as necessary and exported to consumers via @devices.
    */
   GDBusObjectManager *object_manager;
@@ -365,8 +365,7 @@ mks_session_class_init (MksSessionClass *klass)
   /**
    * MksSession:connection:
    *
-   * The "connection" property contains the #GDBusConnection that is used
-   * to communicate with Qemu.
+   * The [class@Gio.DBusConnection] that is used to communicate with QEMU.
    */
   properties [PROP_CONNECTION] =
     g_param_spec_object ("connection", NULL, NULL,
@@ -376,8 +375,8 @@ mks_session_class_init (MksSessionClass *klass)
   /**
    * MksSession:devices:
    *
-   * The "devices" property contains a #GListModel of devices that have been
-   * discovered on the #GDBusConnection to Qemu.
+   * A [iface@Gio.ListModel] of devices that have been
+   * discovered on the [class@Gio.DBusConnection] to QEMU.
    */
   properties [PROP_DEVICES] =
     g_param_spec_object ("devices", NULL, NULL,
@@ -387,8 +386,7 @@ mks_session_class_init (MksSessionClass *klass)
   /**
    * MksSession:name:
    *
-   * The "name" property is the named of the VM as specified by the
-   * Qemu instance.
+   * The VM name as specified by the QEMU instance.
    */
   properties [PROP_NAME] =
     g_param_spec_string ("name", NULL, NULL,
@@ -398,8 +396,7 @@ mks_session_class_init (MksSessionClass *klass)
   /**
    * MksSession:uuid:
    *
-   * The "uuid" property is the unique identifier as specified by the
-   * Qemu instance for the VM.
+   * The VM unique identifier specified by the QEMU instance.
    */
   properties [PROP_UUID] =
     g_param_spec_string ("uuid", NULL, NULL,
@@ -566,7 +563,7 @@ mks_session_new_for_connection_cb (GObject      *object,
  *
  * Creates a #MksSession which communicates using @connection.
  *
- * The #GDBusConnection should be a private D-Bus connection to a Qemu
+ * The [class@Gio.DBusConnection] should be a private D-Bus connection to a QEMU
  * instance which has devices created using the "dbus" backend.
 
  * @callback will be executed when the session has been created or
@@ -574,7 +571,7 @@ mks_session_new_for_connection_cb (GObject      *object,
  *
  * This function will not block the calling thread.
  *
- * use mks_session_new_for_connection_finish() to get the result of
+ * use [ctor@Mks.Session.new_for_connection_finish] to get the result of
  * this operation.
  */
 void
@@ -610,7 +607,7 @@ mks_session_new_for_connection (GDBusConnection     *connection,
  * @result: a #GAsyncResult provided to callback
  * @error: (nullable): a location for a #GError or %NULL
  *
- * Completes a request to create a #MksSession for a #GDBusConnection.
+ * Completes a request to create a #MksSession for a [class@Gio.DBusConnection].
  *
  * Returns: (transfer full): a #MksSession if successful; otherwise %NULL
  *   and @error is set.
@@ -626,13 +623,13 @@ mks_session_new_for_connection_finish (GAsyncResult  *result,
 
 /**
  * mks_session_new_for_connection_sync:
- * @connection: a private #GDBusConnetion to a Qemu instance
+ * @connection: a private #GDBusConnetion to a QEMU instance
  * @cancellable: (nullable): a #GCancellable, or %NULL
  * @error: (nullable): a location for a #GError, or %NULL
  *
  * Synchronously creates a new #MksSession instance.
  *
- * This may block while the Qemu instance is contacted to query for
+ * This may block while the QEMU instance is contacted to query for
  * initial devices and VM status.
  *
  * Returns: (transfer full): a #MksSession if successful; otherwise %NULL
@@ -661,7 +658,7 @@ mks_session_new_for_connection_sync (GDBusConnection  *connection,
  * mks_session_get_connection:
  * @self: a #MksSession
  *
- * Gets the #MksSession:connection property.
+ * Gets the DBus connection used for this session.
  *
  * Returns: (transfer none) (nullable): a #GDBusConnection or %NULL if
  *   the connection has not been set, or was disposed.
@@ -678,7 +675,7 @@ mks_session_get_connection (MksSession *self)
  * mks_session_get_uuid:
  * @self: a #MksSession
  *
- * Gets the "uuid" property.
+ * Gets the unique identifier of the VM.
  */
 const char *
 mks_session_get_uuid (MksSession *self)
@@ -695,7 +692,7 @@ mks_session_get_uuid (MksSession *self)
  * mks_session_get_name:
  * @self: a #MksSession
  *
- * Gets the "name" property.
+ * Gets the name of the VM.
  */
 const char *
 mks_session_get_name (MksSession *self)

@@ -43,6 +43,13 @@ G_BEGIN_DECLS
 
 typedef struct _MksScreenClass MksScreenClass;
 
+/**
+ * MksScreenKind:
+ * @MKS_SCREEN_KIND_TEXT: A text only screen.
+ * @MKS_SCREEN_KIND_GRAPHIC: A graphical screen.
+ * 
+ * A screen kind.
+ */
 typedef enum _MksScreenKind
 {
   MKS_SCREEN_KIND_TEXT = 0,

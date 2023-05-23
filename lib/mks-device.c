@@ -23,6 +23,12 @@
 
 #include "mks-device-private.h"
 
+/**
+ * MksDevice:
+ * 
+ * An abstraction of a virtualized QEMU device.
+ */
+
 G_DEFINE_TYPE (MksDevice, mks_device, G_TYPE_OBJECT)
 
 enum {
@@ -84,6 +90,11 @@ mks_device_class_init (MksDeviceClass *klass)
 
   klass->setup = mks_device_real_setup;
 
+  /**
+   * MksDevice:name:
+   * 
+   * The device name.
+  */
   properties [PROP_NAME] =
     g_param_spec_string ("name", NULL, NULL,
                          NULL,
@@ -97,6 +108,12 @@ mks_device_init (MksDevice *self)
 {
 }
 
+/**
+ * mks_device_get_name:
+ * @self: A `MksDevice`
+ * 
+ * Gets the device name. 
+ */
 const char *
 mks_device_get_name (MksDevice *self)
 {

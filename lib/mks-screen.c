@@ -478,11 +478,11 @@ mks_screen_configure_cb (GObject      *object,
  * @callback: a #GAsyncReadyCallback to execute upon completion
  * @user_data: closure data for @callback
  *
- * Requests the Qemu instance reconfigure the screen with @attributes.
+ * Requests the QEMU instance reconfigure the screen with @attributes.
  *
  * This function takes ownership of @attributes.
  *
- * @callback is executed upon acknowledgment from the Qemu instance or
+ * @callback is executed upon acknowledgment from the QEMU instance or
  * if the request timed out.
  *
  * Call mks_screen_configure_finish() to get the result.
@@ -550,7 +550,7 @@ mks_screen_configure_finish (MksScreen     *self,
  * @cancellable: a #GCancellable
  * @error: a location for a #GError, or %NULL
  *
- * Requests the Qemu instance reconfigure the screen using @attributes.
+ * Requests the QEMU instance reconfigure the screen using @attributes.
  *
  * This function takes ownership of @attributes.
  *
@@ -613,7 +613,7 @@ mks_screen_attach_cb (GObject      *object,
  * contents of the screen.
  *
  * This function registers a new `socketpair()` which is shared with
- * the Qemu instance to receive rendering updates. Those updates are
+ * the QEMU instance to receive rendering updates. Those updates are
  * propagated to the resulting #GdkPainable which can be retrieved
  * using mks_screen_attach_finish() from @callback.
  */
@@ -661,11 +661,11 @@ failure:
  * @result: a #GAsyncResult provided to callback
  * @error: a location for a #GError, or %NULL
  *
- * Completes an asynchronous request to create a #GdkPaintable containing
- * the contents of #MksScreen in the Qemu instance.
+ * Completes an asynchronous request to create a [iface@Gdk.Paintable] containing
+ * the contents of #MksScreen in the QEMU instance.
  *
- * The resulting #GdkPaintable will be updated as changes are delivered
- * from Qemu over a private `socketpair()`. In the typical case, those
+ * The resulting [iface@Gdk.Paintable] will be updated as changes are delivered
+ * from QEMU over a private `socketpair()`. In the typical case, those
  * changes are propagated using a DMA-BUF and damage notifications.
  *
  * Returns: (transfer full): a #GdkPainable if successful; otherwise %NULL
@@ -689,7 +689,7 @@ mks_screen_attach_finish (MksScreen     *self,
  * @error: (nullable): a location for a #GError, or %NULL
  *
  * Synchronous request to attach to screen, creating a paintable that can
- * be used to update display as the Qemu instance updates.
+ * be used to update display as the QEMU instance updates.
  *
  * Returns: (transfer full): a #GdkPaintable if successful; otherwise %NULL
  *   and @error is set.

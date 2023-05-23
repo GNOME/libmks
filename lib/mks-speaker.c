@@ -28,6 +28,12 @@
 #include "mks-speaker.h"
 #include "mks-util-private.h"
 
+/**
+ * MksSpeaker:
+ * 
+ * A virtualized QEMU speaker.
+ */
+
 struct _MksSpeaker
 {
   MksDevice parent_instance;
@@ -310,9 +316,8 @@ mks_speaker_class_init (MksSpeakerClass *klass)
   /**
    * MksSpeaker:muted:
    *
-   * The "muted" property denotes if audio received from the
-   * instance is dropped and the remote sound device should
-   * attempt to be set as muted.
+   * If audio received from the instance is dropped and 
+   * the remote sound device should attempt to be set as muted.
    */
   properties [PROP_MUTED] =
     g_param_spec_boolean ("muted", NULL, NULL,
@@ -348,7 +353,7 @@ mks_speaker_get_muted (MksSpeaker *self)
  * @self: a #MksSpeaker
  * @muted: if the speaker should be muted
  *
- * Sets the #MksSpeaker:muted property.
+ * Mute or un-mute the speaker.
  */
 void
 mks_speaker_set_muted (MksSpeaker *self,
