@@ -629,6 +629,7 @@ static void
 mks_display_picture_init (MksDisplayPicture *self)
 {
   GtkEventController *controller;
+  g_autoptr(GdkCursor) gdk_cursor = gdk_cursor_new_from_name ("none", NULL);
 
   controller = gtk_event_controller_legacy_new ();
   g_signal_connect_object (controller,
@@ -661,6 +662,7 @@ mks_display_picture_init (MksDisplayPicture *self)
                                  self,
                                  G_CONNECT_SWAPPED);
 
+  gtk_widget_set_cursor (GTK_WIDGET (self), gdk_cursor);
   gtk_widget_set_focusable (GTK_WIDGET (self), TRUE);
 }
 
