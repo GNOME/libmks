@@ -374,6 +374,9 @@ mks_paintable_listener_scanout_dmabuf (MksPaintable          *self,
   scanout_data->stride = stride;
   scanout_data->fourcc = fourcc;
   scanout_data->modifier = modifier;
+  if (self->scanout_data)
+    g_clear_fd (&self->scanout_data->dmabuf_fd, NULL);
+
   g_clear_pointer (&self->scanout_data, g_free);
   self->scanout_data = scanout_data;
 
