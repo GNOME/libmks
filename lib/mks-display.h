@@ -52,5 +52,9 @@ MksScreen          *mks_display_get_screen         (MksDisplay         *self);
 MKS_AVAILABLE_IN_ALL
 void                mks_display_set_screen         (MksDisplay         *self,
                                                     MksScreen          *screen);
-
+MKS_AVAILABLE_IN_ALL
+gboolean            mks_display_get_auto_resize    (MksDisplay         *self);
+MKS_AVAILABLE_IN_ALL
+void                mks_display_set_auto_resize    (MksDisplay         *self,
+                                                    gboolean            auto_resize);
 G_END_DECLS

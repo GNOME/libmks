@@ -43,12 +43,14 @@ typedef struct
   MksDisplayPicture  *picture;
   MksInhibitor       *inhibitor;
   GtkShortcutTrigger *ungrab_trigger;
+  guint               auto_resize : 1;
 } MksDisplayPrivate;
 
 enum {
   PROP_0,
   PROP_SCREEN,
   PROP_UNGRAB_TRIGGER,
+  PROP_AUTO_RESIZE,
   N_PROPS
 };
 
@@ -301,12 +303,16 @@ mks_display_size_allocate (GtkWidget *widget,
 
   mks_display_get_paintable_area (self, &area);
 
-  attributes = mks_screen_attributes_new ();
-  mks_screen_attributes_set_width (attributes, width);
-  mks_screen_attributes_set_height (attributes, height);
+  if (priv->auto_resize)
+    {
+      attributes = mks_screen_attributes_new ();
+      mks_screen_attributes_set_width (attributes, width);
+      mks_screen_attributes_set_height (attributes, height);
 
-  mks_screen_resizer_queue_resize (priv->resizer,
-                                   g_steal_pointer (&attributes));
+      mks_screen_resizer_queue_resize (priv->resizer,
+                                       g_steal_pointer (&attributes));
+      mks_screen_attributes_free (attributes);
+    }
 
   gtk_widget_size_allocate (GTK_WIDGET (priv->picture),
                             &(GtkAllocation) {
@@ -316,7 +322,6 @@ mks_display_size_allocate (GtkWidget *widget,
                               area.size.height
                             },
                             -1);
-  mks_screen_attributes_free (attributes);
 }
 
 static void
@@ -335,6 +340,10 @@ mks_display_get_property (GObject    *object,
 
     case PROP_UNGRAB_TRIGGER:
       g_value_set_object (value, mks_display_get_ungrab_trigger (self));
+      break;
+
+    case PROP_AUTO_RESIZE:
+      g_value_set_boolean (value, mks_display_get_auto_resize (self));
       break;
 
     default:
@@ -358,6 +367,10 @@ mks_display_set_property (GObject      *object,
 
     case PROP_UNGRAB_TRIGGER:
       mks_display_set_ungrab_trigger (self, g_value_get_object (value));
+      break;
+
+    case PROP_AUTO_RESIZE:
+      mks_display_set_auto_resize (self, g_value_get_boolean (value));
       break;
 
     default:
@@ -390,6 +403,11 @@ mks_display_class_init (MksDisplayClass *klass)
     g_param_spec_object ("ungrab-trigger", NULL, NULL,
                          GTK_TYPE_SHORTCUT_TRIGGER,
                          (G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS));
+
+  properties [PROP_AUTO_RESIZE] =
+    g_param_spec_boolean ("auto-resize", NULL, NULL,
+                          TRUE,
+                          (G_PARAM_CONSTRUCT | G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_properties (object_class, N_PROPS, properties);
 
@@ -466,6 +484,48 @@ mks_display_set_screen (MksDisplay *self,
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_SCREEN]);
 
   MKS_EXIT;
+}
+
+/**
+ * mks_display_get_auto_resize:
+ * @self: A `MksDisplay`
+ *
+ * Get whether the widget will reconfigure the VM whenever
+ * it gets a new size allocation.
+ */
+gboolean
+mks_display_get_auto_resize (MksDisplay *self)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  
+  g_return_val_if_fail (MKS_IS_DISPLAY (self), FALSE);
+
+  return priv->auto_resize;
+}
+
+/**
+ * mks_display_set_auto_resize:
+ * @self: A `MksDisplay`
+ * @auto_resize: Whether to auto resize or not
+ * 
+ * Sets whether the widget should reconfigure the VM
+ * with the allocated size of the widget.
+ */
+void
+mks_display_set_auto_resize (MksDisplay *self,
+                             gboolean    auto_resize)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+
+  g_return_if_fail (MKS_IS_DISPLAY (self));
+  auto_resize = !!auto_resize;
+
+  if (auto_resize != priv->auto_resize)
+    {
+      priv->auto_resize = auto_resize;
+      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_AUTO_RESIZE]);
+      gtk_widget_queue_allocate (GTK_WIDGET (self));
+    }
 }
 
 /**
