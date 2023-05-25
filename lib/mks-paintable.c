@@ -670,31 +670,6 @@ mks_paintable_listener_disable (MksPaintable          *self,
   return TRUE;
 }
 
-static gboolean
-create_socketpair (int     *us,
-                   int     *them,
-                   GError **error)
-{
-  int fds[2];
-  int rv;
-
-  rv = socketpair (AF_UNIX, SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, 0, fds);
-
-  if (rv != 0)
-    {
-      int errsv = errno;
-      g_set_error_literal (error,
-                           G_IO_ERROR,
-                           g_io_error_from_errno (errsv),
-                           g_strerror (errsv));
-      return FALSE;
-    }
-
-  *us = fds[0];
-  *them = fds[1];
-
-  return TRUE;
-}
 
 static void
 mks_paintable_connection_cb (GObject      *object,

@@ -90,7 +90,7 @@ mks_scroll_event_is_inverted (GdkEvent *event)
     }
 }
 
-static gboolean
+gboolean
 create_socketpair (int     *us,
                    int     *them,
                    GError **error)
