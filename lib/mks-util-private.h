@@ -42,6 +42,10 @@ G_BEGIN_DECLS
 # define MKS_RETURN(_r) G_STMT_START { typeof(_r) __ret = (_r); return (__ret); } G_STMT_END
 #endif
 
+
+gboolean         create_socketpair                    (int     *us,
+                                                       int     *them,
+                                                       GError **error);
 gboolean         mks_scroll_event_is_inverted         (GdkEvent              *event);
 void             mks_socketpair_connection_new        (GDBusConnectionFlags   flags,
                                                        GCancellable          *cancellable,
