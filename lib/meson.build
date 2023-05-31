@@ -124,6 +124,7 @@ libmks = shared_library('mks-' + api_version,
   include_directories: libmks_include_directories,
          dependencies: libmks_deps,
               install: true,
+              version: meson.project_version(),
 )
 
 libmks_dep = declare_dependency(
