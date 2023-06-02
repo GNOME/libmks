@@ -24,12 +24,12 @@
 #include "mks-device-private.h"
 #include "mks-read-only-list-model-private.h"
 #include "mks-qemu.h"
-#include "mks-screen-private.h"
+#include "mks-screen.h"
 #include "mks-session.h"
 
 /**
  * MksSession:
- * 
+ *
  * Session connected to a QEMU VM
  *
  * The `MksSession` represents a connection to a QEMU VM instance. It contains

@@ -33,7 +33,7 @@
 #include "mks-mouse-private.h"
 #include "mks-paintable-private.h"
 #include "mks-screen-attributes-private.h"
-#include "mks-screen-private.h"
+#include "mks-screen.h"
 
 struct _MksScreenClass
 {
