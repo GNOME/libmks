@@ -169,12 +169,13 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
                              cairo_region_t       *region,
                              GError              **error)
 {
-  g_autoptr(MksDmabufTextureData) texture_data = NULL;
-  GLuint texture_id;
   g_autoptr(GdkGLTextureBuilder) builder = NULL;
+  g_autoptr(GdkTexture) texture = NULL;
+  GLuint texture_id;
   guint zero = 0;
 
   g_return_val_if_fail (MKS_IS_DMABUF_PAINTABLE (self), FALSE);
+  g_return_val_if_fail (!gl_context || GDK_IS_GL_CONTEXT (gl_context), FALSE);
 
   if (data->dmabuf_fd < 0)
     {
@@ -203,10 +204,9 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
       gdk_paintable_invalidate_size (GDK_PAINTABLE (self));
     }
 
-
   if (!(texture_id = mks_gl_context_import_dmabuf (gl_context,
                                                    data->fourcc, data->width, data->height,
-                                                   1, &data->dmabuf_fd, &data->stride, &zero, 
+                                                   1, &data->dmabuf_fd, &data->stride, &zero,
                                                    &data->modifier)))
     {
       g_set_error (error,
@@ -221,21 +221,20 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
   gdk_gl_texture_builder_set_width (builder, self->width);
   gdk_gl_texture_builder_set_height (builder, self->height);
   gdk_gl_texture_builder_set_context (builder, gl_context);
-  
-  if (region)
+
+  if (region != NULL)
     {
       gdk_gl_texture_builder_set_update_region (builder, region);
       gdk_gl_texture_builder_set_update_texture (builder, self->texture);
     }
 
-  texture_data = mks_dmabuf_texture_data_new (gl_context, texture_id);
-  g_clear_object (&self->texture); 
-  self->texture = gdk_gl_texture_builder_build (builder, 
-                                                (GDestroyNotify) mks_dmabuf_texture_data_unref,
-                                                mks_dmabuf_texture_data_ref (texture_data)
-                                               );
+  texture = gdk_gl_texture_builder_build (builder,
+                                          (GDestroyNotify)mks_dmabuf_texture_data_unref,
+                                          mks_dmabuf_texture_data_new (gl_context, texture_id));
 
+  g_set_object (&self->texture, texture);
   gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
+
   return TRUE;
 }
 
