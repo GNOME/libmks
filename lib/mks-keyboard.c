@@ -26,12 +26,11 @@
 #include "mks-keyboard.h"
 #include "mks-util-private.h"
 
-
 #include "mks-keymap-xorgevdev2qnum-private.h"
 
 /**
  * MksKeyboard:
- * 
+ *
  * A virtualized QEMU keyboard.
  */
 
@@ -160,7 +159,7 @@ mks_keyboard_class_init (MksKeyboardClass *klass)
 
   /**
    * MksKeyboard:modifiers:
-   * 
+   *
    * Active keyboard modifiers.
    */
   properties [PROP_MODIFIERS] =
@@ -180,7 +179,7 @@ mks_keyboard_init (MksKeyboard *self)
 /**
  * mks_keyboard_get_modifiers:
  * @self: an #MksKeyboard
- * 
+ *
  * Get the active keyboard modifiers.
  */
 MksKeyboardModifier

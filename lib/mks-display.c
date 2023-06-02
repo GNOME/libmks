@@ -498,7 +498,7 @@ gboolean
 mks_display_get_auto_resize (MksDisplay *self)
 {
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-  
+
   g_return_val_if_fail (MKS_IS_DISPLAY (self), FALSE);
 
   return priv->auto_resize;
@@ -508,7 +508,7 @@ mks_display_get_auto_resize (MksDisplay *self)
  * mks_display_set_auto_resize:
  * @self: A `MksDisplay`
  * @auto_resize: Whether to auto resize or not
- * 
+ *
  * Sets whether the widget should reconfigure the VM
  * with the allocated size of the widget.
  */

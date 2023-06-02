@@ -20,8 +20,6 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
-#define G_LOG_DOMAIN "mks-dmabuf-paintable"
-
 #include "config.h"
 
 #include <gtk/gtk.h>
@@ -32,7 +30,7 @@
 /*
  * MksDmabufPaintable is a GdkPaintable that gets created the first time
  * `ScanoutDMABUF` is called.
- * 
+ *
  * The scanout data is then stored until we receive a `UpdateDMABUF` call
  * so we can pass the damage region to `GdkGLTextureBuilder`.
  */

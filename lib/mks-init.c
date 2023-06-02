@@ -71,7 +71,7 @@ mks_init_gtypes (void)
  * mks_init:
  *
  * Initializes the library.
- * 
+ *
  * The function must be called before using any of the library functions.
  */
 void
@@ -96,7 +96,7 @@ _mks_init (void)
 
 /**
  * mks_get_major_version:
- * 
+ *
  * The major version the library.
  */
 int
@@ -107,7 +107,7 @@ mks_get_major_version (void)
 
 /**
  * mks_get_minor_version:
- * 
+ *
  * The minor version the library.
  */
 int
@@ -118,7 +118,7 @@ mks_get_minor_version (void)
 
 /**
  * mks_get_micro_version:
- * 
+ *
  * The micro version the library.
  */
 int
