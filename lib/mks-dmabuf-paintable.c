@@ -106,21 +106,15 @@ mks_dmabuf_texture_data_new (GdkGLContext *gl_context,
   g_assert (GDK_IS_GL_CONTEXT (gl_context));
   g_assert (texture_id > 0);
 
-  texture_data = g_atomic_rc_box_new0 (MksDmabufTextureData);
+  texture_data = g_new0 (MksDmabufTextureData, 1);
   texture_data->gl_context = g_object_ref (gl_context);
   texture_data->texture_id = texture_id;
 
   return texture_data;
 }
 
-static MksDmabufTextureData *
-mks_dmabuf_texture_data_ref (MksDmabufTextureData *texture_data)
-{
-  return g_atomic_rc_box_acquire (texture_data);
-}
-
 static void
-mks_dmabuf_texture_data_finalize (gpointer data)
+mks_dmabuf_texture_data_free (gpointer data)
 {
   MksDmabufTextureData *texture_data = data;
 
@@ -129,15 +123,9 @@ mks_dmabuf_texture_data_finalize (gpointer data)
 
   texture_data->texture_id = 0;
   g_clear_object (&texture_data->gl_context);
-}
 
-static void
-mks_dmabuf_texture_data_unref (MksDmabufTextureData *texture_data)
-{
-  g_atomic_rc_box_release_full (texture_data, mks_dmabuf_texture_data_finalize);
+  g_free (texture_data);
 }
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksDmabufTextureData, mks_dmabuf_texture_data_unref)
 
 static void
 mks_dmabuf_paintable_dispose (GObject *object)
@@ -229,7 +217,7 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
     }
 
   texture = gdk_gl_texture_builder_build (builder,
-                                          (GDestroyNotify)mks_dmabuf_texture_data_unref,
+                                          mks_dmabuf_texture_data_free,
                                           mks_dmabuf_texture_data_new (gl_context, texture_id));
 
   g_set_object (&self->texture, texture);
