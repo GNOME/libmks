@@ -1,0 +1,11 @@
+# libmks 0.1.0
+
+This is an initial preview release of a new library which provides
+"Mouse, Keyboard, and Screen" to Qemu instances.
+
+It communicates using the D-Bus display backend of Qemu.
+
+We expect additional work in the near future such as touchpad, sound,
+clipboard, and other integral components when fronting a VM.
+
+Have fun!
