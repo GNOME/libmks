@@ -70,7 +70,7 @@ mks_display_picture_keyboard_press_cb (GObject      *object,
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
   if (!mks_keyboard_press_finish (keyboard, result, &error))
-    g_warning ("Keyboard press failed: %s", error->message);
+    g_debug ("Keyboard press failed: %s", error->message);
 }
 
 static void
@@ -87,7 +87,7 @@ mks_display_picture_keyboard_release_cb (GObject      *object,
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
   if (!mks_keyboard_release_finish (keyboard, result, &error))
-    g_warning ("Keyboard release failed: %s", error->message);
+    g_debug ("Keyboard release failed: %s", error->message);
 }
 
 static void
@@ -104,7 +104,7 @@ mks_display_picture_mouse_move_to_cb (GObject      *object,
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
   if (!mks_mouse_move_to_finish (mouse, result, &error))
-    g_warning ("Failed move_to: %s", error->message);
+    g_debug ("Failed move_to: %s", error->message);
 }
 
 static void
@@ -121,7 +121,7 @@ mks_display_picture_mouse_move_by_cb (GObject      *object,
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
   if (!mks_mouse_move_by_finish (mouse, result, &error))
-    g_warning ("Failed move_by: %s", error->message);
+    g_debug ("Failed move_by: %s", error->message);
 }
 
 static void
@@ -173,7 +173,7 @@ mks_display_picture_mouse_press_cb (GObject      *object,
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
   if (!mks_mouse_press_finish (mouse, result, &error))
-    g_warning ("Mouse press failed: %s", error->message);
+    g_debug ("Mouse press failed: %s", error->message);
 }
 
 static void
@@ -190,7 +190,7 @@ mks_display_picture_mouse_release_cb (GObject      *object,
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
   if (!mks_mouse_release_finish (mouse, result, &error))
-    g_warning ("Mouse release failed: %s", error->message);
+    g_debug ("Mouse release failed: %s", error->message);
 }
 
 static gboolean

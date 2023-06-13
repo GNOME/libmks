@@ -135,7 +135,7 @@ on_screen_configure_cb (GObject      *object,
   g_assert (MKS_IS_SCREEN_RESIZER (self));
 
   if (!mks_screen_configure_finish (screen, result, &error))
-    g_warning ("Screen configure failed: %s", error->message);
+    g_debug ("Screen configure failed: %s", error->message);
 
   self->in_progress = FALSE;
   attributes = g_steal_pointer (&self->next_op);
