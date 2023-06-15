@@ -271,7 +271,7 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
     case GDK_TOUCH_END:
       {
         double guest_x, guest_y;
-        uint64_t num_slot = GPOINTER_TO_UINT (sequence);
+        guint64 num_slot = GPOINTER_TO_UINT (sequence);
         MksTouchEventKind kind;
 
         if (event_type == GDK_TOUCH_BEGIN)

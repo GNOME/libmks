@@ -34,15 +34,15 @@
 #include "mks-gl-context-private.h"
 
 GLuint
-mks_gl_context_import_dmabuf (GdkGLContext   *context,
-                              uint32_t        format,
-                              unsigned int    width,
-                              unsigned int    height,
-                              uint32_t        n_planes,
-                              const int      *fds,
-                              const uint32_t *strides,
-                              const uint32_t *offsets,
-                              const uint64_t *modifiers)
+mks_gl_context_import_dmabuf (GdkGLContext  *context,
+                              guint32        format,
+                              guint          width,
+                              guint          height,
+                              guint32        n_planes,
+                              const int     *fds,
+                              const guint32 *strides,
+                              const guint32 *offsets,
+                              const guint64 *modifiers)
 {
   GdkDisplay *display;
   EGLDisplay egl_display;
