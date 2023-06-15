@@ -141,6 +141,7 @@ mks_display_connect (MksDisplay *self,
     {
       mks_display_picture_set_keyboard (priv->picture, mks_screen_get_keyboard (screen));
       mks_display_picture_set_mouse (priv->picture, mks_screen_get_mouse (screen));
+      mks_display_picture_set_touchable (priv->picture, mks_screen_get_touchable (screen));
       mks_screen_resizer_set_screen (priv->resizer, screen);
 
       mks_screen_attach (screen,
@@ -172,6 +173,7 @@ mks_display_disconnect (MksDisplay *self)
       mks_display_picture_set_paintable (priv->picture, NULL);
       mks_display_picture_set_keyboard (priv->picture, NULL);
       mks_display_picture_set_mouse (priv->picture, NULL);
+      mks_display_picture_set_touchable (priv->picture, NULL);
     }
 
   MKS_EXIT;

@@ -35,6 +35,7 @@ G_BEGIN_DECLS
 # include "mks-screen.h"
 # include "mks-screen-attributes.h"
 # include "mks-session.h"
+# include "mks-touchable.h"
 # include "mks-types.h"
 # include "mks-version.h"
 # include "mks-version-macros.h"

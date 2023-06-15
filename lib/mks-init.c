@@ -35,6 +35,7 @@
 #include "mks-screen.h"
 #include "mks-screen-attributes.h"
 #include "mks-session.h"
+#include "mks-touchable.h"
 #include "mks-version.h"
 
 static void
@@ -65,6 +66,7 @@ mks_init_gtypes (void)
   g_type_ensure (MKS_TYPE_SCREEN);
   g_type_ensure (MKS_TYPE_SCREEN_ATTRIBUTES);
   g_type_ensure (MKS_TYPE_SESSION);
+  g_type_ensure (MKS_TYPE_TOUCHABLE);
 }
 
 /**

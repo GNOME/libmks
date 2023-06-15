@@ -36,5 +36,6 @@ typedef struct _MksScreen              MksScreen;
 typedef struct _MksSession             MksSession;
 typedef struct _MksScreenAttributes    MksScreenAttributes;
 typedef struct _MksSpeaker             MksSpeaker;
+typedef struct _MksTouchable           MksTouchable;
 
 G_END_DECLS
