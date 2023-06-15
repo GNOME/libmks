@@ -53,6 +53,9 @@ print_device_info (MksDevice *device,
   else if (MKS_IS_MOUSE (device))
     g_print (", is-absolute=%u",
              mks_mouse_get_is_absolute (MKS_MOUSE (device)));
+  else if (MKS_IS_TOUCHABLE (device))
+    g_print (", max-slots=%u",
+             mks_touchable_get_max_slots (MKS_TOUCHABLE (device)));
   g_print (")\n");
 
   if (MKS_IS_SCREEN (device))
@@ -60,9 +63,11 @@ print_device_info (MksDevice *device,
       MksScreen *screen = MKS_SCREEN (device);
       MksKeyboard *keyboard = mks_screen_get_keyboard (screen);
       MksMouse *mouse = mks_screen_get_mouse (screen);
+      MksTouchable *touchable = mks_screen_get_touchable (screen);
 
       print_device_info (MKS_DEVICE (keyboard), depth+1);
       print_device_info (MKS_DEVICE (mouse), depth+1);
+      print_device_info (MKS_DEVICE (touchable), depth+1);
     }
 }
 
