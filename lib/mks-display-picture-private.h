@@ -42,5 +42,8 @@ void          mks_display_picture_set_mouse     (MksDisplayPicture *self,
 MksKeyboard  *mks_display_picture_get_keyboard  (MksDisplayPicture *self);
 void          mks_display_picture_set_keyboard  (MksDisplayPicture *self,
                                                  MksKeyboard       *keyboard);
+MksTouchable *mks_display_picture_get_touchable (MksDisplayPicture *self);
+void          mks_display_picture_set_touchable (MksDisplayPicture *self,
+                                                 MksTouchable      *touchable);
 
 G_END_DECLS

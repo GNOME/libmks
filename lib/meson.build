@@ -15,6 +15,7 @@ libmks_sources = [
   'mks-screen.c',
   'mks-screen-attributes.c',
   'mks-session.c',
+  'mks-touchable.c',
 ]
 
 libmks_headers = [
@@ -27,6 +28,7 @@ libmks_headers = [
   'mks-screen.h',
   'mks-screen-attributes.h',
   'mks-session.h',
+  'mks-touchable.h',
   'mks-types.h',
   'mks-version-macros.h',
 ]

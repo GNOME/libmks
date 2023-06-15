@@ -34,6 +34,7 @@
 #include "mks-paintable-private.h"
 #include "mks-screen-attributes-private.h"
 #include "mks-screen.h"
+#include "mks-touchable.h"
 
 struct _MksScreenClass
 {
@@ -49,6 +50,7 @@ struct _MksScreen
 
   MksKeyboard    *keyboard;
   MksMouse       *mouse;
+  MksTouchable   *touchable;
 
   guint           number;
   guint           width;
@@ -206,6 +208,8 @@ mks_screen_setup (MksDevice     *device,
         self->keyboard = _mks_device_new (MKS_TYPE_KEYBOARD, device->session, object);
       else if (MKS_QEMU_IS_MOUSE (iface))
         self->mouse = _mks_device_new (MKS_TYPE_MOUSE, device->session, object);
+      else if (MKS_QEMU_IS_TOUCH (iface))
+        self->touchable = _mks_device_new (MKS_TYPE_TOUCHABLE, device->session, object);
     }
 
   return self->console != NULL &&
@@ -358,6 +362,22 @@ mks_screen_get_mouse (MksScreen *self)
   g_return_val_if_fail (MKS_IS_SCREEN (self), NULL);
 
   return self->mouse;
+}
+
+/**
+ * mks_screen_get_touchable:
+ * @self: a #MksScreen
+ *
+ * Gets the #MksScreen:touchable property.
+ *
+ * Returns: (transfer none): a #MksTouchable
+ */
+MksTouchable *
+mks_screen_get_touchable (MksScreen *self)
+{
+  g_return_val_if_fail (MKS_IS_SCREEN (self), NULL);
+
+  return self->touchable;
 }
 
 /**

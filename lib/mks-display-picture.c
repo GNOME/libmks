@@ -26,6 +26,7 @@
 #include "mks-display-picture-private.h"
 #include "mks-keyboard.h"
 #include "mks-mouse.h"
+#include "mks-touchable.h"
 #include "mks-util-private.h"
 
 struct _MksDisplayPicture
@@ -36,6 +37,7 @@ struct _MksDisplayPicture
   MksPaintable *paintable;
   MksKeyboard  *keyboard;
   MksMouse     *mouse;
+  MksTouchable *touchable;
 
   double        last_mouse_x;
   double        last_mouse_y;
@@ -46,6 +48,7 @@ enum {
   PROP_PAINTABLE,
   PROP_KEYBOARD,
   PROP_MOUSE,
+  PROP_TOUCHABLE,
   N_PROPS
 };
 
@@ -67,7 +70,7 @@ mks_display_picture_keyboard_press_cb (GObject      *object,
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
   if (!mks_keyboard_press_finish (keyboard, result, &error))
-    g_warning ("Keyboard press failed: %s", error->message);
+    g_debug ("Keyboard press failed: %s", error->message);
 }
 
 static void
@@ -84,7 +87,7 @@ mks_display_picture_keyboard_release_cb (GObject      *object,
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
   if (!mks_keyboard_release_finish (keyboard, result, &error))
-    g_warning ("Keyboard release failed: %s", error->message);
+    g_debug ("Keyboard release failed: %s", error->message);
 }
 
 static void
@@ -101,7 +104,7 @@ mks_display_picture_mouse_move_to_cb (GObject      *object,
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
   if (!mks_mouse_move_to_finish (mouse, result, &error))
-    g_warning ("Failed move_to: %s", error->message);
+    g_debug ("Failed move_to: %s", error->message);
 }
 
 static void
@@ -118,7 +121,24 @@ mks_display_picture_mouse_move_by_cb (GObject      *object,
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
   if (!mks_mouse_move_by_finish (mouse, result, &error))
-    g_warning ("Failed move_by: %s", error->message);
+    g_debug ("Failed move_by: %s", error->message);
+}
+
+static void
+mks_display_picture_touchable_send_event_cb (GObject      *object,
+                                             GAsyncResult *result,
+                                             gpointer      user_data)
+{
+  MksTouchable *touchable = (MksTouchable *)object;
+  g_autoptr(MksDisplayPicture) self = user_data;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (MKS_IS_TOUCHABLE (touchable));
+  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (MKS_IS_DISPLAY_PICTURE (self));
+
+  if (!mks_touchable_send_event_finish (touchable, result, &error))
+    g_debug ("Failed to send touch event: %s", error->message);
 }
 
 static void
@@ -153,7 +173,7 @@ mks_display_picture_mouse_press_cb (GObject      *object,
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
   if (!mks_mouse_press_finish (mouse, result, &error))
-    g_warning ("Mouse press failed: %s", error->message);
+    g_debug ("Mouse press failed: %s", error->message);
 }
 
 static void
@@ -170,9 +190,58 @@ mks_display_picture_mouse_release_cb (GObject      *object,
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
   if (!mks_mouse_release_finish (mouse, result, &error))
-    g_warning ("Mouse release failed: %s", error->message);
+    g_debug ("Mouse release failed: %s", error->message);
 }
 
+static gboolean
+mks_display_picture_event_get_guest_position (MksDisplayPicture *self,
+                                              GdkEvent          *event,
+                                              double            *guest_x,
+                                              double            *guest_y)
+{
+  GdkPaintable *paintable;
+  GtkNative *native;
+  int guest_width, guest_height;
+  graphene_rect_t area;
+  graphene_point_t translated;
+  double translate_x, translate_y;
+  double x, y;
+
+  g_assert (MKS_IS_DISPLAY_PICTURE (self));
+  g_assert (GDK_IS_EVENT (event));
+
+  paintable = GDK_PAINTABLE (self->paintable);
+  native = gtk_widget_get_native (GTK_WIDGET (self));
+  guest_width = gdk_paintable_get_intrinsic_width (paintable);
+  guest_height = gdk_paintable_get_intrinsic_height (paintable);
+
+  area = GRAPHENE_RECT_INIT (0, 0,
+                             gtk_widget_get_width (GTK_WIDGET (self)),
+                             gtk_widget_get_height (GTK_WIDGET (self)));
+  gtk_native_get_surface_transform (native, &translate_x, &translate_y);
+
+  if (gdk_event_get_position (event, &x, &y))
+    {
+      x -= translate_x;
+      y -= translate_y;
+
+      if (!gtk_widget_compute_point (GTK_WIDGET (native),
+                                     GTK_WIDGET (self),
+                                     &GRAPHENE_POINT_INIT (x, y),
+                                     &translated))
+        return FALSE;
+
+      *guest_x = floor (translated.x) / area.size.width * guest_width;
+      *guest_y = floor (translated.y) / area.size.height * guest_height;
+
+      *guest_x = CLAMP (*guest_x, 0, guest_width);
+      *guest_y = CLAMP (*guest_y, 0, guest_width);
+
+      return TRUE;
+    }
+
+  return FALSE;
+}
 
 static gboolean
 mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
@@ -181,19 +250,52 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
 {
   GdkPaintable *paintable;
   GdkEventType event_type;
+  GdkEventSequence *sequence;
 
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
-  g_assert (event != NULL);
+  g_assert (GDK_IS_EVENT (event));
   g_assert (GTK_IS_EVENT_CONTROLLER_LEGACY (controller));
 
-  if (self->keyboard == NULL || self->mouse == NULL || self->paintable == NULL)
+  if (self->keyboard == NULL || self->mouse == NULL || self->touchable == NULL || self->paintable == NULL)
     return GDK_EVENT_PROPAGATE;
 
   event_type = gdk_event_get_event_type (event);
   paintable = GDK_PAINTABLE (self->paintable);
+  sequence = gdk_event_get_event_sequence (event);
 
   switch ((int)event_type)
     {
+    case GDK_TOUCH_BEGIN:
+    case GDK_TOUCH_UPDATE:
+    case GDK_TOUCH_CANCEL:
+    case GDK_TOUCH_END:
+      {
+        double guest_x, guest_y;
+        uint64_t num_slot = GPOINTER_TO_UINT (sequence);
+        MksTouchEventKind kind;
+
+        if (event_type == GDK_TOUCH_BEGIN)
+          kind = MKS_TOUCH_EVENT_BEGIN;
+        else if (event_type == GDK_TOUCH_UPDATE)
+          kind = MKS_TOUCH_EVENT_UPDATE;
+        else if (event_type == GDK_TOUCH_CANCEL)
+          kind = MKS_TOUCH_EVENT_CANCEL;
+        else
+          kind = MKS_TOUCH_EVENT_END;
+
+        if (mks_display_picture_event_get_guest_position (self, event, &guest_x, &guest_y))
+          {
+            mks_touchable_send_event (self->touchable, kind,
+                                      num_slot,
+                                      guest_x, guest_y,
+                                      NULL,
+                                      mks_display_picture_touchable_send_event_cb,
+                                      g_object_ref (self));
+            return GDK_EVENT_STOP;
+          }
+
+        break;
+      }
     case GDK_MOTION_NOTIFY:
       {
         GdkSurface *surface = gdk_event_get_surface (event);
@@ -215,28 +317,9 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
 
         if (mks_mouse_get_is_absolute (self->mouse))
           {
-            gdouble x, y;
-
-            if (gdk_event_get_position (event, &x, &y))
+            double guest_x, guest_y;
+            if (mks_display_picture_event_get_guest_position (self, event, &guest_x, &guest_y))
               {
-                graphene_point_t translated;
-                double guest_x, guest_y;
-
-                x -= translate_x;
-                y -= translate_y;
-
-                if (!gtk_widget_compute_point (GTK_WIDGET (native),
-                                               GTK_WIDGET (self),
-                                               &GRAPHENE_POINT_INIT (x, y),
-                                               &translated))
-                  break;
-
-                guest_x = floor (translated.x) / area.size.width * guest_width;
-                guest_y = floor (translated.y) / area.size.height * guest_height;
-
-                guest_x = CLAMP (guest_x, 0, guest_width);
-                guest_y = CLAMP (guest_y, 0, guest_width);
-
                 mks_mouse_move_to (self->mouse,
                                    guest_x,
                                    guest_y,
@@ -558,6 +641,10 @@ mks_display_picture_get_property (GObject    *object,
       g_value_set_object (value, mks_display_picture_get_mouse (self));
       break;
 
+    case PROP_TOUCHABLE:
+      g_value_set_object (value, mks_display_picture_get_touchable (self));
+      break;
+
     case PROP_PAINTABLE:
       g_value_set_object (value, mks_display_picture_get_paintable (self));
       break;
@@ -583,6 +670,10 @@ mks_display_picture_set_property (GObject      *object,
 
     case PROP_MOUSE:
       mks_display_picture_set_mouse (self, g_value_get_object (value));
+      break;
+
+    case PROP_TOUCHABLE:
+      mks_display_picture_set_touchable (self, g_value_get_object (value));
       break;
 
     case PROP_PAINTABLE:
@@ -616,6 +707,11 @@ mks_display_picture_class_init (MksDisplayPictureClass *klass)
   properties[PROP_MOUSE] =
     g_param_spec_object ("mouse", NULL, NULL,
                          MKS_TYPE_MOUSE,
+                         (G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS));
+
+  properties[PROP_TOUCHABLE] =
+    g_param_spec_object ("touchable", NULL, NULL,
+                         MKS_TYPE_TOUCHABLE,
                          (G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS));
 
   properties[PROP_PAINTABLE] =
@@ -732,4 +828,23 @@ mks_display_picture_set_keyboard (MksDisplayPicture *self,
 
   if (g_set_object (&self->keyboard, keyboard))
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_KEYBOARD]);
+}
+
+MksTouchable *
+mks_display_picture_get_touchable (MksDisplayPicture *self)
+{
+  g_return_val_if_fail (MKS_IS_DISPLAY_PICTURE (self), NULL);
+
+  return self->touchable;
+}
+
+void
+mks_display_picture_set_touchable (MksDisplayPicture *self,
+                                   MksTouchable      *touchable)
+{
+  g_return_if_fail (MKS_IS_DISPLAY_PICTURE (self));
+  g_return_if_fail (!touchable || MKS_IS_TOUCHABLE (touchable));
+
+  if (g_set_object (&self->touchable, touchable))
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_TOUCHABLE]);
 }
