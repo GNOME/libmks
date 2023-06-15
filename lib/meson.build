@@ -37,6 +37,7 @@ libmks_enum_headers = [
   'mks-mouse.h',
   'mks-screen.h',
   'mks-keyboard.h',
+  'mks-touchable.h',
 ]
 
 libmks_private_sources = [
