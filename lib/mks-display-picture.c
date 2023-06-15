@@ -173,6 +173,55 @@ mks_display_picture_mouse_release_cb (GObject      *object,
     g_warning ("Mouse release failed: %s", error->message);
 }
 
+static gboolean
+mks_display_picture_event_get_guest_position (MksDisplayPicture *self,
+                                              GdkEvent          *event,
+                                              double            *guest_x,
+                                              double            *guest_y)
+{
+  GdkPaintable *paintable;
+  GtkNative *native;
+  int guest_width, guest_height;
+  graphene_rect_t area;
+  graphene_point_t translated;
+  double translate_x, translate_y;
+  double x, y;
+
+  g_assert (MKS_IS_DISPLAY_PICTURE (self));
+  g_assert (GDK_IS_EVENT (event));
+
+  paintable = GDK_PAINTABLE (self->paintable);
+  native = gtk_widget_get_native (GTK_WIDGET (self));
+  guest_width = gdk_paintable_get_intrinsic_width (paintable);
+  guest_height = gdk_paintable_get_intrinsic_height (paintable);
+
+  area = GRAPHENE_RECT_INIT (0, 0,
+                             gtk_widget_get_width (GTK_WIDGET (self)),
+                             gtk_widget_get_height (GTK_WIDGET (self)));
+  gtk_native_get_surface_transform (native, &translate_x, &translate_y);
+
+  if (gdk_event_get_position (event, &x, &y))
+    {
+      x -= translate_x;
+      y -= translate_y;
+
+      if (!gtk_widget_compute_point (GTK_WIDGET (native),
+                                     GTK_WIDGET (self),
+                                     &GRAPHENE_POINT_INIT (x, y),
+                                     &translated))
+        return FALSE;
+
+      *guest_x = floor (translated.x) / area.size.width * guest_width;
+      *guest_y = floor (translated.y) / area.size.height * guest_height;
+
+      *guest_x = CLAMP (*guest_x, 0, guest_width);
+      *guest_y = CLAMP (*guest_y, 0, guest_width);
+
+      return TRUE;
+    }
+
+  return FALSE;
+}
 
 static gboolean
 mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
@@ -183,7 +232,7 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
   GdkEventType event_type;
 
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
-  g_assert (event != NULL);
+  g_assert (GDK_IS_EVENT (event));
   g_assert (GTK_IS_EVENT_CONTROLLER_LEGACY (controller));
 
   if (self->keyboard == NULL || self->mouse == NULL || self->paintable == NULL)
@@ -215,28 +264,9 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
 
         if (mks_mouse_get_is_absolute (self->mouse))
           {
-            gdouble x, y;
-
-            if (gdk_event_get_position (event, &x, &y))
+            double guest_x, guest_y;
+            if (mks_display_picture_event_get_guest_position (self, event, &guest_x, &guest_y))
               {
-                graphene_point_t translated;
-                double guest_x, guest_y;
-
-                x -= translate_x;
-                y -= translate_y;
-
-                if (!gtk_widget_compute_point (GTK_WIDGET (native),
-                                               GTK_WIDGET (self),
-                                               &GRAPHENE_POINT_INIT (x, y),
-                                               &translated))
-                  break;
-
-                guest_x = floor (translated.x) / area.size.width * guest_width;
-                guest_y = floor (translated.y) / area.size.height * guest_height;
-
-                guest_x = CLAMP (guest_x, 0, guest_width);
-                guest_y = CLAMP (guest_y, 0, guest_width);
-
                 mks_mouse_move_to (self->mouse,
                                    guest_x,
                                    guest_y,
