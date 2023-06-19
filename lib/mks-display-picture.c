@@ -193,7 +193,7 @@ mks_display_picture_mouse_release_cb (GObject      *object,
     g_debug ("Mouse release failed: %s", error->message);
 }
 
-static gboolean
+gboolean
 mks_display_picture_event_get_guest_position (MksDisplayPicture *self,
                                               GdkEvent          *event,
                                               double            *guest_x,

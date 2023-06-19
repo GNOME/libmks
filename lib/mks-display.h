@@ -58,4 +58,10 @@ gboolean            mks_display_get_auto_resize    (MksDisplay         *self);
 MKS_AVAILABLE_IN_ALL
 void                mks_display_set_auto_resize    (MksDisplay         *self,
                                                     gboolean            auto_resize);
+MKS_AVAILABLE_IN_ALL
+gboolean
+          mks_display_get_event_position_in_guest  (MksDisplay         *self,
+                                                    GdkEvent           *event,
+                                                    double             *guest_x,
+                                                    double             *guest_y);
 G_END_DECLS
