@@ -41,7 +41,7 @@
       Interactions with a console may be done with
       :dbus:iface:`org.qemu.Display1.Keyboard`,
       :dbus:iface:`org.qemu.Display1.Mouse` and
-      :dbus:iface:`org.qemu.Display1.Touch` interfaces when available.
+      :dbus:iface:`org.qemu.Display1.MultiTouch` interfaces when available.
   -->
   <interface name="org.qemu.Display1.Console">
     <!--
@@ -239,7 +239,7 @@
   </interface>
 
   <!--
-      org.qemu.Display1.Touch:
+      org.qemu.Display1.MultiTouch:
 
       This interface in implemented on ``/org/qemu/Display1/Console_$id`` (see
       :dbus:iface:`~org.qemu.Display1.Console` documentation).
@@ -253,7 +253,7 @@
         End         = 2
         Cancel      = 3
   -->
-  <interface name="org.qemu.Display1.Touch">
+  <interface name="org.qemu.Display1.MultiTouch">
     <!--
         SendEvent:
         @kind: The touch event kind
