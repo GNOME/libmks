@@ -61,6 +61,4 @@ const char      *mks_session_get_uuid                  (MksSession           *se
 MKS_AVAILABLE_IN_ALL
 MksScreen       *mks_session_ref_screen                (MksSession           *self);
 
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksSpeaker, g_object_unref)
-
 G_END_DECLS
