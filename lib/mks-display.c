@@ -569,3 +569,32 @@ mks_display_set_ungrab_trigger (MksDisplay         *self,
 
   MKS_EXIT;
 }
+
+/**
+ * mks_display_get_event_position_in_guest:
+ * @self: a #MksDisplay
+ * @event: A #GdkEvent
+ * @guest_x: (out): Guest's X position
+ * @guest_y: (out): Guest's Y position
+ *
+ * Retrieve the (`guest_x`, `guest_y`) position
+ * where the `event` happened.
+ * 
+ * Could be useful for implementing touch support emulation.
+ * 
+ * Returns: Whether the event has an associated position
+ */
+gboolean
+mks_display_get_event_position_in_guest (MksDisplay *self,
+                                         GdkEvent   *event,
+                                         double     *guest_x,
+                                         double     *guest_y)
+{
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+
+  g_return_val_if_fail (MKS_IS_DISPLAY (self), FALSE);
+  g_return_val_if_fail (GDK_IS_EVENT (event), FALSE);
+
+  return mks_display_picture_event_get_guest_position (priv->picture, event,
+                                                       guest_x, guest_y);
+}

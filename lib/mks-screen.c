@@ -208,7 +208,7 @@ mks_screen_setup (MksDevice     *device,
         self->keyboard = _mks_device_new (MKS_TYPE_KEYBOARD, device->session, object);
       else if (MKS_QEMU_IS_MOUSE (iface))
         self->mouse = _mks_device_new (MKS_TYPE_MOUSE, device->session, object);
-      else if (MKS_QEMU_IS_TOUCH (iface))
+      else if (MKS_QEMU_IS_MULTI_TOUCH (iface))
         self->touchable = _mks_device_new (MKS_TYPE_TOUCHABLE, device->session, object);
     }
 

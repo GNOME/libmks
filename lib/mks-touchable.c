@@ -33,8 +33,8 @@
  */
 struct _MksTouchable
 {
-  MksDevice     parent_instance;
-  MksQemuTouch *touch;
+  MksDevice          parent_instance;
+  MksQemuMultiTouch *touch;
 };
 
 struct _MksTouchableClass
@@ -54,11 +54,11 @@ static GParamSpec *properties [N_PROPS];
 
 
 static void
-mks_touchable_set_touch (MksTouchable *self,
-                         MksQemuTouch *touch)
+mks_touchable_set_touch (MksTouchable      *self,
+                         MksQemuMultiTouch *touch)
 {
   g_assert (MKS_IS_TOUCHABLE (self));
-  g_assert (!touch || MKS_QEMU_IS_TOUCH (touch));
+  g_assert (!touch || MKS_QEMU_IS_MULTI_TOUCH (touch));
 
   g_set_object (&self->touch, touch);
 }
@@ -79,8 +79,8 @@ mks_touchable_setup (MksDevice     *device,
     {
       GDBusInterface *iface = iter->data;
 
-      if (MKS_QEMU_IS_TOUCH (iface))
-        mks_touchable_set_touch (self, MKS_QEMU_TOUCH (iface));
+      if (MKS_QEMU_IS_MULTI_TOUCH (iface))
+        mks_touchable_set_touch (self, MKS_QEMU_MULTI_TOUCH (iface));
     }
 
   return self->touch != NULL;
@@ -165,17 +165,17 @@ mks_touchable_send_event_cb (GObject      *object,
                              GAsyncResult *result,
                              gpointer      user_data)
 {
-  MksQemuTouch *touch = (MksQemuTouch *)object;
+  MksQemuMultiTouch *touch = (MksQemuMultiTouch *)object;
   g_autoptr(GTask) task = user_data;
   g_autoptr(GError) error = NULL;
 
   MKS_ENTRY;
 
-  g_assert (MKS_QEMU_IS_TOUCH (touch));
+  g_assert (MKS_QEMU_IS_MULTI_TOUCH (touch));
   g_assert (G_IS_ASYNC_RESULT (result));
   g_assert (G_IS_TASK (task));
 
-  if (!mks_qemu_touch_call_send_event_finish (touch, result, &error))
+  if (!mks_qemu_multi_touch_call_send_event_finish (touch, result, &error))
     g_task_return_error (task, g_steal_pointer (&error));
   else
     g_task_return_boolean (task, TRUE);
@@ -219,11 +219,11 @@ mks_touchable_send_event (MksTouchable       *self,
   if (!check_touch (self, &error))
     g_task_return_error (task, g_steal_pointer (&error));
   else
-    mks_qemu_touch_call_send_event (self->touch, kind,
-                                    num_slot, x, y,
-                                    cancellable,
-                                    mks_touchable_send_event_cb,
-                                    g_steal_pointer (&task));
+    mks_qemu_multi_touch_call_send_event (self->touch, kind,
+                                          num_slot, x, y,
+                                          cancellable,
+                                          mks_touchable_send_event_cb,
+                                          g_steal_pointer (&task));
 
   MKS_EXIT;
 }
@@ -291,9 +291,9 @@ mks_touchable_send_event_sync (MksTouchable      *self,
   if (!check_touch (self, error))
     MKS_RETURN (FALSE);
 
-  ret = mks_qemu_touch_call_send_event_sync (self->touch, kind,
-                                             num_slot, x, y,
-                                             cancellable, error);
+  ret = mks_qemu_multi_touch_call_send_event_sync (self->touch, kind,
+                                                   num_slot, x, y,
+                                                   cancellable, error);
 
   MKS_RETURN (ret);
 }
@@ -310,7 +310,7 @@ mks_touchable_get_max_slots (MksTouchable *self)
   g_return_val_if_fail (MKS_IS_TOUCHABLE (self), 0);
 
   if (self->touch)
-    return mks_qemu_touch_get_max_slots (self->touch);
+    return mks_qemu_multi_touch_get_max_slots (self->touch);
 
   return 0;
 }

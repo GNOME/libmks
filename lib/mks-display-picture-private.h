@@ -45,5 +45,9 @@ void          mks_display_picture_set_keyboard  (MksDisplayPicture *self,
 MksTouchable *mks_display_picture_get_touchable (MksDisplayPicture *self);
 void          mks_display_picture_set_touchable (MksDisplayPicture *self,
                                                  MksTouchable      *touchable);
-
+gboolean
+   mks_display_picture_event_get_guest_position (MksDisplayPicture *self,
+                                                 GdkEvent          *event,
+                                                 double            *guest_x,
+                                                 double            *guest_y);
 G_END_DECLS
