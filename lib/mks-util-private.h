@@ -44,7 +44,7 @@ G_BEGIN_DECLS
 #endif
 
 
-gboolean         create_socketpair                    (int     *us,
+gboolean         mks_socketpair_create                (int     *us,
                                                        int     *them,
                                                        GError **error);
 gboolean         mks_scroll_event_is_inverted         (GdkEvent              *event);

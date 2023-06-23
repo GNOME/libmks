@@ -92,9 +92,9 @@ mks_scroll_event_is_inverted (GdkEvent *event)
 }
 
 gboolean
-create_socketpair (int     *us,
-                   int     *them,
-                   GError **error)
+mks_socketpair_create (int     *us,
+                       int     *them,
+                       GError **error)
 {
   int fds[2];
   int rv;
@@ -165,7 +165,7 @@ mks_socketpair_connection_new (GDBusConnectionFlags  flags,
   g_task_set_source_tag (task, mks_socketpair_connection_new);
   g_task_set_task_data (task, GINT_TO_POINTER (-1), NULL);
 
-  if (!create_socketpair (&us, &them, &error) ||
+  if (!mks_socketpair_create (&us, &them, &error) ||
       !(socket = g_socket_new_from_fd (us, &error)))
     {
       g_task_return_error (task, g_steal_pointer (&error));
