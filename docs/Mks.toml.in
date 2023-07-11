@@ -1,9 +1,9 @@
 [library]
 version = "@version@"
-browse_url = "https://gitlab.gnome.org/chergert/libmks"
-repository_url = "https://gitlab.gnome.org/chergert/libmks.git"
-website_url = "https://gitlab.gnome.org/chergert/libmks"
-docs_url = "https://chergert.pages.gitlab.gnome.org/libmks/"
+browse_url = "https://gitlab.gnome.org/GNOME/libmks"
+repository_url = "https://gitlab.gnome.org/GNOME/libmks.git"
+website_url = "https://gitlab.gnome.org/GNOME/libmks"
+docs_url = "https://gnome.pages.gitlab.gnome.org/libmks/libmks1"
 authors = "Christian Hergert"
 license = "LGPL-2.1-or-later"
 description = "Mouse, Keyboard, and Screen to QEMU"
