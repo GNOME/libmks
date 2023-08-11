@@ -5,7 +5,7 @@ D-Bus device support in QEMU and GTK 4.
 
 # Documentation
 
-Nightly documentation can be found [here](https://chergert.pages.gitlab.gnome.org/libmks/libmks1).
+Nightly documentation can be found [here](https://gnome.pages.gitlab.gnome.org/libmks/libmks1).
 
 # Testing
 
