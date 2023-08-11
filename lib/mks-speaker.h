@@ -43,4 +43,6 @@ MKS_AVAILABLE_IN_ALL
 void     mks_speaker_set_muted (MksSpeaker *self,
                                 gboolean    muted);
 
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksSpeaker, g_object_unref)
+
 G_END_DECLS

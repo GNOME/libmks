@@ -725,7 +725,7 @@ _mks_paintable_new (GCancellable  *cancellable,
   /* Create a socketpair() to use for D-Bus P2P protocol. We will be receiving
    * DMA-BUF FDs over this.
    */
-  if (!create_socketpair (&us, &them, error))
+  if (!mks_socketpair_create (&us, &them, error))
     return NULL;
 
   /* Create socket for our side of the socket pair */
