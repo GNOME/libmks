@@ -35,67 +35,20 @@
  * so we can pass the damage region to `GdkGLTextureBuilder`.
  */
 
-struct _MksDmabufPaintable
-{
-  GObject parent_instance;
-  GdkTexture *texture;
-  guint width;
-  guint height;
-};
-
 typedef struct _MksDmabufTextureData
 {
   GdkGLContext *gl_context;
   GLuint texture_id;
 } MksDmabufTextureData;
 
-static int
-mks_dmabuf_paintable_get_intrinsic_width (GdkPaintable *paintable)
+struct _MksDmabufPaintable
 {
-  return MKS_DMABUF_PAINTABLE (paintable)->width;
-}
-
-static int
-mks_dmabuf_paintable_get_intrinsic_height (GdkPaintable *paintable)
-{
-  return MKS_DMABUF_PAINTABLE (paintable)->height;
-}
-
-static double
-mks_dmabuf_paintable_get_intrinsic_aspect_ratio (GdkPaintable *paintable)
-{
-  MksDmabufPaintable *self = MKS_DMABUF_PAINTABLE (paintable);
-
-  return (double)self->width / (double)self->height;
-}
-
-static void
-mks_dmabuf_paintable_snapshot (GdkPaintable *paintable,
-                               GdkSnapshot  *snapshot,
-                               double        width,
-                               double        height)
-{
-  MksDmabufPaintable *self = (MksDmabufPaintable *)paintable;
-  graphene_rect_t area;
-
-  g_assert (MKS_IS_DMABUF_PAINTABLE (self));
-  g_assert (GDK_IS_SNAPSHOT (snapshot));
-
-  area = GRAPHENE_RECT_INIT (0, 0, width, height);
-  gtk_snapshot_append_texture (snapshot, self->texture, &area);
-}
-
-static void
-paintable_iface_init (GdkPaintableInterface *iface)
-{
-  iface->get_intrinsic_width = mks_dmabuf_paintable_get_intrinsic_width;
-  iface->get_intrinsic_height = mks_dmabuf_paintable_get_intrinsic_height;
-  iface->get_intrinsic_aspect_ratio = mks_dmabuf_paintable_get_intrinsic_aspect_ratio;
-  iface->snapshot = mks_dmabuf_paintable_snapshot;
-}
-
-G_DEFINE_FINAL_TYPE_WITH_CODE (MksDmabufPaintable, mks_dmabuf_paintable, G_TYPE_OBJECT,
-                               G_IMPLEMENT_INTERFACE (GDK_TYPE_PAINTABLE, paintable_iface_init))
+  GObject parent_instance;
+  GdkTexture *texture;
+  GdkGLTextureBuilder *builder;
+  guint width;
+  guint height;
+};
 
 static MksDmabufTextureData *
 mks_dmabuf_texture_data_new (GdkGLContext *gl_context,
@@ -127,12 +80,76 @@ mks_dmabuf_texture_data_free (gpointer data)
   g_free (texture_data);
 }
 
+static int
+mks_dmabuf_paintable_get_intrinsic_width (GdkPaintable *paintable)
+{
+  return MKS_DMABUF_PAINTABLE (paintable)->width;
+}
+
+static int
+mks_dmabuf_paintable_get_intrinsic_height (GdkPaintable *paintable)
+{
+  return MKS_DMABUF_PAINTABLE (paintable)->height;
+}
+
+static double
+mks_dmabuf_paintable_get_intrinsic_aspect_ratio (GdkPaintable *paintable)
+{
+  MksDmabufPaintable *self = MKS_DMABUF_PAINTABLE (paintable);
+
+  return (double)self->width / (double)self->height;
+}
+
+static void
+mks_dmabuf_paintable_snapshot (GdkPaintable *paintable,
+                               GdkSnapshot  *snapshot,
+                               double        width,
+                               double        height)
+{
+  MksDmabufPaintable *self = (MksDmabufPaintable *)paintable;
+  g_autoptr(GdkTexture) texture = NULL;
+  GdkGLContext *gl_context;
+  GLuint texture_id;
+  graphene_rect_t area;
+
+  g_assert (MKS_IS_DMABUF_PAINTABLE (self));
+  g_assert (GDK_IS_SNAPSHOT (snapshot));
+
+  texture_id = gdk_gl_texture_builder_get_id (self->builder);
+  gl_context = gdk_gl_texture_builder_get_context (self->builder);
+
+  gdk_gl_texture_builder_set_update_texture (self->builder, self->texture);
+  texture = gdk_gl_texture_builder_build (self->builder,
+                                          mks_dmabuf_texture_data_free,
+                                          mks_dmabuf_texture_data_new (gl_context, 
+                                                                       texture_id));
+  // Clear up the update region to not union it with the next UpdateDMABuf call
+  gdk_gl_texture_builder_set_update_region (self->builder, NULL);
+  g_set_object (&self->texture, texture);
+
+  area = GRAPHENE_RECT_INIT (0, 0, width, height);
+  gtk_snapshot_append_texture (snapshot, self->texture, &area);
+}
+
+static void
+paintable_iface_init (GdkPaintableInterface *iface)
+{
+  iface->get_intrinsic_width = mks_dmabuf_paintable_get_intrinsic_width;
+  iface->get_intrinsic_height = mks_dmabuf_paintable_get_intrinsic_height;
+  iface->get_intrinsic_aspect_ratio = mks_dmabuf_paintable_get_intrinsic_aspect_ratio;
+  iface->snapshot = mks_dmabuf_paintable_snapshot;
+}
+
+G_DEFINE_FINAL_TYPE_WITH_CODE (MksDmabufPaintable, mks_dmabuf_paintable, G_TYPE_OBJECT,
+                               G_IMPLEMENT_INTERFACE (GDK_TYPE_PAINTABLE, paintable_iface_init))
+
 static void
 mks_dmabuf_paintable_dispose (GObject *object)
 {
   MksDmabufPaintable *self = (MksDmabufPaintable *)object;
 
   g_clear_object (&self->texture);
+  g_clear_object (&self->builder);
 
   G_OBJECT_CLASS (mks_dmabuf_paintable_parent_class)->dispose (object);
 }
@@ -157,8 +174,8 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
                              cairo_region_t       *region,
                              GError              **error)
 {
-  g_autoptr(GdkGLTextureBuilder) builder = NULL;
-  g_autoptr(GdkTexture) texture = NULL;
+  cairo_region_t *accumulated_damages;
+  cairo_region_t *previous_region;
   GLuint texture_id;
   guint zero = 0;
 
@@ -204,25 +221,32 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
       return FALSE;
     }
 
-  builder = gdk_gl_texture_builder_new ();
-  gdk_gl_texture_builder_set_id (builder, texture_id);
-  gdk_gl_texture_builder_set_width (builder, self->width);
-  gdk_gl_texture_builder_set_height (builder, self->height);
-  gdk_gl_texture_builder_set_context (builder, gl_context);
+  accumulated_damages = cairo_region_create ();
 
   if (region != NULL)
+    cairo_region_union (accumulated_damages, region);
+
+  if (self->builder != NULL)
     {
-      gdk_gl_texture_builder_set_update_region (builder, region);
-      gdk_gl_texture_builder_set_update_texture (builder, self->texture);
+      previous_region = gdk_gl_texture_builder_get_update_region (self->builder);
+      if (previous_region != NULL)
+        cairo_region_union (accumulated_damages, previous_region);
     }
 
-  texture = gdk_gl_texture_builder_build (builder,
-                                          mks_dmabuf_texture_data_free,
-                                          mks_dmabuf_texture_data_new (gl_context, texture_id));
+  g_clear_object (&self->builder);
 
-  g_set_object (&self->texture, texture);
+  self->builder = gdk_gl_texture_builder_new ();
+  gdk_gl_texture_builder_set_width (self->builder, self->width);
+  gdk_gl_texture_builder_set_height (self->builder, self->height);
+  gdk_gl_texture_builder_set_context (self->builder, gl_context);
+  gdk_gl_texture_builder_set_id (self->builder, texture_id);
+
+  if (cairo_region_num_rectangles (accumulated_damages) > 0)
+    gdk_gl_texture_builder_set_update_region (self->builder,
+                                              accumulated_damages);
+
+  g_clear_pointer (&accumulated_damages, cairo_region_destroy);
   gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
-
   return TRUE;
 }
 
