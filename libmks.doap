@@ -5,7 +5,7 @@
          xmlns:gnome="http://api.gnome.org/doap-extensions#"
          xmlns="http://usefulinc.com/ns/doap#">
 
-  <name>libpanel</name>
+  <name>libmks</name>
   <shortname>libmks</shortname>
   <shortdesc>Mouse, Keyboard, and Screen to QEMU</shortdesc>
   <description>
