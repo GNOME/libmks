@@ -18,5 +18,5 @@ option('tracing',
 option('tests',
   type: 'boolean',
   value: true,
-  description: 'Enable tests globally.'
+  description: 'Build unit tests'
 )
