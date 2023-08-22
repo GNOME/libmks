@@ -160,13 +160,12 @@ subdir('tools')
 
 have_tests = get_option('tests')
 if have_tests
-subdir('tests')
+ subdir('tests')
 endif
+summary('Enabled', have_tests, section: 'Tests')
 
 if get_option('docs') and get_option('introspection').allowed()
   subdir('docs')
 endif
 
 configure_file(output: 'config.h', configuration: config_h)
-
-summary('Enabled', have_tests, section: 'Tests')
