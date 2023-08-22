@@ -7,6 +7,21 @@ D-Bus device support in QEMU and GTK 4.
 
 Nightly documentation can be found [here](https://gnome.pages.gitlab.gnome.org/libmks/libmks1).
 
+# Unit testing
+
+Be sure you have `lcov` package installed on your system if you want coverage data.
+
+```bash
+meson setup builddir
+meson configure -Db_coverage=true builddir  # if you want to collect coverage data
+meson compile -C builddir
+meson test -C builddir --suit "libmks"
+rm -rf builddir/subprojects  # if you don't want subprojects coverage in the report
+ninja coverage-html -C builddir  # if you want to generate coverage report
+```
+
+If generated, coverage report will be in `builddir/meson-logs/coveragereport/index.html`
+
 # Testing
 
 By default, QEMU will connect to your user session D-Bus if you do not
