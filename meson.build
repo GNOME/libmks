@@ -158,8 +158,15 @@ add_project_link_arguments(project_link_args, language: 'c')
 subdir('lib')
 subdir('tools')
 
+have_tests = get_option('tests')
+if have_tests
+subdir('tests')
+endif
+
 if get_option('docs') and get_option('introspection').allowed()
   subdir('docs')
 endif
 
 configure_file(output: 'config.h', configuration: config_h)
+
+summary('Enabled', have_tests, section: 'Tests')

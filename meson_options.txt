@@ -14,3 +14,9 @@ option('tracing',
        type: 'boolean',
        value: false,
        description: 'Enable developer tracing information in logs')
+
+option('tests',
+  type: 'boolean',
+  value: true,
+  description: 'Enable tests globally.'
+)
