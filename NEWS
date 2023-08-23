@@ -1,6 +1,7 @@
 # libmks 0.1.1
 
 - Support touch events that were added recently to QEMU
+- Improvement to the rendering fixing frame drops or updating wrong regions
 - Expose a Mks.Display.get_event_position_in_guest helper function.
 Allowing end-users of the library to implement things like touch emulation
 - Migrate to GNOME Gitlab group
