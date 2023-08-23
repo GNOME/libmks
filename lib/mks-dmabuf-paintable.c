@@ -48,6 +48,7 @@ struct _MksDmabufPaintable
   GdkGLTextureBuilder *builder;
   guint width;
   guint height;
+  guint dmabuf_updated : 1;
 };
 
 static MksDmabufTextureData *
@@ -115,17 +116,27 @@ mks_dmabuf_paintable_snapshot (GdkPaintable *paintable,
   g_assert (MKS_IS_DMABUF_PAINTABLE (self));
   g_assert (GDK_IS_SNAPSHOT (snapshot));
 
-  texture_id = gdk_gl_texture_builder_get_id (self->builder);
-  gl_context = gdk_gl_texture_builder_get_context (self->builder);
+  /**
+   * If the widget gets resized, snapshot would be called even
+   * if we didn't receive a new DMABufUpdate call.
+   * So only create a new GLTexture when that happens
+   */
+  if (self->dmabuf_updated)
+    {
+      texture_id = gdk_gl_texture_builder_get_id (self->builder);
+      gl_context = gdk_gl_texture_builder_get_context (self->builder);
 
-  gdk_gl_texture_builder_set_update_texture (self->builder, self->texture);
-  texture = gdk_gl_texture_builder_build (self->builder,
-                                          mks_dmabuf_texture_data_free,
-                                          mks_dmabuf_texture_data_new (gl_context, 
-                                                                       texture_id));
-  // Clear up the update region to not union it with the next UpdateDMABuf call
-  gdk_gl_texture_builder_set_update_region (self->builder, NULL);
-  g_set_object (&self->texture, texture);
+
+      gdk_gl_texture_builder_set_update_texture (self->builder, self->texture);
+      texture = gdk_gl_texture_builder_build (self->builder,
+                                              mks_dmabuf_texture_data_free,
+                                              mks_dmabuf_texture_data_new (gl_context, 
+                                                                           texture_id));
+      // Clear up the update region to not union it with the next UpdateDMABuf call
+      gdk_gl_texture_builder_set_update_region (self->builder, NULL);
+      g_set_object (&self->texture, texture);
+      self->dmabuf_updated = FALSE;
+    }
 
   area = GRAPHENE_RECT_INIT (0, 0, width, height);
   gtk_snapshot_append_texture (snapshot, self->texture, &area);
@@ -246,6 +257,7 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
                                               accumulated_damages);
 
   g_clear_pointer (&accumulated_damages, cairo_region_destroy);
+  self->dmabuf_updated = TRUE;
   gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
   return TRUE;
 }
@@ -257,6 +269,7 @@ mks_dmabuf_paintable_new (void)
   g_autoptr(MksDmabufPaintable) self = NULL;
 
   self = g_object_new (MKS_TYPE_DMABUF_PAINTABLE, NULL);
+  self->dmabuf_updated = FALSE;
   self->width = 0;
   self->height = 0;
   return g_steal_pointer (&self);
