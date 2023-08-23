@@ -1,3 +1,10 @@
+# libmks 0.1.1
+
+- Support touch events that were added recently to QEMU
+- Expose a Mks.Display.get_event_position_in_guest helper function.
+Allowing end-users of the library to implement things like touch emulation
+- Migrate to GNOME Gitlab group
+
 # libmks 0.1.0
 
 This is an initial preview release of a new library which provides
