@@ -7,6 +7,30 @@ stages:
   - docs
   - deploy
 
+tests:
+  image: fedora:rawhide
+  stage: test
+  variables:
+    MESON_FLAGS: "-Db_coverage=true -Ddocs=false -Dvapi=false -Dintrospection=disabled"
+  before_script:
+    - sudo dnf install -y git gtk4-devel libepoxy-devel meson gcc lcov wget
+      qemu-system-x86 qemu-ui-dbus qemu-ui-opengl
+      dbus-x11 xorg-x11-server-Xvfb
+  script:
+    - meson setup _build
+    - meson configure ${MESON_FLAGS} _build
+    - meson compile -C _build
+    - meson test -C _build --suit "libmks"
+    - cd tests
+    - BUILDDIR=_build xvfb-run ./functional.sh
+    - cd ..
+    - rm -rf _build/subprojects
+    - ninja coverage-html -C _build
+  artifacts:
+    paths:
+      - _build/meson-logs/coveragereport
+
+
 flatpak:
   variables:
     BUNDLE: "mks-test-widget-dev.flatpak"
@@ -17,13 +41,13 @@ flatpak:
   extends: ".flatpak"
 
 reference:
-  image: fedora:38
+  image: fedora:rawhide
   stage: docs
-  needs: []
   variables:
-    MESON_FLAGS: "--buildtype=release -Dgtk:gtk_doc=false -Dgtk:introspection=disabled -Dgtk:build-examples=false -Dgtk:build-tests=false -Dgtk:demos=false -Dgtk:media-gstreamer=disabled -Dlibepoxy:tests=false"
+    MESON_FLAGS: "--buildtype=release -Ddocs=true -Dintrospection=enabled"
   before_script:
-    - sudo dnf install -y git gtk4-devel meson gcc gcc-c++ gi-docgen gobject-introspection-devel vala
+    - sudo dnf install -y git gtk4-devel libepoxy-devel meson gcc
+      gi-docgen gobject-introspection-devel vala
   script:
     - mkdir -p pfx/
     - meson ${MESON_FLAGS} --prefix=${PWD}/pfx -Ddocs=true _build
