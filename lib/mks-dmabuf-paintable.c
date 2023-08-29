@@ -97,7 +97,10 @@ mks_dmabuf_paintable_get_intrinsic_aspect_ratio (GdkPaintable *paintable)
 {
   MksDmabufPaintable *self = MKS_DMABUF_PAINTABLE (paintable);
 
-  return (double)self->width / (double)self->height;
+  if (self->height != 0)
+    return (double)self->width / (double)self->height;
+  else
+    return 0.;
 }
 
 static void
