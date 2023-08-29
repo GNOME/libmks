@@ -37,6 +37,8 @@ struct _MksMouse
   MksQemuMouse *mouse;
   double last_known_x;
   double last_known_y;
+
+  guint is_absolute: 1;
 };
 
 struct _MksMouseClass
@@ -55,13 +57,52 @@ enum {
 static GParamSpec *properties [N_PROPS];
 
 static void
+mks_mouse_set_is_absolute (MksMouse *self,
+                           gboolean  is_absolute)
+{
+  g_assert (MKS_IS_MOUSE (self));
+
+  if (self->is_absolute != is_absolute)
+    {
+      self->is_absolute = is_absolute;
+      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_IS_ABSOLUTE]);
+    }
+}
+
+static void
+mks_mouse_mouse_notify_cb (MksMouse     *self,
+                           GParamSpec   *pspec,
+                           MksQemuMouse *mouse)
+{
+  MKS_ENTRY;
+
+  g_assert (MKS_IS_MOUSE (self));
+  g_assert (pspec != NULL);
+  g_assert (MKS_QEMU_IS_MOUSE (mouse));
+
+  if (strcmp (pspec->name, "is-absolute") == 0)
+    mks_mouse_set_is_absolute (self, mks_qemu_mouse_get_is_absolute (mouse));
+
+  MKS_EXIT;
+}
+
+static void
 mks_mouse_set_mouse (MksMouse     *self,
                      MksQemuMouse *mouse)
 {
   g_assert (MKS_IS_MOUSE (self));
   g_assert (MKS_QEMU_IS_MOUSE (mouse));
+  g_assert (self->mouse == NULL);
 
-  g_set_object (&self->mouse, mouse);
+  if (g_set_object (&self->mouse, mouse))
+    {
+      g_signal_connect_object (self->mouse,
+                               "notify",
+                               G_CALLBACK (mks_mouse_mouse_notify_cb),
+                               self,
+                               G_CONNECT_SWAPPED);
+      mks_mouse_set_is_absolute (self, mks_qemu_mouse_get_is_absolute (mouse));
+    }
 }
 
 static gboolean
@@ -156,10 +197,7 @@ mks_mouse_get_is_absolute (MksMouse *self)
 {
   g_return_val_if_fail (MKS_IS_MOUSE (self), FALSE);
 
-  if (self->mouse)
-    return mks_qemu_mouse_get_is_absolute (self->mouse);
-
-  return FALSE;
+  return self->is_absolute;
 }
 
 static gboolean
