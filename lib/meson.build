@@ -97,6 +97,7 @@ libmks_gresources = gnome.compile_resources(
   'mks-resources',
   'mks.gresource.xml',
   c_name: 'mks',
+  extra_args: [ '--manual-register', ],
 )
 
 libmks_generated_sources = [
