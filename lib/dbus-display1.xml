@@ -26,6 +26,20 @@
         The list of consoles available on ``/org/qemu/Display1/Console_$id``.
     -->
     <property name="ConsoleIDs" type="au" access="read"/>
+
+    <!--
+        Interfaces:
+
+        This property lists extra interfaces provided by the
+        /org/qemu/Display1/VM object, and can be used to detect
+        the capabilities with which they are communicating.
+
+        Unlike the standard D-Bus Introspectable interface, querying this
+        property does not require parsing XML.
+
+        (earlier version of the display interface do not provide this property)
+    -->
+    <property name="Interfaces" type="as" access="read"/>
   </interface>
 
   <!--
@@ -122,12 +136,27 @@
         The device address (ex: "pci/0000/02.0").
     -->
     <property name="DeviceAddress" type="s" access="read"/>
+
+    <!--
+        Interfaces:
+
+        This property lists extra interfaces provided by the
+        ``/org/qemu/Display1/Console_$id`` object, and can be used to detect the
+        capabilities with which they are communicating.
+
+        Unlike the standard D-Bus Introspectable interface, querying this
+        property does not require parsing XML.
+
+        (earlier version of the display interface do not provide this property)
+    -->
+    <property name="Interfaces" type="as" access="read"/>
   </interface>
 
   <!--
       org.qemu.Display1.Keyboard:
 
-      This interface in implemented on ``/org/qemu/Display1/Console_$id`` (see
+      This interface is optionally implemented on
+      ``/org/qemu/Display1/Console_$id`` (see
       :dbus:iface:`~org.qemu.Display1.Console`).
   -->
   <interface name="org.qemu.Display1.Keyboard">
@@ -166,7 +195,8 @@
   <!--
       org.qemu.Display1.Mouse:
 
-      This interface in implemented on ``/org/qemu/Display1/Console_$id`` (see
+      This interface is optionally implemented on
+      ``/org/qemu/Display1/Console_$id`` (see
       :dbus:iface:`~org.qemu.Display1.Console` documentation).
 
       .. _dbus-button-values:
@@ -261,7 +291,7 @@
         @x: The x coordinates.
         @y: The y coordinates.
 
-        Send a touch gesture begin event.
+        Send a touch gesture event.
     -->
     <method name="SendEvent">
       <arg type="u" name="kind" direction="in"/>
@@ -417,6 +447,20 @@
         <annotation name="org.gtk.GDBus.C.ForceGVariant" value="true"/>
       </arg>
     </method>
+
+    <!--
+        Interfaces:
+
+        This property lists extra interfaces provided by the
+        /org/qemu/Display1/Listener object, and can be used to detect
+        the capabilities with which they are communicating.
+
+        Unlike the standard D-Bus Introspectable interface, querying this
+        property does not require parsing XML.
+
+        (earlier version of the display interface do not provide this property)
+    -->
+    <property name="Interfaces" type="as" access="read"/>
   </interface>
 
   <!--
@@ -514,6 +558,20 @@
         <annotation name="org.gtk.GDBus.C.ForceGVariant" value="true"/>
       </arg>
     </method>
+
+    <!--
+        Interfaces:
+
+        This property lists extra interfaces provided by the
+        /org/qemu/Display1/Clipboard object, and can be used to detect
+        the capabilities with which they are communicating.
+
+        Unlike the standard D-Bus Introspectable interface, querying this
+        property does not require parsing XML.
+
+        (earlier version of the display interface do not provide this property)
+    -->
+    <property name="Interfaces" type="as" access="read"/>
   </interface>
 
   <!--
@@ -553,6 +611,20 @@
       <annotation name="org.gtk.GDBus.C.UnixFD" value="true"/>
       <arg type="h" name="listener" direction="in"/>
     </method>
+
+    <!--
+        Interfaces:
+
+        This property lists extra interfaces provided by the
+        /org/qemu/Display1/Audio object, and can be used to detect
+        the capabilities with which they are communicating.
+
+        Unlike the standard D-Bus Introspectable interface, querying this
+        property does not require parsing XML.
+
+        (earlier version of the display interface do not provide this property)
+    -->
+    <property name="Interfaces" type="as" access="read"/>
   </interface>
 
   <!--
@@ -639,6 +711,20 @@
         <annotation name="org.gtk.GDBus.C.ForceGVariant" value="true"/>
       </arg>
     </method>
+
+    <!--
+        Interfaces:
+
+        This property lists extra interfaces provided by the
+        /org/qemu/Display1/AudioOutListener object, and can be used to detect
+        the capabilities with which they are communicating.
+
+        Unlike the standard D-Bus Introspectable interface, querying this
+        property does not require parsing XML.
+
+        (earlier version of the display interface do not provide this property)
+    -->
+    <property name="Interfaces" type="as" access="read"/>
   </interface>
 
   <!--
@@ -727,6 +813,20 @@
         <annotation name="org.gtk.GDBus.C.ForceGVariant" value="true"/>
       </arg>
     </method>
+
+    <!--
+        Interfaces:
+
+        This property lists extra interfaces provided by the
+        /org/qemu/Display1/AudioInListener object, and can be used to detect
+        the capabilities with which they are communicating.
+
+        Unlike the standard D-Bus Introspectable interface, querying this
+        property does not require parsing XML.
+
+        (earlier version of the display interface do not provide this property)
+    -->
+    <property name="Interfaces" type="as" access="read"/>
   </interface>
 
   <!--
@@ -802,5 +902,19 @@
         The D-Bus unique name of the registered handler.
     -->
     <property name="Owner" type="s" access="read"/>
+
+    <!--
+        Interfaces:
+
+        This property lists extra interfaces provided by the
+        ``/org/qemu/Display1/Chardev_$i`` object, and can be used to detect
+        the capabilities with which they are communicating.
+
+        Unlike the standard D-Bus Introspectable interface, querying this
+        property does not require parsing XML.
+
+        (earlier version of the display interface do not provide this property)
+    -->
+    <property name="Interfaces" type="as" access="read"/>
   </interface>
 </node>
