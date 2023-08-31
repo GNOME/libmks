@@ -619,6 +619,7 @@ mks_display_picture_dispose (GObject *object)
   g_clear_object (&self->keyboard);
   g_clear_object (&self->mouse);
   g_clear_object (&self->paintable_signals);
+  g_clear_object (&self->touchable);
 
   G_OBJECT_CLASS (mks_display_picture_parent_class)->dispose (object);
 }
