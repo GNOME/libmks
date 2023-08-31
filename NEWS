@@ -1,3 +1,10 @@
+# libmks 0.1.2
+
+- Avoid division by 0, fixing a GTK warning
+- Fix a rendering artifact when resizing the MksDisplay widget
+- Few multi touch leaks & code cleanup
+- Fix building GIR file
+
 # libmks 0.1.1
 
 - Support touch events that were added recently to QEMU
