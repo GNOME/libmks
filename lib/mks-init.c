@@ -41,8 +41,6 @@
 static void
 mks_init_gtypes (void)
 {
-  g_resources_register (mks_get_resource ());
-
   /* First register GTypes for QEMU IPC */
   g_type_ensure (MKS_QEMU_TYPE_AUDIO);
   g_type_ensure (MKS_QEMU_TYPE_AUDIO_IN_LISTENER);
@@ -83,6 +81,7 @@ mks_init (void)
 
   if (g_once_init_enter (&initialized))
     {
+      mks_register_resource ();
       mks_init_gtypes ();
       g_once_init_leave (&initialized, TRUE);
     }

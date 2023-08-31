@@ -53,6 +53,8 @@ libmks_private_sources = [
 ]
 
 libmks_enums = gnome.mkenums_simple('mks-enums',
+        body_prefix: '#include "config.h"',
+          decorator: '_MKS_EXTERN',
             sources: libmks_enum_headers,
      install_header: true,
         install_dir: libmks_headers_dir,
@@ -95,6 +97,7 @@ libmks_gresources = gnome.compile_resources(
   'mks-resources',
   'mks.gresource.xml',
   c_name: 'mks',
+  extra_args: [ '--manual-register', ],
 )
 
 libmks_generated_sources = [
@@ -151,9 +154,18 @@ pkg.generate(
 )
 
 if get_option('introspection').allowed()
+  libmks_gir_extra_args = [
+     '--c-include=libmks.h',
+     '--quiet',
+     '-DMKS_COMPILATION',
+   ]
   libmks_gir = gnome.generate_gir(libmks,
-                sources: libmks_sources + libmks_headers,
+                sources: libmks_sources +
+                         libmks_headers +
+                         libmks_generated_sources +
+                         libmks_generated_headers,
               nsversion: api_version,
+              link_with: libmks,
               namespace: 'Mks',
           symbol_prefix: 'mks',
       identifier_prefix: 'Mks',
@@ -161,7 +173,8 @@ if get_option('introspection').allowed()
     include_directories: libmks_include_directories,
                includes: ['Gio-2.0', 'Gtk-4.0'],
                 install: true,
-                 header: 'libmks-1.h'
+                 header: 'libmks-1.h',
+             extra_args: libmks_gir_extra_args,
   )
 
   if get_option('vapi')
