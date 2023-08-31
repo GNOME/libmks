@@ -87,7 +87,6 @@ main (int   argc,
 
   settings = gtk_settings_get_default ();
   g_object_set (settings, "gtk-application-prefer-dark-theme", TRUE, NULL);
-  gtk_widget_add_css_class (GTK_WIDGET (window), "dark");
 
   display = mks_display_new ();
   gtk_window_set_child (window, display);
