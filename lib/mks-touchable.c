@@ -35,6 +35,7 @@ struct _MksTouchable
 {
   MksDevice          parent_instance;
   MksQemuMultiTouch *touch;
+  int                max_slots;
 };
 
 struct _MksTouchableClass
@@ -54,13 +55,54 @@ static GParamSpec *properties [N_PROPS];
 
 
 static void
+mks_touchable_set_max_slots (MksTouchable *self,
+                             int           max_slots)
+{
+  g_assert (MKS_IS_TOUCHABLE (self));
+  // Per INPUT_EVENT_SLOTS_MIN / INPUT_EVENT_SLOTS_MAX in QEMU
+  g_assert (max_slots >= 0 && max_slots <= 10);
+
+  if (self->max_slots != max_slots)
+    {
+      self->max_slots = max_slots;
+      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_MAX_SLOTS]);
+    }
+}
+
+static void
+mks_touchable_touch_notify_cb (MksTouchable      *self,
+                               GParamSpec        *pspec,
+                               MksQemuMultiTouch *touch)
+{
+  MKS_ENTRY;
+
+  g_assert (MKS_IS_TOUCHABLE (self));
+  g_assert (pspec != NULL);
+  g_assert (MKS_QEMU_IS_MULTI_TOUCH (touch));
+
+  if (strcmp (pspec->name, "max-slots") == 0)
+    mks_touchable_set_max_slots (self, mks_qemu_multi_touch_get_max_slots (touch));
+
+  MKS_EXIT;
+}
+
+static void
 mks_touchable_set_touch (MksTouchable      *self,
                          MksQemuMultiTouch *touch)
 {
   g_assert (MKS_IS_TOUCHABLE (self));
   g_assert (!touch || MKS_QEMU_IS_MULTI_TOUCH (touch));
+  g_assert (self->touch == NULL);
 
-  g_set_object (&self->touch, touch);
+  if (g_set_object (&self->touch, touch))
+    {
+      g_signal_connect_object (self->touch,
+                               "notify",
+                               G_CALLBACK (mks_touchable_touch_notify_cb),
+                               self,
+                               G_CONNECT_SWAPPED);
+      mks_touchable_set_max_slots (self, mks_qemu_multi_touch_get_max_slots (touch));
+    }
 }
 
 static gboolean
@@ -133,7 +175,7 @@ mks_touchable_class_init (MksTouchableClass *klass)
    */
   properties [PROP_MAX_SLOTS] =
     g_param_spec_int ("max-slots", NULL, NULL,
-                      0, G_MAXINT, 0,
+                      0, 10, 0,
                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_properties (object_class, N_PROPS, properties);
@@ -309,8 +351,5 @@ mks_touchable_get_max_slots (MksTouchable *self)
 {
   g_return_val_if_fail (MKS_IS_TOUCHABLE (self), 0);
 
-  if (self->touch)
-    return mks_qemu_multi_touch_get_max_slots (self->touch);
-
-  return 0;
+  return self->max_slots;
 }

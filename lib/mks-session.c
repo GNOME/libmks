@@ -106,6 +106,9 @@ struct _MksSession
    */
   MksQemuObject *vm_object;
   MksQemuVM *vm;
+
+  char  *name;
+  char  *uuid;
 };
 
 static void
@@ -165,6 +168,26 @@ mks_session_add_device (MksSession *self,
 }
 
 static void
+mks_session_set_name (MksSession *self,
+                      const char *name)
+{
+  g_assert (MKS_IS_SESSION (self));
+
+  if (g_set_str (&self->name, name))
+    g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_NAME]);
+}
+
+static void
+mks_session_set_uuid (MksSession *self,
+                      const char *uuid)
+{
+  g_assert (MKS_IS_SESSION (self));
+
+  if (g_set_str (&self->uuid, uuid))
+    g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_UUID]);
+}
+
+static void
 mks_session_vm_notify_cb (MksSession *self,
                           GParamSpec *pspec,
                           MksQemuVM  *vm)
@@ -173,11 +196,10 @@ mks_session_vm_notify_cb (MksSession *self,
   g_assert (pspec != NULL);
   g_assert (MKS_QEMU_IS_VM (vm));
 
-  if (0) {}
-  else if (strcmp (pspec->name, "name") == 0)
-    g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_NAME]);
+  if (strcmp (pspec->name, "name") == 0)
+    mks_session_set_name (self, mks_qemu_vm_get_name (vm));
   else if (strcmp (pspec->name, "uuid") == 0)
-    g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_UUID]);
+    mks_session_set_uuid (self, mks_qemu_vm_get_uuid (vm));
 }
 
 static void
@@ -200,9 +222,8 @@ mks_session_set_vm (MksSession    *self,
                            G_CALLBACK (mks_session_vm_notify_cb),
                            self,
                            G_CONNECT_SWAPPED);
-
-  g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_NAME]);
-  g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_UUID]);
+  mks_session_set_name (self, mks_qemu_vm_get_name (vm));
+  mks_session_set_uuid (self, mks_qemu_vm_get_uuid (vm));
 }
 
 static void
@@ -286,6 +307,8 @@ mks_session_dispose (GObject *object)
   g_clear_object (&self->object_manager);
   g_clear_object (&self->vm);
   g_clear_object (&self->vm_object);
+  g_clear_pointer (&self->name, g_free);
+  g_clear_pointer (&self->uuid, g_free);
 
   G_OBJECT_CLASS (mks_session_parent_class)->dispose (object);
 }
@@ -682,10 +705,7 @@ mks_session_get_uuid (MksSession *self)
 {
   g_return_val_if_fail (MKS_IS_SESSION (self), NULL);
 
-  if (self->vm != NULL)
-    return mks_qemu_vm_get_uuid (self->vm);
-
-  return NULL;
+  return self->uuid;
 }
 
 /**
@@ -699,10 +719,7 @@ mks_session_get_name (MksSession *self)
 {
   g_return_val_if_fail (MKS_IS_SESSION (self), NULL);
 
-  if (self->vm != NULL)
-    return mks_qemu_vm_get_name (self->vm);
-
-  return NULL;
+  return self->name;
 }
 
 /**

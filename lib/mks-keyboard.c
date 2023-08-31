@@ -57,6 +57,19 @@ enum {
 static GParamSpec *properties [N_PROPS];
 
 static void
+mks_keyboard_set_modifiers (MksKeyboard         *self,
+                            MksKeyboardModifier  modifiers)
+{
+  g_assert (MKS_IS_KEYBOARD (self));
+
+  if (self->modifiers != modifiers)
+    {
+      self->modifiers = modifiers;
+      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_MODIFIERS]);
+    }
+}
+
+static void
 mks_keyboard_keyboard_notify_cb (MksKeyboard     *self,
                                  GParamSpec      *pspec,
                                  MksQemuKeyboard *keyboard)
@@ -68,10 +81,7 @@ mks_keyboard_keyboard_notify_cb (MksKeyboard     *self,
   g_assert (MKS_QEMU_IS_KEYBOARD (keyboard));
 
   if (strcmp (pspec->name, "modifiers") == 0)
-    {
-      self->modifiers = mks_qemu_keyboard_get_modifiers (keyboard);
-      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_MODIFIERS]);
-    }
+    mks_keyboard_set_modifiers (self, mks_qemu_keyboard_get_modifiers (keyboard));
 
   MKS_EXIT;
 }
@@ -82,6 +92,7 @@ mks_keyboard_set_keyboard (MksKeyboard     *self,
 {
   g_assert (MKS_IS_KEYBOARD (self));
   g_assert (!keyboard || MKS_QEMU_IS_KEYBOARD (keyboard));
+  g_assert (self->keyboard == NULL);
 
   if (g_set_object (&self->keyboard, keyboard))
     {
@@ -90,7 +101,7 @@ mks_keyboard_set_keyboard (MksKeyboard     *self,
                                G_CALLBACK (mks_keyboard_keyboard_notify_cb),
                                self,
                                G_CONNECT_SWAPPED);
-      self->modifiers = mks_qemu_keyboard_get_modifiers (keyboard);
+      mks_keyboard_set_modifiers (self, mks_qemu_keyboard_get_modifiers (keyboard));
     }
 }
 

@@ -76,8 +76,8 @@ enum {
 static GParamSpec *properties [N_PROPS];
 
 static void
-_mks_screen_set_width (MksScreen *self,
-                       guint      width)
+mks_screen_set_width (MksScreen *self,
+                      guint      width)
 {
   g_assert (MKS_IS_SCREEN (self));
 
@@ -89,8 +89,8 @@ _mks_screen_set_width (MksScreen *self,
 }
 
 static void
-_mks_screen_set_height (MksScreen *self,
-                        guint      height)
+mks_screen_set_height (MksScreen *self,
+                       guint      height)
 {
   g_assert (MKS_IS_SCREEN (self));
 
@@ -102,8 +102,8 @@ _mks_screen_set_height (MksScreen *self,
 }
 
 static void
-_mks_screen_set_number (MksScreen *self,
-                        guint      number)
+mks_screen_set_number (MksScreen *self,
+                       guint      number)
 {
   g_assert (MKS_IS_SCREEN (self));
 
@@ -111,6 +111,26 @@ _mks_screen_set_number (MksScreen *self,
     {
       self->number = number;
       g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_NUMBER]);
+    }
+}
+
+static void
+mks_screen_set_type (MksScreen  *self,
+                     const char *type)
+{
+  MksScreenKind kind;
+
+  g_assert (MKS_IS_SCREEN (self));
+
+  kind = MKS_SCREEN_KIND_TEXT;
+
+  if (strcmp (type, "Graphic") == 0)
+    kind = MKS_SCREEN_KIND_GRAPHIC;
+
+  if (kind != self->kind)
+    {
+      self->kind = kind;
+      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_KIND]);
     }
 }
 
@@ -126,29 +146,13 @@ mks_screen_console_notify_cb (MksScreen      *self,
   if (strcmp (pspec->name, "label") == 0)
     _mks_device_set_name (MKS_DEVICE (self), mks_qemu_console_get_label (console));
   else if (strcmp (pspec->name, "width") == 0)
-    _mks_screen_set_width (self, mks_qemu_console_get_width (console));
+    mks_screen_set_width (self, mks_qemu_console_get_width (console));
   else if (strcmp (pspec->name, "height") == 0)
-    _mks_screen_set_height (self, mks_qemu_console_get_height (console));
+    mks_screen_set_height (self, mks_qemu_console_get_height (console));
   else if (strcmp (pspec->name, "number") == 0)
-    _mks_screen_set_number (self, mks_qemu_console_get_head (console));
+    mks_screen_set_number (self, mks_qemu_console_get_head (console));
   else if (strcmp (pspec->name, "type") == 0)
-    {
-      const char *type;
-
-      if ((type = mks_qemu_console_get_type_ ((console))))
-        {
-          MksScreenKind kind = MKS_SCREEN_KIND_TEXT;
-
-          if (strcmp (type, "Graphic") == 0)
-            kind = MKS_SCREEN_KIND_GRAPHIC;
-
-          if (kind != self->kind)
-            {
-              self->kind = kind;
-              g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_KIND]);
-            }
-        }
-    }
+    mks_screen_set_type (self, mks_qemu_console_get_type_ ((console)));
 }
 
 static void
@@ -163,8 +167,6 @@ mks_screen_set_console (MksScreen      *self,
 
   if (g_set_object (&self->console, console))
     {
-      const char *type;
-
       _mks_device_set_name (MKS_DEVICE (self), mks_qemu_console_get_label (console));
 
       self->console_notify_handler =
@@ -174,15 +176,10 @@ mks_screen_set_console (MksScreen      *self,
                                  self,
                                  G_CONNECT_SWAPPED);
 
-      if ((type = mks_qemu_console_get_type_ ((console))))
-        {
-          if (strcmp (type, "Graphic") == 0)
-            self->kind = MKS_SCREEN_KIND_GRAPHIC;
-        }
-
-      self->width = mks_qemu_console_get_width (console);
-      self->height = mks_qemu_console_get_height (console);
-      self->number = mks_qemu_console_get_head (console);
+      mks_screen_set_type (self, mks_qemu_console_get_type_ ((console)));
+      mks_screen_set_width (self, mks_qemu_console_get_width (console));
+      mks_screen_set_height (self, mks_qemu_console_get_height (console));
+      mks_screen_set_number (self, mks_qemu_console_get_head (console));
     }
 }
 
