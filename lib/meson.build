@@ -153,7 +153,7 @@ pkg.generate(
   install_dir: join_paths(get_option('libdir'), 'pkgconfig')
 )
 
-if get_option('introspection').allowed()
+if get_option('introspection').enabled()
   libmks_gir_extra_args = [
      '--c-include=libmks.h',
      '--quiet',
