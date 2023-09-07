@@ -102,15 +102,21 @@ libmks_gresources = gnome.compile_resources(
 
 libmks_generated_sources = [
   libmks_enums[0],
-  libmks_gresources[0],
   libmks_marshal[0],
+]
+
+libmks_private_generated_sources = [
+  libmks_gresources[0],
 ]
 
 libmks_generated_headers = [
   mks_version_h,
   libmks_enums[1],
-  libmks_gresources[1],
   libmks_marshal[1],
+]
+
+libmks_private_generated_headers = [
+  libmks_gresources[1],
 ]
 
 libmks_deps = [
@@ -126,6 +132,8 @@ libmks = shared_library('mks-' + api_version,
     libmks_generated_headers +
     libmks_generated_sources +
     libmks_private_sources +
+    libmks_private_generated_sources +
+    libmks_private_generated_headers +
     libmks_sources,
   include_directories: libmks_include_directories,
          dependencies: libmks_deps,
