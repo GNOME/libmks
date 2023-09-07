@@ -181,7 +181,6 @@ if get_option('introspection').enabled()
     include_directories: libmks_include_directories,
                includes: ['Gio-2.0', 'Gtk-4.0'],
                 install: true,
-                 header: 'libmks-1.h',
              extra_args: libmks_gir_extra_args,
   )
 
