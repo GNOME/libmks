@@ -1,3 +1,8 @@
+# libmks 0.1.3
+
+- Fix license mismatch in certain source files
+- Don't expose generated GResource specific functions in the GIR file
+
 # libmks 0.1.2
 
 - Avoid division by 0, fixing a GTK warning
