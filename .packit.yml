@@ -8,6 +8,16 @@ files_to_sync:
   - libmks.spec
 
 jobs:
+  - job: copr_build
+    trigger: pull_request
+    srpm_build_deps:
+      - wget
+    targets:
+      - fedora-rawhide-aarch64
+      - fedora-rawhide-x86_64
+      - fedora-39-aarch64
+      - fedora-39-x86_64
+
   - job: propose_downstream
     trigger: release
     dist_git_branches:
