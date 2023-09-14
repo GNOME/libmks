@@ -1,7 +1,7 @@
 downstream_package_name: libmks
 actions:
   post-upstream-clone:
-    - "wget https://src.fedoraproject.org/rpms/libmks/blob/rawhide/f/libmks.spec -O libmks.spec"
+    - "wget https://src.fedoraproject.org/rpms/libmks/raw/rawhide/f/libmks.spec -O libmks.spec"
 specfile_path: libmks.spec
 files_to_sync:
   - .packit.yml
