@@ -1,3 +1,7 @@
+# libmks 0.1.5
+
+- Fix packit automation
+
 # libmks 0.1.4
 
 - Automate fedora package build with packit
