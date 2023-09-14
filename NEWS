@@ -1,3 +1,7 @@
+# libmks 0.1.4
+
+- Automate fedora package build with packit
+
 # libmks 0.1.3
 
 - Fix license mismatch in certain source files
