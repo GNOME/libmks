@@ -13,7 +13,7 @@ tests:
   variables:
     MESON_FLAGS: "-Db_coverage=true -Ddocs=false -Dvapi=false -Dintrospection=disabled"
   before_script:
-    - sudo dnf install -y git gtk4-devel libepoxy-devel meson gcc lcov wget
+    - sudo dnf install -y git gtk4-devel meson gcc lcov wget
       qemu-system-x86 qemu-ui-dbus qemu-ui-opengl
       dbus-x11 xorg-x11-server-Xvfb
   script:
@@ -46,7 +46,7 @@ reference:
   variables:
     MESON_FLAGS: "--buildtype=release -Ddocs=true -Dintrospection=enabled"
   before_script:
-    - sudo dnf install -y git gtk4-devel libepoxy-devel meson gcc
+    - sudo dnf install -y git gtk4-devel meson gcc
       gi-docgen gobject-introspection-devel vala
   script:
     - mkdir -p pfx/

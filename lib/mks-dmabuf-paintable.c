@@ -25,61 +25,24 @@
 #include <gtk/gtk.h>
 
 #include "mks-dmabuf-paintable-private.h"
-#include "mks-gl-context-private.h"
 
 /*
  * MksDmabufPaintable is a GdkPaintable that gets created the first time
  * `ScanoutDMABUF` is called.
  *
  * The scanout data is then stored until we receive a `UpdateDMABUF` call
- * so we can pass the damage region to `GdkGLTextureBuilder`.
+ * so we can pass the damage region to `GdkDmabufTextureBuilder`.
  */
-
-typedef struct _MksDmabufTextureData
-{
-  GdkGLContext *gl_context;
-  GLuint texture_id;
-} MksDmabufTextureData;
 
 struct _MksDmabufPaintable
 {
   GObject parent_instance;
   GdkTexture *texture;
-  GdkGLTextureBuilder *builder;
+  GdkDmabufTextureBuilder *builder;
   guint width;
   guint height;
   guint dmabuf_updated : 1;
 };
-
-static MksDmabufTextureData *
-mks_dmabuf_texture_data_new (GdkGLContext *gl_context,
-                             GLuint        texture_id)
-{
-  MksDmabufTextureData *texture_data;
-
-  g_assert (GDK_IS_GL_CONTEXT (gl_context));
-  g_assert (texture_id > 0);
-
-  texture_data = g_new0 (MksDmabufTextureData, 1);
-  texture_data->gl_context = g_object_ref (gl_context);
-  texture_data->texture_id = texture_id;
-
-  return texture_data;
-}
-
-static void
-mks_dmabuf_texture_data_free (gpointer data)
-{
-  MksDmabufTextureData *texture_data = data;
-
-  gdk_gl_context_make_current (texture_data->gl_context);
-  glDeleteTextures (1, &texture_data->texture_id);
-
-  texture_data->texture_id = 0;
-  g_clear_object (&texture_data->gl_context);
-
-  g_free (texture_data);
-}
 
 static int
 mks_dmabuf_paintable_get_intrinsic_width (GdkPaintable *paintable)
@@ -112,8 +75,7 @@ mks_dmabuf_paintable_snapshot (GdkPaintable *paintable,
 {
   MksDmabufPaintable *self = (MksDmabufPaintable *)paintable;
   g_autoptr(GdkTexture) texture = NULL;
-  GdkGLContext *gl_context;
-  GLuint texture_id;
+  g_autoptr(GError) error = NULL;
   graphene_rect_t area;
 
   g_assert (MKS_IS_DMABUF_PAINTABLE (self));
@@ -122,21 +84,22 @@ mks_dmabuf_paintable_snapshot (GdkPaintable *paintable,
   /**
    * If the widget gets resized, snapshot would be called even
    * if we didn't receive a new DMABufUpdate call.
-   * So only create a new GLTexture when that happens
+   * So only create a new DmabufTexture when that happens
    */
   if (self->dmabuf_updated)
     {
-      texture_id = gdk_gl_texture_builder_get_id (self->builder);
-      gl_context = gdk_gl_texture_builder_get_context (self->builder);
 
-
-      gdk_gl_texture_builder_set_update_texture (self->builder, self->texture);
-      texture = gdk_gl_texture_builder_build (self->builder,
-                                              mks_dmabuf_texture_data_free,
-                                              mks_dmabuf_texture_data_new (gl_context, 
-                                                                           texture_id));
+      gdk_dmabuf_texture_builder_set_update_texture (self->builder, self->texture);
+      texture = gdk_dmabuf_texture_builder_build (self->builder,
+                                                  NULL, NULL, &error);
+      if (error != NULL)
+        {
+          g_warning ("Failed to build texture: %s", error->message);
+          return;
+        }
+      g_assert (texture != NULL);
       // Clear up the update region to not union it with the next UpdateDMABuf call
-      gdk_gl_texture_builder_set_update_region (self->builder, NULL);
+      gdk_dmabuf_texture_builder_set_update_region (self->builder, NULL);
       g_set_object (&self->texture, texture);
       self->dmabuf_updated = FALSE;
     }
@@ -183,18 +146,16 @@ mks_dmabuf_paintable_init (MksDmabufPaintable *self)
 
 gboolean
 mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
-                             GdkGLContext         *gl_context,
+                             GdkDisplay           *display,
                              MksDmabufScanoutData *data,
                              cairo_region_t       *region,
                              GError              **error)
 {
   cairo_region_t *accumulated_damages;
   cairo_region_t *previous_region;
-  GLuint texture_id;
-  guint zero = 0;
+  guint plane = 0;
 
   g_return_val_if_fail (MKS_IS_DMABUF_PAINTABLE (self), FALSE);
-  g_return_val_if_fail (!gl_context || GDK_IS_GL_CONTEXT (gl_context), FALSE);
 
   if (data->dmabuf_fd < 0)
     {
@@ -223,18 +184,6 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
       gdk_paintable_invalidate_size (GDK_PAINTABLE (self));
     }
 
-  if (!(texture_id = mks_gl_context_import_dmabuf (gl_context,
-                                                   data->fourcc, data->width, data->height,
-                                                   1, &data->dmabuf_fd, &data->stride, &zero,
-                                                   &data->modifier)))
-    {
-      g_set_error (error,
-                   G_IO_ERROR,
-                   G_IO_ERROR_FAILED,
-                   "Failed to import dmabuf into GL texture");
-      return FALSE;
-    }
-
   accumulated_damages = cairo_region_create ();
 
   if (region != NULL)
@@ -242,22 +191,27 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
 
   if (self->builder != NULL)
     {
-      previous_region = gdk_gl_texture_builder_get_update_region (self->builder);
+      previous_region = gdk_dmabuf_texture_builder_get_update_region (self->builder);
       if (previous_region != NULL)
         cairo_region_union (accumulated_damages, previous_region);
     }
 
   g_clear_object (&self->builder);
 
-  self->builder = gdk_gl_texture_builder_new ();
-  gdk_gl_texture_builder_set_width (self->builder, self->width);
-  gdk_gl_texture_builder_set_height (self->builder, self->height);
-  gdk_gl_texture_builder_set_context (self->builder, gl_context);
-  gdk_gl_texture_builder_set_id (self->builder, texture_id);
+  self->builder = gdk_dmabuf_texture_builder_new ();
+  gdk_dmabuf_texture_builder_set_modifier (self->builder, data->modifier);
+  gdk_dmabuf_texture_builder_set_stride (self->builder, plane, data->stride);
+  gdk_dmabuf_texture_builder_set_fourcc (self->builder, data->fourcc);
+  gdk_dmabuf_texture_builder_set_width (self->builder, data->width);
+  gdk_dmabuf_texture_builder_set_height (self->builder, data->height);
+  gdk_dmabuf_texture_builder_set_fd (self->builder, plane, data->dmabuf_fd);
+  gdk_dmabuf_texture_builder_set_offset (self->builder, plane, 0);
+  gdk_dmabuf_texture_builder_set_display (self->builder, display);
+  gdk_dmabuf_texture_builder_set_n_planes (self->builder, 1);
 
   if (cairo_region_num_rectangles (accumulated_damages) > 0)
-    gdk_gl_texture_builder_set_update_region (self->builder,
-                                              accumulated_damages);
+    gdk_dmabuf_texture_builder_set_update_region (self->builder,
+                                                  accumulated_damages);
 
   g_clear_pointer (&accumulated_damages, cairo_region_destroy);
   self->dmabuf_updated = TRUE;

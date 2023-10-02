@@ -145,6 +145,7 @@ mks_display_connect (MksDisplay *self,
       mks_screen_resizer_set_screen (priv->resizer, screen);
 
       mks_screen_attach (screen,
+                         gtk_widget_get_display (GTK_WIDGET (self)),
                          NULL,
                          mks_display_attach_cb,
                          g_object_ref (self));

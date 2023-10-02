@@ -39,9 +39,9 @@
 struct _MksPaintable
 {
   GObject               parent_instance;
-  GdkGLContext         *gl_context;
   MksQemuListener      *listener;
   GDBusConnection      *connection;
+  GdkDisplay           *display;
   GdkPaintable         *child;
   GdkCursor            *cursor;
   MksDmabufScanoutData *scanout_data;
@@ -155,23 +155,6 @@ paintable_iface_init (GdkPaintableInterface *iface)
 G_DEFINE_FINAL_TYPE_WITH_CODE (MksPaintable, mks_paintable, G_TYPE_OBJECT,
                                G_IMPLEMENT_INTERFACE (GDK_TYPE_PAINTABLE, paintable_iface_init))
 
-static GdkGLContext *
-mks_paintable_get_gl_context (MksPaintable  *self,
-                              GError       **error)
-{
-  g_assert (MKS_IS_PAINTABLE (self));
-
-  if (self->gl_context == NULL)
-    {
-      GdkDisplay *display = gdk_display_get_default ();
-
-      if (!(self->gl_context = gdk_display_create_gl_context (display, error)))
-        return NULL;
-    }
-
-  return self->gl_context;
-}
-
 static void
 mks_paintable_dispose (GObject *object)
 {
@@ -180,8 +163,8 @@ mks_paintable_dispose (GObject *object)
   g_clear_object (&self->connection);
   g_clear_object (&self->listener);
   g_clear_object (&self->child);
-  g_clear_object (&self->gl_context);
   g_clear_object (&self->cursor);
+  g_clear_object (&self->display);
 
   G_OBJECT_CLASS (mks_paintable_parent_class)->dispose (object);
 }
@@ -396,7 +379,6 @@ mks_paintable_listener_update_dmabuf (MksPaintable          *self,
 {
   cairo_region_t *region = NULL;
   g_autoptr(GError) error = NULL;
-  GdkGLContext *gl_context;
 
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
@@ -409,9 +391,8 @@ mks_paintable_listener_update_dmabuf (MksPaintable          *self,
         y = self->scanout_data->height - y - height;
 
       region = cairo_region_create_rectangle (&(cairo_rectangle_int_t) { x, y, width, height });
-      if (!(gl_context = mks_paintable_get_gl_context (self, &error)) ||
-          !mks_dmabuf_paintable_import (MKS_DMABUF_PAINTABLE (self->child),
-                                        gl_context,
+      if (!mks_dmabuf_paintable_import (MKS_DMABUF_PAINTABLE (self->child),
+                                        self->display,
                                         self->scanout_data,
                                         region,
                                         &error))
@@ -705,7 +686,8 @@ mks_paintable_connection_cb (GObject      *object,
 }
 
 GdkPaintable *
-_mks_paintable_new (GCancellable  *cancellable,
+_mks_paintable_new (GdkDisplay    *display,
+                    GCancellable  *cancellable,
                     int           *peer_fd,
                     GError       **error)
 {
@@ -721,7 +703,7 @@ _mks_paintable_new (GCancellable  *cancellable,
   *peer_fd = -1;
 
   self = g_object_new (MKS_TYPE_PAINTABLE, NULL);
-
+  self->display = g_object_ref (display);
   /* Create a socketpair() to use for D-Bus P2P protocol. We will be receiving
    * DMA-BUF FDs over this.
    */

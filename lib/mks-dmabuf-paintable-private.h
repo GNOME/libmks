@@ -42,7 +42,7 @@ G_DECLARE_FINAL_TYPE (MksDmabufPaintable, mks_dmabuf_paintable, MKS, DMABUF_PAIN
 
 MksDmabufPaintable *mks_dmabuf_paintable_new        (void);
 gboolean            mks_dmabuf_paintable_import     (MksDmabufPaintable   *self,
-                                                     GdkGLContext         *gl_context,
+                                                     GdkDisplay           *display,
                                                      MksDmabufScanoutData *data,
                                                      cairo_region_t       *region,
                                                      GError              **error);

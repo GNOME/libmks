@@ -45,7 +45,6 @@ libmks_private_sources = [
   'mks-dmabuf-paintable.c',
   'mks-display-picture.c',
   'mks-css.c',
-  'mks-gl-context.c',
   'mks-inhibitor.c',
   'mks-read-only-list-model.c',
   'mks-screen-resizer.c',
@@ -120,7 +119,6 @@ libmks_private_generated_headers = [
 ]
 
 libmks_deps = [
-  libepoxy_dep,
   libgio_dep,
   libgiounix_dep,
   libgtk_dep,
