@@ -79,6 +79,10 @@ main (int argc,
   g_autoptr(GDBusConnection) connection = NULL;
   g_autoptr(MksSession) session = NULL;
   g_autoptr(GError) error = NULL;
+  g_autoptr(GVariant) variant = NULL;
+  g_autoptr(GDBusProxy) proxy = NULL;
+  g_autofree const char **queued_owners = NULL;
+  gsize n_queued_owners;
   GListModel *devices = NULL;
   guint n_items;
 
@@ -106,25 +110,56 @@ main (int argc,
       return EXIT_FAILURE;
     }
 
-  if (!(session = mks_session_new_for_connection_sync (connection, NULL, &error)))
+  proxy = g_dbus_proxy_new_sync (connection,
+                                 G_DBUS_PROXY_FLAGS_NONE,
+                                 NULL,
+                                 "org.freedesktop.DBus",
+                                 "/org/freedesktop/DBus",
+                                 "org.freedesktop.DBus",
+                                 NULL,
+                                 &error);
+
+  if (proxy == NULL)
     {
-      g_printerr ("Failed to create MksSession: %s\n",
+      g_printerr ("Failed to connect to `org.freedesktop.DBus`: %s\n",
+                  error->message);
+      return EXIT_FAILURE;
+    }
+  variant = g_dbus_proxy_call_sync (proxy, "ListQueuedOwners",
+                                    g_variant_new ("(s)", "org.qemu"), G_DBUS_CALL_FLAGS_NONE,
+                                    -1, NULL, &error);
+  if (error != NULL)
+    {
+      g_printerr ("Failed to ListQueuedOwners: %s\n",
                   error->message);
       return EXIT_FAILURE;
     }
 
-  g_print ("Session(uuid=\"%s\", name=\"%s\")\n",
-           mks_session_get_uuid (session),
-           mks_session_get_name (session));
+  queued_owners  = g_variant_get_strv (g_variant_get_child_value (variant, 0),
+                                       &n_queued_owners);
 
-  devices = mks_session_get_devices (session);
-  n_items = g_list_model_get_n_items (devices);
-
-  for (guint i = 0; i < n_items; i++)
+  for (guint i = 0; i < n_queued_owners; i++)
     {
-      g_autoptr(MksDevice) device = g_list_model_get_item (devices, i);
-      print_device_info (device, 1);
-    }
+      if (!(session = mks_session_new_for_connection_with_name_sync (connection, queued_owners[i], NULL, &error)))
+        {
+          g_printerr ("Failed to create MksSession: %s\n",
+                      error->message);
+          return EXIT_FAILURE;
+        }
 
+      g_print ("Session(uuid=\"%s\", name=\"%s\", bus-name=%s)\n",
+              mks_session_get_uuid (session),
+              mks_session_get_name (session),
+              mks_session_get_bus_name (session));
+
+      devices = mks_session_get_devices (session);
+      n_items = g_list_model_get_n_items (devices);
+
+      for (guint j = 0; j < n_items; j++)
+        {
+          g_autoptr(MksDevice) device = g_list_model_get_item (devices, j);
+          print_device_info (device, 1);
+        }
+    }
   return EXIT_SUCCESS;
 }
