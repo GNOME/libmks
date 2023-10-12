@@ -4,3 +4,4 @@
 subprojects/gtk
 subprojects/libsass
 subprojects/sassc
+*.raw
