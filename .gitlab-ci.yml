@@ -22,7 +22,7 @@ tests:
     - meson compile -C _build
     - meson test -C _build --suit "libmks"
     - cd tests
-    - BUILDDIR=_build xvfb-run ./functional.sh
+    - BUILDDIR=_build dbus-run-session xvfb-run -ad ./functional.sh
     - cd ..
     - rm -rf _build/subprojects
     - ninja coverage-html -C _build

@@ -56,6 +56,8 @@
  * with [method@Mks.Display.set_screen].
  */
 
+#define QEMU_BUS_NAME "org.qemu"
+
 static gboolean mks_session_initable_init              (GInitable            *initable,
                                                         GCancellable         *cancellable,
                                                         GError              **error);
@@ -109,6 +111,7 @@ struct _MksSession
 
   char  *name;
   char  *uuid;
+  char  *bus_name;
 };
 
 static void
@@ -131,6 +134,7 @@ G_DEFINE_FINAL_TYPE_WITH_CODE (MksSession, mks_session, G_TYPE_OBJECT,
 enum {
   PROP_0,
   PROP_CONNECTION,
+  PROP_BUS_NAME,
   PROP_DEVICES,
   PROP_NAME,
   PROP_UUID,
@@ -309,6 +313,7 @@ mks_session_dispose (GObject *object)
   g_clear_object (&self->vm_object);
   g_clear_pointer (&self->name, g_free);
   g_clear_pointer (&self->uuid, g_free);
+  g_clear_pointer (&self->bus_name, g_free);
 
   G_OBJECT_CLASS (mks_session_parent_class)->dispose (object);
 }
@@ -337,6 +342,10 @@ mks_session_get_property (GObject    *object,
     {
     case PROP_CONNECTION:
       g_value_set_object (value, mks_session_get_connection (self));
+      break;
+
+    case PROP_BUS_NAME:
+      g_value_set_string (value, self->bus_name);
       break;
 
     case PROP_DEVICES:
@@ -369,6 +378,9 @@ mks_session_set_property (GObject      *object,
     case PROP_CONNECTION:
       mks_session_set_connection (self, g_value_get_object (value));
       break;
+    case PROP_BUS_NAME:
+      g_set_str (&self->bus_name, g_value_get_string (value));
+      break;
 
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -393,6 +405,16 @@ mks_session_class_init (MksSessionClass *klass)
   properties [PROP_CONNECTION] =
     g_param_spec_object ("connection", NULL, NULL,
                          G_TYPE_DBUS_CONNECTION,
+                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS));
+
+  /**
+   * MksSession:bus-name:
+   *
+   * The unique connection name to connect to or `org.qemu` as fallback.
+   */
+  properties [PROP_BUS_NAME] =
+    g_param_spec_string ("bus-name", NULL, NULL,
+                         QEMU_BUS_NAME,
                          (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS));
 
   /**
@@ -459,7 +481,7 @@ mks_session_initable_init (GInitable     *initable,
   object_manager =
     mks_qemu_object_manager_client_new_sync (self->connection,
                                              G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
-                                             "org.qemu",
+                                             self->bus_name,
                                              "/org/qemu/Display1",
                                              cancellable,
                                              error);
@@ -521,7 +543,7 @@ mks_session_async_initable_init_async (GAsyncInitable      *async_initable,
   else
     mks_qemu_object_manager_client_new (self->connection,
                                         G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
-                                        "org.qemu",
+                                        self->bus_name,
                                         "/org/qemu/Display1",
                                         cancellable,
                                         mks_session_async_initable_vm_cb,
@@ -604,25 +626,12 @@ mks_session_new_for_connection (GDBusConnection     *connection,
                                 GAsyncReadyCallback  callback,
                                 gpointer             user_data)
 {
-  g_autoptr(MksSession) self = NULL;
-  g_autoptr(GTask) task = NULL;
-
-  g_return_if_fail (G_IS_DBUS_CONNECTION (connection));
-  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
-
-  self = g_object_new (MKS_TYPE_SESSION,
-                       "connection", connection,
-                       NULL);
-
-  task = g_task_new (self, cancellable, callback, user_data);
-  g_task_set_source_tag (task, mks_session_new_for_connection);
-  g_task_set_priority (task, io_priority);
-
-  g_async_initable_init_async (G_ASYNC_INITABLE (self),
-                               io_priority,
-                               cancellable,
-                               mks_session_new_for_connection_cb,
-                               g_steal_pointer (&task));
+  mks_session_new_for_connection_with_name (connection,
+                                            QEMU_BUS_NAME,
+                                            io_priority,
+                                            cancellable,
+                                            callback,
+                                            user_data);
 }
 
 /**
@@ -663,12 +672,108 @@ mks_session_new_for_connection_sync (GDBusConnection  *connection,
                                      GCancellable     *cancellable,
                                      GError          **error)
 {
-  g_autoptr(MksSession) self = NULL;
+  return mks_session_new_for_connection_with_name_sync (connection,
+                                                        QEMU_BUS_NAME,
+                                                        cancellable,
+                                                        error);
+}
 
-  g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
+/**
+ * mks_session_new_for_connection_with_name:
+ * @connection: a #GDBusConnection
+ * @bus_name: The unique name to connect
+ * @io_priority: priority for IO operations
+ * @cancellable: (nullable): a #GCancellable or %NULL
+ * @callback: a callback to execute upon completion of the operation
+ * @user_data: closure data for @callback
+ *
+ * Creates a #MksSession which communicates using @connection.
+ *
+ * The constructor is similar to [func@Mks.Session.new_for_connection] but allows
+ * to set the bus name to something else than the default `org.qemu`.
+ *
+ * use [ctor@Mks.Session.new_for_connection_with_name_finish] to get the result of
+ * this operation.
+ */
+void
+mks_session_new_for_connection_with_name (GDBusConnection     *connection,
+                                          const char          *bus_name,
+                                          int                  io_priority,
+                                          GCancellable        *cancellable,
+                                          GAsyncReadyCallback  callback,
+                                          gpointer             user_data)
+{
+  g_autoptr(MksSession) self = NULL;
+  g_autoptr(GTask) task = NULL;
+
+  g_return_if_fail (G_IS_DBUS_CONNECTION (connection));
+  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
+  g_return_if_fail (bus_name != NULL);
 
   self = g_object_new (MKS_TYPE_SESSION,
                        "connection", connection,
+                       "bus-name", bus_name,
+                       NULL);
+
+  task = g_task_new (self, cancellable, callback, user_data);
+  g_task_set_source_tag (task, mks_session_new_for_connection);
+  g_task_set_priority (task, io_priority);
+
+  g_async_initable_init_async (G_ASYNC_INITABLE (self),
+                               io_priority,
+                               cancellable,
+                               mks_session_new_for_connection_cb,
+                               g_steal_pointer (&task));
+}
+
+/**
+ * mks_session_new_for_connection_with_name_finish:
+ * @result: a #GAsyncResult provided to callback
+ * @error: (nullable): a location for a #GError or %NULL
+ *
+ * Completes a request to create a #MksSession for a [class@Gio.DBusConnection].
+ *
+ * Returns: (transfer full): a #MksSession if successful; otherwise %NULL
+ *   and @error is set.
+ */
+MksSession *
+mks_session_new_for_connection_with_name_finish (GAsyncResult  *result,
+                                                 GError       **error)
+{
+  g_return_val_if_fail (G_IS_TASK (result), NULL);
+
+  return g_task_propagate_pointer (G_TASK (result), error);
+}
+
+/**
+ * mks_session_new_for_connection_with_name_sync:
+ * @bus_name: The unique name to connect
+ * @connection: a private #GDBusConnetion to a QEMU instance
+ * @cancellable: (nullable): a #GCancellable, or %NULL
+ * @error: (nullable): a location for a #GError, or %NULL
+ *
+ * Synchronously creates a new #MksSession instance.
+ *
+ * The constructor is similar to [func@Mks.Session.new_for_connection_sync] except
+ * it allows to set the bus name to something else than the default `org.qemu`.
+ *
+ * Returns: (transfer full): a #MksSession if successful; otherwise %NULL
+ *   and @error is set.
+ */
+MksSession *
+mks_session_new_for_connection_with_name_sync (GDBusConnection  *connection,
+                                               const char       *bus_name,
+                                               GCancellable     *cancellable,
+                                               GError          **error)
+{
+  g_autoptr(MksSession) self = NULL;
+
+  g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
+  g_return_val_if_fail (bus_name != NULL, NULL);
+
+  self = g_object_new (MKS_TYPE_SESSION,
+                       "connection", connection,
+                       "bus-name", bus_name,
                        NULL);
 
   if (g_initable_init (G_INITABLE (self), cancellable, error))
@@ -692,6 +797,22 @@ mks_session_get_connection (MksSession *self)
   g_return_val_if_fail (MKS_IS_SESSION (self), NULL);
 
   return self->connection;
+}
+
+/**
+ * mks_session_get_bus_name:
+ * @self: a #MksSession
+ *
+ * Gets the DBus connection unique name or `org.qemu` as a fallback.
+ *
+ * Returns: A unique name the session is connected to
+ */
+const char *
+mks_session_get_bus_name (MksSession *self)
+{
+  g_return_val_if_fail (MKS_IS_SESSION (self), NULL);
+
+  return self->bus_name;
 }
 
 /**

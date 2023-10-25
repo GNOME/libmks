@@ -38,27 +38,49 @@ MKS_AVAILABLE_IN_ALL
 G_DECLARE_FINAL_TYPE (MksSession, mks_session, MKS, SESSION, GObject)
 
 MKS_AVAILABLE_IN_ALL
-void             mks_session_new_for_connection        (GDBusConnection      *connection,
-                                                        int                   io_priority,
-                                                        GCancellable         *cancellable,
-                                                        GAsyncReadyCallback   callback,
-                                                        gpointer              user_data);
+void mks_session_new_for_connection                         (GDBusConnection     *connection,
+                                                             int                  io_priority,
+                                                             GCancellable        *cancellable,
+                                                             GAsyncReadyCallback  callback,
+                                                             gpointer             user_data);
+
 MKS_AVAILABLE_IN_ALL
-MksSession      *mks_session_new_for_connection_finish (GAsyncResult         *result,
-                                                        GError              **error);
+MksSession *mks_session_new_for_connection_finish           (GAsyncResult         *result,
+                                                             GError              **error);
+
 MKS_AVAILABLE_IN_ALL
-MksSession      *mks_session_new_for_connection_sync   (GDBusConnection      *connection,
-                                                        GCancellable         *cancellable,
-                                                        GError              **error);
+void mks_session_new_for_connection_with_name               (GDBusConnection     *connection,
+                                                             const char          *bus_name,
+                                                             int                  io_priority,
+                                                             GCancellable        *cancellable,
+                                                             GAsyncReadyCallback  callback,
+                                                             gpointer             user_data);
+
 MKS_AVAILABLE_IN_ALL
-GDBusConnection *mks_session_get_connection            (MksSession           *self);
+MksSession *mks_session_new_for_connection_with_name_finish (GAsyncResult         *result,
+                                                             GError              **error);
+
 MKS_AVAILABLE_IN_ALL
-GListModel      *mks_session_get_devices               (MksSession           *self);
+MksSession *mks_session_new_for_connection_sync             (GDBusConnection  *connection,
+                                                             GCancellable     *cancellable,
+                                                             GError          **error);
+
 MKS_AVAILABLE_IN_ALL
-const char      *mks_session_get_name                  (MksSession           *self);
+MksSession *mks_session_new_for_connection_with_name_sync   (GDBusConnection  *connection,
+                                                             const char       *bus_name,
+                                                             GCancellable     *cancellable,
+                                                             GError          **error);
 MKS_AVAILABLE_IN_ALL
-const char      *mks_session_get_uuid                  (MksSession           *self);
+GDBusConnection *mks_session_get_connection                 (MksSession           *self);
 MKS_AVAILABLE_IN_ALL
-MksScreen       *mks_session_ref_screen                (MksSession           *self);
+GListModel      *mks_session_get_devices                    (MksSession           *self);
+MKS_AVAILABLE_IN_ALL
+const char      *mks_session_get_name                       (MksSession           *self);
+MKS_AVAILABLE_IN_ALL
+const char      *mks_session_get_uuid                       (MksSession           *self);
+MKS_AVAILABLE_IN_ALL
+const char      *mks_session_get_bus_name                   (MksSession           *self);
+MKS_AVAILABLE_IN_ALL
+MksScreen       *mks_session_ref_screen                     (MksSession           *self);
 
 G_END_DECLS
