@@ -1,16 +1,16 @@
 {
-    "app-id" : "org.gnome.libmks.mks",
-    "runtime" : "org.gnome.Platform",
-    "runtime-version" : "master",
-    "sdk" : "org.gnome.Sdk",
-    "command" : "mks",
-    "finish-args" : [
+    "app-id": "org.gnome.libmks.mks",
+    "runtime": "org.gnome.Platform",
+    "runtime-version": "master",
+    "sdk": "org.gnome.Sdk",
+    "command": "mks",
+    "finish-args": [
         "--socket=fallback-x11",
         "--device=dri",
         "--socket=wayland",
         "--socket=session-bus"
     ],
-    "cleanup" : [
+    "cleanup": [
         "/include",
         "/lib/pkgconfig",
         "/share/gir-1.0",
@@ -18,18 +18,68 @@
         "*.la",
         "*.a"
     ],
-    "modules" : [
+    "modules": [
         {
-            "name" : "mks",
-            "builddir" : true,
-            "buildsystem" : "meson",
-            "config-opts" : [
+            "name": "gtk",
+            "buildsystem": "meson",
+            "config-opts": [
+                "--libdir=/app/lib",
+                "-Dvulkan=disabled",
+                "-Dmedia-gstreamer=disabled",
+                "-Dbuild-demos=false",
+                "-Dbuild-testsuite=false",
+                "-Dbuild-examples=false",
+                "-Dbuild-tests=false"
+            ],
+            "sources": [
+                {
+                    "type": "git",
+                    "url": "https://gitlab.gnome.org/GNOME/gtk.git",
+                    "branch": "main"
+                }
+            ],
+            "modules": [
+                {
+                    "name": "libsass",
+                    "buildsystem": "meson",
+                    "config-opts": [
+                        "--libdir=/app/lib"
+                    ],
+                    "sources": [
+                        {
+                            "type": "git",
+                            "url": "https://github.com/lazka/libsass.git",
+                            "branch": "meson"
+                        }
+                    ]
+                },
+                {
+                    "name": "sassc",
+                    "buildsystem": "meson",
+                    "config-opts": [
+                        "--libdir=/app/lib"
+                    ],
+                    "sources": [
+                        {
+                            "type": "git",
+                            "url": "https://github.com/lazka/sassc.git",
+                            "branch": "meson"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "mks",
+            "builddir": true,
+            "buildsystem": "meson",
+            "config-opts": [
                 "-Dinstall-tools=true"
             ],
-            "sources" : [
+            "sources": [
                 {
-                    "type" : "git",
-                    "url" : "https://gitlab.gnome.org/chergert/libmks.git"
+                    "type": "git",
+                    "url": "https://gitlab.gnome.org/chergert/libmks.git"
                 }
             ]
         }
