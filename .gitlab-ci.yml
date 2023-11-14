@@ -2,6 +2,9 @@ include:
   - project: "gnome/citemplates"
     file: "flatpak/flatpak_ci_initiative.yml"
 
+variables:
+  COMMON_FLAGS: "-Dgtk:media-gstreamer=disabled -Dgtk:build-demos=false -Dgtk:build-testsuite=false -Dgtk:build-examples=false -Dgtk:build-tests=false"
+  COMMON_DEPS: "git meson gcc"
 stages:
   - test
   - docs
@@ -11,9 +14,11 @@ tests:
   image: fedora:rawhide
   stage: test
   variables:
-    MESON_FLAGS: "-Db_coverage=true -Ddocs=false -Dvapi=false -Dintrospection=disabled"
+    MESON_FLAGS: "-Db_coverage=true -Ddocs=false -Dvapi=false -Dintrospection=disabled ${COMMON_FLAGS}"
   before_script:
-    - sudo dnf install -y git gtk4-devel meson gcc lcov wget
+    - sudo dnf install 'dnf-command(builddep)' -y
+    - sudo dnf builddep gtk4 -y
+    - sudo dnf install -y ${COMMON_DEPS} lcov wget
       qemu-system-x86 qemu-ui-dbus qemu-ui-opengl
       dbus-x11 xorg-x11-server-Xvfb
   script:
@@ -44,10 +49,11 @@ reference:
   image: fedora:rawhide
   stage: docs
   variables:
-    MESON_FLAGS: "--buildtype=release -Ddocs=true -Dintrospection=enabled"
+    MESON_FLAGS: "--buildtype=release -Ddocs=true -Dintrospection=enabled ${COMMON_FLAGS}"
   before_script:
-    - sudo dnf install -y git gtk4-devel meson gcc
-      gi-docgen gobject-introspection-devel vala
+    - sudo dnf install 'dnf-command(builddep)' -y
+    - sudo dnf builddep gtk4 -y
+    - sudo dnf install -y ${COMMON_DEPS} gi-docgen gobject-introspection-devel vala
   script:
     - mkdir -p pfx/
     - meson ${MESON_FLAGS} --prefix=${PWD}/pfx -Ddocs=true _build
