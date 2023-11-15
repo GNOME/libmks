@@ -49,14 +49,14 @@ reference:
   image: fedora:rawhide
   stage: docs
   variables:
-    MESON_FLAGS: "--buildtype=release -Ddocs=true -Dintrospection=enabled ${COMMON_FLAGS}"
+    MESON_FLAGS: "--buildtype=release -Ddocs=true -Dvapi=false -Dintrospection=enabled ${COMMON_FLAGS}"
   before_script:
     - sudo dnf install 'dnf-command(builddep)' -y
     - sudo dnf builddep gtk4 -y
     - sudo dnf install -y ${COMMON_DEPS} gi-docgen gobject-introspection-devel vala
   script:
     - mkdir -p pfx/
-    - meson ${MESON_FLAGS} --prefix=${PWD}/pfx -Ddocs=true _build
+    - meson ${MESON_FLAGS} --prefix=${PWD}/pfx _build
     - ninja -C _build install
     - mkdir -p _reference/
     - mv pfx/share/doc/libmks1/ _reference/
