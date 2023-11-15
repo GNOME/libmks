@@ -26,6 +26,7 @@ if get_option('docs')
   custom_target('mks-doc',
     input: [ source_toml, libmks_gir[0] ],
     output: 'libmks1',
+    depends: libmks_gir,
     command: [
       gidocgen,
       'generate',

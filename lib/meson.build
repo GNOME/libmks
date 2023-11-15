@@ -172,6 +172,7 @@ if get_option('introspection').enabled()
                          libmks_generated_headers,
               nsversion: api_version,
               link_with: libmks,
+           dependencies: libmks_deps,
               namespace: 'Mks',
           symbol_prefix: 'mks',
       identifier_prefix: 'Mks',
