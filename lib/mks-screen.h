@@ -91,6 +91,7 @@ gboolean       mks_screen_configure_sync     (MksScreen            *self,
                                               GError              **error);
 MKS_AVAILABLE_IN_ALL
 void           mks_screen_attach             (MksScreen            *self,
+                                              GdkDisplay           *display,
                                               GCancellable         *cancellable,
                                               GAsyncReadyCallback   callback,
                                               gpointer              user_data);
@@ -100,6 +101,7 @@ GdkPaintable  *mks_screen_attach_finish      (MksScreen            *self,
                                               GError              **error);
 MKS_AVAILABLE_IN_ALL
 GdkPaintable  *mks_screen_attach_sync        (MksScreen            *self,
+                                              GdkDisplay           *display,
                                               GCancellable         *cancellable,
                                               GError              **error);
 

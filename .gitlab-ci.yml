@@ -13,9 +13,9 @@ tests:
   variables:
     MESON_FLAGS: "-Db_coverage=true -Ddocs=false -Dvapi=false -Dintrospection=disabled"
   before_script:
-    - sudo dnf install -y git gtk4-devel libepoxy-devel meson gcc lcov wget
+    - sudo dnf install -y git gtk4-devel meson gcc gcovr lcov wget
       qemu-system-x86 qemu-ui-dbus qemu-ui-opengl
-      dbus-x11 xorg-x11-server-Xvfb
+      dbus-x11 xorg-x11-server-Xvfb python3-packaging
   script:
     - meson setup _build
     - meson configure ${MESON_FLAGS} _build
@@ -24,7 +24,6 @@ tests:
     - cd tests
     - BUILDDIR=_build dbus-run-session xvfb-run -ad ./functional.sh
     - cd ..
-    - rm -rf _build/subprojects
     - ninja coverage-html -C _build
   artifacts:
     paths:
@@ -46,8 +45,8 @@ reference:
   variables:
     MESON_FLAGS: "--buildtype=release -Ddocs=true -Dintrospection=enabled"
   before_script:
-    - sudo dnf install -y git gtk4-devel libepoxy-devel meson gcc
-      gi-docgen gobject-introspection-devel vala
+    - sudo dnf install -y git gtk4-devel meson gcc
+      gi-docgen gobject-introspection-devel vala python3-packaging
   script:
     - mkdir -p pfx/
     - meson ${MESON_FLAGS} --prefix=${PWD}/pfx -Ddocs=true _build

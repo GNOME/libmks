@@ -43,6 +43,7 @@ typedef struct
   MksScreenResizer   *resizer;
   MksDisplayPicture  *picture;
   MksInhibitor       *inhibitor;
+  GtkWidget          *offload;
   GtkShortcutTrigger *ungrab_trigger;
   guint               auto_resize : 1;
 } MksDisplayPrivate;
@@ -145,6 +146,7 @@ mks_display_connect (MksDisplay *self,
       mks_screen_resizer_set_screen (priv->resizer, screen);
 
       mks_screen_attach (screen,
+                         gtk_widget_get_display (GTK_WIDGET (self)),
                          NULL,
                          mks_display_attach_cb,
                          g_object_ref (self));
@@ -236,23 +238,10 @@ mks_display_dispose (GObject *object)
 
   mks_display_disconnect (self);
 
-  g_clear_pointer ((GtkWidget **)&priv->picture, gtk_widget_unparent);
+  g_clear_pointer (&priv->offload, gtk_widget_unparent);
   g_clear_object (&priv->resizer);
 
   G_OBJECT_CLASS (mks_display_parent_class)->dispose (object);
-}
-
-static void
-mks_display_snapshot (GtkWidget   *widget,
-                      GtkSnapshot *snapshot)
-{
-  MksDisplay *self = (MksDisplay *)widget;
-  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-
-  g_assert (MKS_IS_DISPLAY (self));
-  g_assert (GTK_IS_SNAPSHOT (snapshot));
-
-  gtk_widget_snapshot_child (widget, GTK_WIDGET (priv->picture), snapshot);
 }
 
 static gboolean
@@ -285,7 +274,7 @@ mks_display_measure (GtkWidget      *widget,
 
   g_assert (MKS_IS_DISPLAY (self));
 
-  gtk_widget_measure (GTK_WIDGET (priv->picture), orientation, for_size,
+  gtk_widget_measure (priv->offload, orientation, for_size,
                       minimum, natural, minimum_baseline, natural_baseline);
 }
 
@@ -317,7 +306,7 @@ mks_display_size_allocate (GtkWidget *widget,
       mks_screen_attributes_free (attributes);
     }
 
-  gtk_widget_size_allocate (GTK_WIDGET (priv->picture),
+  gtk_widget_size_allocate (priv->offload,
                             &(GtkAllocation) {
                               area.origin.x,
                               area.origin.y,
@@ -394,7 +383,6 @@ mks_display_class_init (MksDisplayClass *klass)
   widget_class->get_request_mode = mks_display_get_request_mode;
   widget_class->measure = mks_display_measure;
   widget_class->size_allocate = mks_display_size_allocate;
-  widget_class->snapshot = mks_display_snapshot;
   widget_class->grab_focus = mks_display_grab_focus;
 
   properties[PROP_SCREEN] =
@@ -427,7 +415,9 @@ mks_display_init (MksDisplay *self)
 
   priv->picture = g_object_new (MKS_TYPE_DISPLAY_PICTURE, NULL);
   priv->resizer = mks_screen_resizer_new ();
-  gtk_widget_set_parent (GTK_WIDGET (priv->picture), GTK_WIDGET (self));
+
+  priv->offload = gtk_graphics_offload_new (GTK_WIDGET (priv->picture));
+  gtk_widget_set_parent (priv->offload, GTK_WIDGET (self));
 
   controller = gtk_event_controller_legacy_new ();
   gtk_event_controller_set_propagation_phase (controller, GTK_PHASE_CAPTURE);

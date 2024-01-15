@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 
 #include <glib/gstdio.h>
+#include <gtk/gtk.h>
 
 #include "mks-device-private.h"
 #include "mks-enums.h"
@@ -637,6 +638,7 @@ mks_screen_attach_cb (GObject      *object,
  */
 void
 mks_screen_attach (MksScreen           *self,
+                   GdkDisplay          *display,
                    GCancellable        *cancellable,
                    GAsyncReadyCallback  callback,
                    gpointer             user_data)
@@ -654,7 +656,7 @@ mks_screen_attach (MksScreen           *self,
   g_task_set_source_tag (task, mks_screen_attach);
 
   if (!check_console (self, &error) ||
-      !(paintable = _mks_paintable_new (cancellable, &fd, &error)))
+      !(paintable = _mks_paintable_new (display, cancellable, &fd, &error)))
     goto failure;
 
   g_task_set_task_data (task, g_steal_pointer (&paintable), g_object_unref);
@@ -714,6 +716,7 @@ mks_screen_attach_finish (MksScreen     *self,
  */
 GdkPaintable *
 mks_screen_attach_sync (MksScreen     *self,
+                        GdkDisplay    *display,
                         GCancellable  *cancellable,
                         GError       **error)
 {
@@ -725,7 +728,7 @@ mks_screen_attach_sync (MksScreen     *self,
   g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), NULL);
 
   if (!check_console (self, error) ||
-      !(paintable = _mks_paintable_new (cancellable, &fd, error)))
+      !(paintable = _mks_paintable_new (display, cancellable, &fd, error)))
     return NULL;
 
   unix_fd_list = g_unix_fd_list_new_from_array (&fd, 1), fd = -1;

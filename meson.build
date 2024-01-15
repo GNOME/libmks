@@ -23,7 +23,7 @@ add_project_arguments(['-I' + meson.project_build_root()], language: 'c')
 
 # Check dependencies
 glib_req_version = '2.75.0'
-gtk_req_version = '4.11'
+gtk_req_version = '4.13'
 
 glib_req = '>= @0@'.format(glib_req_version)
 gtk_req = '>= @0@'.format(gtk_req_version)
@@ -40,7 +40,6 @@ if gtk_minor % 2 == 1
   gtk_minor = gtk_minor + 1
 endif
 
-libepoxy_dep = dependency('epoxy')
 libgio_dep = dependency('gio-2.0', version: glib_req)
 libgiounix_dep = dependency('gio-unix-2.0', version: glib_req)
 libgtk_dep = dependency('gtk4', version: gtk_req, fallback: ['gtk'])
