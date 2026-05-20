@@ -22,7 +22,7 @@
 #pragma once
 
 #include <cairo.h>
-#include <gdk/gdk.h>
+#include <gtk/gtk.h>
 
 G_BEGIN_DECLS
 
@@ -44,5 +44,12 @@ cairo_t             *mks_cairo_framebuffer_update     (MksCairoFramebuffer *self
 void                 mks_cairo_framebuffer_copy_to    (MksCairoFramebuffer *self,
                                                        MksCairoFramebuffer *dest);
 void                 mks_cairo_framebuffer_clear      (MksCairoFramebuffer *self);
+void                 mks_cairo_framebuffer_snapshot   (MksCairoFramebuffer *self,
+                                                       GtkSnapshot         *snapshot,
+                                                       double               width,
+                                                       double               height,
+                                                       double               surface_x,
+                                                       double               surface_y,
+                                                       int                  scale);
 
 G_END_DECLS

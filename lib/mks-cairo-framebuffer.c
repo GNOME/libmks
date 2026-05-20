@@ -27,9 +27,6 @@
 #include "mks-cairo-framebuffer-private.h"
 #include "mks-util-private.h"
 
-#define TILE_WIDTH  128
-#define TILE_HEIGHT 128
-
 struct _MksCairoFramebuffer
 {
   GObject parent_instance;
@@ -43,16 +40,14 @@ struct _MksCairoFramebuffer
    * avoid additional copies beyond the one to the GPU.
    *
    * We somewhat abuse the GdkSnapshot diffing here by giving a new memory
-   * texture for tiles that changed even though they will point to the
-   * same memory. That way the renderer will upload the new contents for
-   * that area instead of using the previously cached texture.
+   * texture for updates even though they point to the same memory. That
+   * way the renderer uploads the new contents for the damaged area instead
+   * of using the previously cached texture.
    */
   GBytes *content;
 
-  /* The GdkMemoryTexture tiles we'll export using indices
-   * in the format [row0:col0,col1,.. to rowN:colN]
-   */
-  GPtrArray *tiles;
+  /* A GdkMemoryTexture we export and refresh with update regions. */
+  GdkTexture *texture;
 
   /* The format our framebuffer uses and corresponding format
    * the uploaded textures will use.
@@ -76,9 +71,7 @@ struct _MksCairoFramebuffer
   guint real_height;
   guint real_width;
 
-  /* The number of tiles horizontally and vertically */
-  guint n_columns;
-  guint n_rows;
+  cairo_region_t *update_region;
 };
 
 enum {
@@ -113,54 +106,75 @@ mks_cairo_framebuffer_get_intrinsic_aspect_ratio (GdkPaintable *paintable)
 }
 
 static void
-mks_cairo_framebuffer_snapshot (GdkPaintable *paintable,
-                                GdkSnapshot  *snapshot,
-                                double        width,
-                                double        height)
+mks_cairo_framebuffer_rebuild_texture (MksCairoFramebuffer *self)
 {
-  MksCairoFramebuffer *self = MKS_CAIRO_FRAMEBUFFER (paintable);
+  g_autoptr(GdkMemoryTextureBuilder) builder = NULL;
+  g_autoptr(GdkTexture) texture = NULL;
 
-  gtk_snapshot_save (snapshot);
-  gtk_snapshot_scale (snapshot,
-                      width / (double)self->width,
-                      height / (double)self->height);
+  g_assert (MKS_IS_CAIRO_FRAMEBUFFER (self));
+  g_assert (self->content != NULL);
 
-  for (guint row = 0; row < self->n_rows; row++)
-    {
-      guint row_pos = row * self->n_columns;
+  builder = gdk_memory_texture_builder_new ();
+  gdk_memory_texture_builder_set_bytes (builder, self->content);
+  gdk_memory_texture_builder_set_format (builder, self->memory_format);
+  gdk_memory_texture_builder_set_width (builder, self->width);
+  gdk_memory_texture_builder_set_height (builder, self->height);
+  gdk_memory_texture_builder_set_stride_for_plane (builder, 0, self->stride);
 
-      for (guint col = 0; col < self->n_columns; col++)
-        {
-          guint col_pos = row_pos + col;
+  if (self->texture != NULL)
+    gdk_memory_texture_builder_set_update_texture (builder, self->texture);
 
-          if G_UNLIKELY (self->tiles->pdata[col_pos] == NULL)
-            {
-              guint tile_y = row * TILE_HEIGHT;
-              guint tile_x = col * TILE_WIDTH;
+  if (self->update_region != NULL)
+    gdk_memory_texture_builder_set_update_region (builder, self->update_region);
 
-              gsize byte_offset = (tile_y * self->stride) + (tile_x * self->bpp);
-              gsize n_bytes = (TILE_HEIGHT-1) * self->stride + (TILE_WIDTH * self->bpp);
+  texture = gdk_memory_texture_builder_build (builder);
+  g_set_object (&self->texture, texture);
+  g_clear_pointer (&self->update_region, cairo_region_destroy);
+}
 
-              g_autoptr(GBytes) bytes = g_bytes_new_from_bytes (self->content, byte_offset, n_bytes);
+static void
+mks_cairo_framebuffer_snapshot_internal (MksCairoFramebuffer *self,
+                                         GtkSnapshot         *snapshot,
+                                         double               width,
+                                         double               height,
+                                         double               surface_x,
+                                         double               surface_y,
+                                         int                  scale)
+{
+  graphene_rect_t bounds;
 
-              self->tiles->pdata[col_pos] =
-                gdk_memory_texture_new (TILE_WIDTH,
-                                        TILE_HEIGHT,
-                                        self->memory_format,
-                                        bytes,
-                                        self->stride);
-            }
+  g_assert (MKS_IS_CAIRO_FRAMEBUFFER (self));
+  g_assert (GTK_IS_SNAPSHOT (snapshot));
+  g_assert (scale > 0);
 
-          gtk_snapshot_append_texture (snapshot,
-                                       self->tiles->pdata[col_pos],
-                                       &GRAPHENE_RECT_INIT (col * TILE_WIDTH,
-                                                            row * TILE_HEIGHT,
-                                                            TILE_WIDTH,
-                                                            TILE_HEIGHT));
-        }
-    }
+  if (self->texture == NULL)
+    mks_cairo_framebuffer_rebuild_texture (self);
 
-  gtk_snapshot_restore (snapshot);
+  bounds = GRAPHENE_RECT_INIT (0, 0, width, height);
+  bounds.origin.x = floor ((bounds.origin.x + surface_x) * scale) / scale - surface_x;
+  bounds.origin.y = floor ((bounds.origin.y + surface_y) * scale) / scale - surface_y;
+  bounds.size.width = ceil ((width + surface_x) * scale) / scale - surface_x - bounds.origin.x;
+  bounds.size.height = ceil ((height + surface_y) * scale) / scale - surface_y - bounds.origin.y;
+
+  gtk_snapshot_append_scaled_texture (snapshot,
+                                      self->texture,
+                                      GSK_SCALING_FILTER_NEAREST,
+                                      &bounds);
+}
+
+static void
+mks_cairo_framebuffer_paintable_snapshot (GdkPaintable *paintable,
+                                          GdkSnapshot  *snapshot,
+                                          double        width,
+                                          double        height)
+{
+  mks_cairo_framebuffer_snapshot_internal (MKS_CAIRO_FRAMEBUFFER (paintable),
+                                           GTK_SNAPSHOT (snapshot),
+                                           width,
+                                           height,
+                                           0,
+                                           0,
+                                           1);
 }
 
 static void
@@ -169,32 +183,13 @@ paintable_iface_init (GdkPaintableInterface *iface)
   iface->get_intrinsic_width = mks_cairo_framebuffer_get_intrinsic_width;
   iface->get_intrinsic_height = mks_cairo_framebuffer_get_intrinsic_height;
   iface->get_intrinsic_aspect_ratio = mks_cairo_framebuffer_get_intrinsic_aspect_ratio;
-  iface->snapshot = mks_cairo_framebuffer_snapshot;
+  iface->snapshot = mks_cairo_framebuffer_paintable_snapshot;
 }
 
 G_DEFINE_FINAL_TYPE_WITH_CODE (MksCairoFramebuffer, mks_cairo_framebuffer, G_TYPE_OBJECT,
                                G_IMPLEMENT_INTERFACE (GDK_TYPE_PAINTABLE, paintable_iface_init))
 
 static GParamSpec *properties [N_PROPS];
-
-static inline void
-realign (guint *value,
-         guint  alignment)
-{
-  guint rem = (*value) % alignment;
-
-  if (rem != 0)
-    *value += (alignment - rem);
-}
-
-static void
-texture_clear (gpointer data)
-{
-  GdkTexture *texture = data;
-
-  if (texture != NULL)
-    g_object_unref (texture);
-}
 
 static void
 mks_cairo_framebuffer_constructed (GObject *object)
@@ -232,12 +227,6 @@ mks_cairo_framebuffer_constructed (GObject *object)
   self->real_width = self->width;
   self->real_height = self->height;
 
-  realign (&self->real_width, TILE_WIDTH);
-  realign (&self->real_height, TILE_HEIGHT);
-
-  g_assert (self->real_width % TILE_WIDTH == 0);
-  g_assert (self->real_height % TILE_HEIGHT == 0);
-
   self->surface = cairo_image_surface_create (self->format, self->real_width, self->real_height);
 
   if (self->surface == NULL)
@@ -258,11 +247,7 @@ mks_cairo_framebuffer_constructed (GObject *object)
                                               (GDestroyNotify) cairo_surface_destroy,
                                               cairo_surface_reference (self->surface));
 
-  self->n_columns = self->real_width / TILE_WIDTH;
-  self->n_rows = self->real_height / TILE_HEIGHT;
-
-  self->tiles = g_ptr_array_new_full (self->n_columns * self->n_rows, texture_clear);
-  g_ptr_array_set_size (self->tiles, self->n_columns * self->n_rows);
+  self->texture = NULL;
 }
 
 static void
@@ -272,7 +257,8 @@ mks_cairo_framebuffer_dispose (GObject *object)
 
   g_clear_pointer (&self->content, g_bytes_unref);
   g_clear_pointer (&self->surface, cairo_surface_destroy);
-  g_clear_pointer (&self->tiles, g_ptr_array_unref);
+  g_clear_object (&self->texture);
+  g_clear_pointer (&self->update_region, cairo_region_destroy);
 
   G_OBJECT_CLASS (mks_cairo_framebuffer_parent_class)->dispose (object);
 }
@@ -387,6 +373,7 @@ flush_and_invalidate_on_destroy (gpointer data)
   g_autoptr(MksCairoFramebuffer) self = data;
 
   cairo_surface_flush (self->surface);
+  mks_cairo_framebuffer_rebuild_texture (self);
   gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
 }
 
@@ -398,34 +385,17 @@ mks_cairo_framebuffer_update (MksCairoFramebuffer *self,
                               guint                height)
 {
   cairo_t *cr;
-  guint col1, col2;
-  guint row1, row2;
+  cairo_rectangle_int_t update_area;
 
   g_return_val_if_fail (MKS_IS_CAIRO_FRAMEBUFFER (self), NULL);
   g_return_val_if_fail (self->surface != NULL, NULL);
 
-  g_assert (self->n_columns > 0);
-  g_assert (self->n_rows > 0);
+  update_area = (cairo_rectangle_int_t) { x, y, width, height };
 
-  col1 = MIN (x / TILE_WIDTH, self->n_columns-1);
-  col2 = MIN ((x + width) / TILE_WIDTH, self->n_columns-1);
-
-  row1 = MIN (y / TILE_HEIGHT, self->n_rows-1);
-  row2 = MIN ((y + height) / TILE_HEIGHT, self->n_rows-1);
-
-  for (guint row = row1; row <= row2; row++)
-    {
-      guint row_pos = row * self->n_columns;
-
-      for (guint col = col1; col <= col2; col++)
-        {
-          guint col_pos = row_pos + col;
-
-          g_assert (col_pos < self->tiles->len);
-
-          g_clear_object (&self->tiles->pdata[col_pos]);
-        }
-    }
+  if (self->update_region == NULL)
+    self->update_region = cairo_region_create_rectangle (&update_area);
+  else
+    cairo_region_union_rectangle (self->update_region, &update_area);
 
   cr = cairo_create (self->surface);
   cairo_translate (cr, x, y);
@@ -444,17 +414,50 @@ void
 mks_cairo_framebuffer_clear (MksCairoFramebuffer *self)
 {
   cairo_t *cr;
+  cairo_rectangle_int_t update_area;
 
   g_return_if_fail (MKS_IS_CAIRO_FRAMEBUFFER (self));
 
   cr = cairo_create (self->surface);
   cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
   cairo_rectangle (cr, 0, 0,
-                   self->n_columns * TILE_WIDTH,
-                   self->n_rows * TILE_HEIGHT);
+                   self->real_width,
+                   self->real_height);
   cairo_set_source_rgba (cr, 0, 0, 0, 1);
   cairo_paint (cr);
   cairo_destroy (cr);
+
+  cairo_surface_flush (self->surface);
+
+  update_area = (cairo_rectangle_int_t) { 0, 0, self->width, self->height };
+  if (self->update_region == NULL)
+    self->update_region = cairo_region_create_rectangle (&update_area);
+  else
+    cairo_region_union_rectangle (self->update_region, &update_area);
+
+  mks_cairo_framebuffer_rebuild_texture (self);
+}
+
+void
+mks_cairo_framebuffer_snapshot (MksCairoFramebuffer *self,
+                                GtkSnapshot         *snapshot,
+                                double               width,
+                                double               height,
+                                double               surface_x,
+                                double               surface_y,
+                                int                  scale)
+{
+  g_return_if_fail (MKS_IS_CAIRO_FRAMEBUFFER (self));
+  g_return_if_fail (GTK_IS_SNAPSHOT (snapshot));
+  g_return_if_fail (scale > 0);
+
+  mks_cairo_framebuffer_snapshot_internal (self,
+                                           snapshot,
+                                           width,
+                                           height,
+                                           surface_x,
+                                           surface_y,
+                                           scale);
 }
 
 cairo_format_t
@@ -496,4 +499,6 @@ mks_cairo_framebuffer_copy_to (MksCairoFramebuffer *self,
   cairo_set_operator (cr, CAIRO_OPERATOR_SOURCE);
   cairo_fill (cr);
   cairo_destroy (cr);
+
+  cairo_surface_flush (dest->surface);
 }

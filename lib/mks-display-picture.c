@@ -600,14 +600,38 @@ mks_display_picture_snapshot (GtkWidget   *widget,
                               GtkSnapshot *snapshot)
 {
   MksDisplayPicture *self = (MksDisplayPicture *)widget;
+  GtkNative *native;
+  graphene_rect_t bounds;
+  double native_x = 0;
+  double native_y = 0;
+  double surface_x = 0;
+  double surface_y = 0;
 
   if (self->paintable == NULL)
     return;
 
-  gdk_paintable_snapshot (GDK_PAINTABLE (self->paintable),
-                          snapshot,
-                          gtk_widget_get_width (GTK_WIDGET (self)),
-                          gtk_widget_get_height (GTK_WIDGET (self)));
+  if ((native = gtk_widget_get_native (widget)) &&
+      gtk_widget_compute_bounds (widget, GTK_WIDGET (native), &bounds))
+    {
+      gtk_native_get_surface_transform (native, &native_x, &native_y);
+
+      surface_x = bounds.origin.x + native_x;
+      surface_y = bounds.origin.y + native_y;
+    }
+
+  gtk_snapshot_push_clip (snapshot,
+                          &GRAPHENE_RECT_INIT (0,
+                                               0,
+                                               gtk_widget_get_width (widget),
+                                               gtk_widget_get_height (widget)));
+  _mks_paintable_snapshot (self->paintable,
+                           snapshot,
+                           gtk_widget_get_width (widget),
+                           gtk_widget_get_height (widget),
+                           surface_x,
+                           surface_y,
+                           gtk_widget_get_scale_factor (widget));
+  gtk_snapshot_pop (snapshot);
 }
 
 static void

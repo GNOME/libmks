@@ -23,7 +23,7 @@ add_project_arguments(['-I' + meson.project_build_root()], language: 'c')
 
 # Check dependencies
 glib_req_version = '2.75.0'
-gtk_req_version = '4.13'
+gtk_req_version = '4.20'
 
 glib_req = '>= @0@'.format(glib_req_version)
 gtk_req = '>= @0@'.format(gtk_req_version)

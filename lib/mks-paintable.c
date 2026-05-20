@@ -124,23 +124,13 @@ mks_paintable_snapshot (GdkPaintable *paintable,
                         double        width,
                         double        height)
 {
-  MksPaintable *self = MKS_PAINTABLE (paintable);
-
-  if (self->child != NULL)
-    {
-      if (MKS_IS_DMABUF_PAINTABLE (self->child) && !self->y_inverted)
-        {
-          gtk_snapshot_save (snapshot);
-          gtk_snapshot_translate (snapshot, &GRAPHENE_POINT_INIT (0, height));
-          gtk_snapshot_scale (snapshot, 1, -1);
-          gdk_paintable_snapshot (self->child, snapshot, width, height);
-          gtk_snapshot_restore (snapshot);
-        }
-      else
-        {
-          gdk_paintable_snapshot (self->child, snapshot, width, height);
-        }
-    }
+  _mks_paintable_snapshot (MKS_PAINTABLE (paintable),
+                           GTK_SNAPSHOT (snapshot),
+                           width,
+                           height,
+                           0,
+                           0,
+                           1);
 }
 
 static void
@@ -790,4 +780,44 @@ _mks_paintable_get_cursor (MksPaintable *self)
   g_return_val_if_fail (MKS_IS_PAINTABLE (self), NULL);
 
   return self->cursor;
+}
+
+void
+_mks_paintable_snapshot (MksPaintable *self,
+                         GtkSnapshot  *snapshot,
+                         double        width,
+                         double        height,
+                         double        surface_x,
+                         double        surface_y,
+                         int           scale)
+{
+  g_return_if_fail (MKS_IS_PAINTABLE (self));
+  g_return_if_fail (GTK_IS_SNAPSHOT (snapshot));
+  g_return_if_fail (scale > 0);
+
+  if (self->child == NULL)
+    return;
+
+  if (MKS_IS_CAIRO_FRAMEBUFFER (self->child))
+    {
+      mks_cairo_framebuffer_snapshot (MKS_CAIRO_FRAMEBUFFER (self->child),
+                                      snapshot,
+                                      width,
+                                      height,
+                                      surface_x,
+                                      surface_y,
+                                      scale);
+    }
+  else if (MKS_IS_DMABUF_PAINTABLE (self->child) && !self->y_inverted)
+    {
+      gtk_snapshot_save (snapshot);
+      gtk_snapshot_translate (snapshot, &GRAPHENE_POINT_INIT (0, height));
+      gtk_snapshot_scale (snapshot, 1, -1);
+      gdk_paintable_snapshot (self->child, GDK_SNAPSHOT (snapshot), width, height);
+      gtk_snapshot_restore (snapshot);
+    }
+  else
+    {
+      gdk_paintable_snapshot (self->child, GDK_SNAPSHOT (snapshot), width, height);
+    }
 }

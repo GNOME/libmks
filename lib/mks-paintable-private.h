@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include <gdk/gdk.h>
+#include <gtk/gtk.h>
 
 G_BEGIN_DECLS
 
@@ -34,6 +34,13 @@ GdkPaintable *_mks_paintable_new          (GdkDisplay    *display,
                                            int           *peer_fd,
                                            GError       **error);
 GdkCursor    *_mks_paintable_get_cursor   (MksPaintable  *self);
+void          _mks_paintable_snapshot     (MksPaintable  *self,
+                                           GtkSnapshot   *snapshot,
+                                           double         width,
+                                           double         height,
+                                           double         surface_x,
+                                           double         surface_y,
+                                           int            scale);
 void          _mks_paintable_get_position (MksPaintable  *self,
                                            int           *x,
                                            int           *y);
