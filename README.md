@@ -51,3 +51,11 @@ cd build
 ninja
 ./tools/mks
 ```
+
+You can specify a renderer to use if you are having problems importing DMABUF
+exported from Qemu and imported into libmks.
+
+```
+qemu-system-x86_64 \
+  -display dbus,gl=on,rendernode=/dev/dri/by-path/pci-0000:00:02.0-render
+```
