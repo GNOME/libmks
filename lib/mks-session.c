@@ -754,7 +754,7 @@ mks_session_new_for_connection_with_name_finish (GAsyncResult  *result,
  *
  * Synchronously creates a new #MksSession instance.
  *
- * The constructor is similar to [func@Mks.Session.new_for_connection_sync] except
+ * The constructor is similar to [ctor@Mks.Session.new_for_connection_sync] except
  * it allows to set the bus name to something else than the default `org.qemu`.
  *
  * Returns: (transfer full): a #MksSession if successful; otherwise %NULL
