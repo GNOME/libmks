@@ -3,7 +3,7 @@ include:
     file: "templates/default-rules.yml"
   - component: "gitlab.gnome.org/GNOME/citemplates/gnomeos-basic-ci@master"
     inputs:
-      meson-options: "-Ddocs=true"
+      meson-options: "-Ddocs=true -Dintrospection=enabled"
       lsan-options: "suppressions=${CI_PROJECT_DIR}/testsuite/lsan.supp"
   - component: "gitlab.gnome.org/GNOME/citemplates/release-service@master"
     inputs:
