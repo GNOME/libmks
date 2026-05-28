@@ -255,7 +255,6 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
                                      GdkEvent                 *event,
                                      GtkEventControllerLegacy *controller)
 {
-  GdkPaintable *paintable;
   GdkEventType event_type;
   GdkEventSequence *sequence;
 
@@ -267,7 +266,6 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
     return GDK_EVENT_PROPAGATE;
 
   event_type = gdk_event_get_event_type (event);
-  paintable = GDK_PAINTABLE (self->paintable);
   sequence = gdk_event_get_event_sequence (event);
 
   switch ((int)event_type)
@@ -305,22 +303,7 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
       }
     case GDK_MOTION_NOTIFY:
       {
-        GdkSurface *surface = gdk_event_get_surface (event);
-        GtkNative *native = gtk_widget_get_native (GTK_WIDGET (self));
-        int guest_width = gdk_paintable_get_intrinsic_width (paintable);
-        int guest_height = gdk_paintable_get_intrinsic_height (paintable);
-        graphene_rect_t area;
-        double translate_x;
-        double translate_y;
-
         g_assert (MKS_IS_MOUSE (self->mouse));
-        g_assert (GDK_IS_SURFACE (surface));
-
-        area = GRAPHENE_RECT_INIT (0, 0,
-                                   gtk_widget_get_width (GTK_WIDGET (self)),
-                                   gtk_widget_get_height (GTK_WIDGET (self)));
-
-        gtk_native_get_surface_transform (native, &translate_x, &translate_y);
 
         if (mks_mouse_get_is_absolute (self->mouse))
           {
@@ -339,13 +322,15 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
           }
         else
           {
-            double x, y;
+            double guest_x, guest_y;
 
-            if (gdk_event_get_axis (event, GDK_AXIS_X, &x) &&
-                gdk_event_get_axis (event, GDK_AXIS_Y, &y))
+            if (mks_display_picture_event_get_guest_position (self, event, &guest_x, &guest_y))
               {
-                double delta_x = self->last_mouse_x - (x / area.size.width) * guest_width;
-                double delta_y = self->last_mouse_y - (y / area.size.height) * guest_height;
+                double delta_x = guest_x - self->last_mouse_x;
+                double delta_y = guest_y - self->last_mouse_y;
+
+                self->last_mouse_x = guest_x;
+                self->last_mouse_y = guest_y;
 
                 mks_mouse_move_by (self->mouse,
                                    delta_x,
