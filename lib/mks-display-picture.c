@@ -433,9 +433,9 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
 
               gdk_scroll_event_get_deltas (event, &delta_x, &delta_y);
 
-              if (delta_y < 0)
+              if (delta_y > 0)
                 button = MKS_MOUSE_BUTTON_WHEEL_DOWN;
-              else if (delta_y > 0)
+              else if (delta_y < 0)
                 button = MKS_MOUSE_BUTTON_WHEEL_UP;
 
               break;
@@ -462,6 +462,11 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
                              NULL,
                              mks_display_picture_mouse_press_cb,
                              g_object_ref (self));
+            mks_mouse_release (self->mouse,
+                               button,
+                               NULL,
+                               mks_display_picture_mouse_release_cb,
+                               g_object_ref (self));
 
             return GDK_EVENT_STOP;
           }
