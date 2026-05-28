@@ -215,6 +215,13 @@ mks_display_picture_event_get_guest_position (MksDisplayPicture *self,
   guest_width = gdk_paintable_get_intrinsic_width (paintable);
   guest_height = gdk_paintable_get_intrinsic_height (paintable);
 
+  if (native == NULL ||
+      guest_width <= 0 ||
+      guest_height <= 0 ||
+      gtk_widget_get_width (GTK_WIDGET (self)) <= 0 ||
+      gtk_widget_get_height (GTK_WIDGET (self)) <= 0)
+    return FALSE;
+
   area = GRAPHENE_RECT_INIT (0, 0,
                              gtk_widget_get_width (GTK_WIDGET (self)),
                              gtk_widget_get_height (GTK_WIDGET (self)));
@@ -234,8 +241,8 @@ mks_display_picture_event_get_guest_position (MksDisplayPicture *self,
       *guest_x = floor (translated.x) / area.size.width * guest_width;
       *guest_y = floor (translated.y) / area.size.height * guest_height;
 
-      *guest_x = CLAMP (*guest_x, 0, guest_width);
-      *guest_y = CLAMP (*guest_y, 0, guest_width);
+      *guest_x = CLAMP (*guest_x, 0, guest_width - 1);
+      *guest_y = CLAMP (*guest_y, 0, guest_height - 1);
 
       return TRUE;
     }
