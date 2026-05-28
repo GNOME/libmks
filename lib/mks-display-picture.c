@@ -556,7 +556,7 @@ mks_display_picture_measure (GtkWidget      *widget,
   paintable = GDK_PAINTABLE (self->paintable);
 
   default_width = gdk_paintable_get_intrinsic_width (paintable);
-  default_height = gdk_paintable_get_intrinsic_width (paintable);
+  default_height = gdk_paintable_get_intrinsic_height (paintable);
 
   if (default_width <= 0)
     default_width = 640;
