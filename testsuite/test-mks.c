@@ -53,12 +53,34 @@ test_mks_get_micro_version (void)
 }
 
 static void
+test_mks_clipboard_content (void)
+{
+  static const char data[] = "hello";
+  g_autoptr(GBytes) bytes = NULL;
+  g_autoptr(GBytes) copy = NULL;
+  g_autoptr(MksClipboardContent) content = NULL;
+  gconstpointer copy_data;
+  gsize copy_size;
+
+  bytes = g_bytes_new_static (data, sizeof data - 1);
+  content = mks_clipboard_content_new ("text/plain", bytes);
+
+  g_assert_cmpstr (mks_clipboard_content_get_mime_type (content), ==, "text/plain");
+
+  copy = mks_clipboard_content_ref_bytes (content);
+  copy_data = g_bytes_get_data (copy, &copy_size);
+
+  g_assert_cmpmem (copy_data, copy_size, data, sizeof data - 1);
+}
+
+static void
 test_mks_add_tests (void)
 {
   g_test_add_func ("/Mks/init", test_mks_init);
   g_test_add_func ("/Mks/version/major", test_mks_get_major_version);
   g_test_add_func ("/Mks/version/minor", test_mks_get_minor_version);
   g_test_add_func ("/Mks/version/micro", test_mks_get_micro_version);
+  g_test_add_func ("/Mks/clipboard/content", test_mks_clipboard_content);
 }
 
 int

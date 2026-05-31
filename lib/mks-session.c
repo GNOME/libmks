@@ -23,6 +23,7 @@
 
 #include "mks-device-private.h"
 #include "mks-chardev.h"
+#include "mks-clipboard-private.h"
 #include "mks-microphone.h"
 #include "mks-read-only-list-model-private.h"
 #include "mks-qemu.h"
@@ -95,6 +96,9 @@ struct _MksSession
    */
   GListModel *devices_read_only;
 
+  MksQemuObject *clipboard_object;
+  MksClipboard *clipboard;
+
   /* An object manager client is used to monitor for new objects exported by
    * the QEMU instance. Those objects are then wrapped by MksDevice objects
    * as necessary and exported to consumers via @devices.
@@ -130,6 +134,7 @@ enum {
   PROP_CONNECTION,
   PROP_BUS_NAME,
   PROP_DEVICES,
+  PROP_CLIPBOARD,
   PROP_NAME,
   PROP_UUID,
   N_PROPS
@@ -274,6 +279,15 @@ mks_session_add_interface (MksSession     *self,
 
   if (MKS_QEMU_IS_VM (iface))
     mks_session_set_vm (self, object, MKS_QEMU_VM (iface));
+  else if (MKS_QEMU_IS_CLIPBOARD (iface))
+    {
+      if (self->clipboard == NULL)
+        {
+          self->clipboard_object = g_object_ref (object);
+          self->clipboard = _mks_clipboard_new (self, object);
+          g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_CLIPBOARD]);
+        }
+    }
   else if (MKS_QEMU_IS_AUDIO (iface))
     {
       mks_session_add_device_once (self, MKS_TYPE_SPEAKER, object);
@@ -331,6 +345,12 @@ mks_session_object_manager_object_removed_cb (MksSession         *self,
       g_clear_object (&self->vm_object);
       g_list_store_remove_all (self->devices);
     }
+  else if (object == self->clipboard_object)
+    {
+      g_clear_object (&self->clipboard);
+      g_clear_object (&self->clipboard_object);
+      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_CLIPBOARD]);
+    }
 }
 
 static void
@@ -376,6 +396,8 @@ mks_session_dispose (GObject *object)
     g_list_store_remove_all (self->devices);
 
   g_clear_object (&self->object_manager);
+  g_clear_object (&self->clipboard);
+  g_clear_object (&self->clipboard_object);
   g_clear_object (&self->vm);
   g_clear_object (&self->vm_object);
   g_clear_pointer (&self->name, g_free);
@@ -417,6 +439,10 @@ mks_session_get_property (GObject    *object,
 
     case PROP_DEVICES:
       g_value_set_object (value, mks_session_get_devices (self));
+      break;
+
+    case PROP_CLIPBOARD:
+      g_value_set_object (value, self->clipboard);
       break;
 
     case PROP_NAME:
@@ -496,6 +522,17 @@ mks_session_class_init (MksSessionClass *klass)
   properties [PROP_DEVICES] =
     g_param_spec_object ("devices", NULL, NULL,
                          G_TYPE_LIST_MODEL,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  /**
+   * MksSession:clipboard:
+   *
+   * The [class@Mks.Clipboard] for the session, if clipboard redirection is
+   * available.
+   */
+  properties [PROP_CLIPBOARD] =
+    g_param_spec_object ("clipboard", NULL, NULL,
+                         MKS_TYPE_CLIPBOARD,
                          (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   /**
@@ -892,4 +929,20 @@ mks_session_ref_screen (MksSession *self)
     }
 
   return NULL;
+}
+
+/**
+ * mks_session_ref_clipboard:
+ * @self: a `MksSession`
+ *
+ * Gets the clipboard for the session, if available.
+ *
+ * Returns: (transfer full) (nullable): an `MksClipboard`
+ */
+MksClipboard *
+mks_session_ref_clipboard (MksSession *self)
+{
+  g_return_val_if_fail (MKS_IS_SESSION (self), NULL);
+
+  return self->clipboard ? g_object_ref (self->clipboard) : NULL;
 }

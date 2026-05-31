@@ -21,12 +21,15 @@ libmks_sources = [
   'mks-audio-format.c',
   'mks-chardev.c',
   'mks-chardev-pty.c',
+  'mks-clipboard.c',
+  'mks-clipboard-redirector.c',
   'mks-init.c',
   'mks-device.c',
   'mks-display.c',
   'mks-keyboard.c',
   'mks-microphone.c',
   'mks-mouse.c',
+  'mks-mapped-paintable.c',
   'mks-paintable.c',
   'mks-screen.c',
   'mks-screen-attributes.c',
@@ -39,6 +42,8 @@ libmks_headers = [
   'libmks.h',
   'mks-audio-format.h',
   'mks-chardev.h',
+  'mks-clipboard.h',
+  'mks-clipboard-redirector.h',
   'mks-device.h',
   'mks-display.h',
   'mks-init.h',
@@ -55,6 +60,8 @@ libmks_headers = [
 ]
 
 libmks_enum_headers = [
+  'mks-clipboard.h',
+  'mks-clipboard-redirector.h',
   'mks-mouse.h',
   'mks-screen.h',
   'mks-keyboard.h',

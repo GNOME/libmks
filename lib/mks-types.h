@@ -29,16 +29,19 @@
 
 G_BEGIN_DECLS
 
-typedef struct _MksDevice           MksDevice;
-typedef struct _MksAudioFormat      MksAudioFormat;
-typedef struct _MksChardev          MksChardev;
-typedef struct _MksKeyboard         MksKeyboard;
-typedef struct _MksMicrophone       MksMicrophone;
-typedef struct _MksMouse            MksMouse;
-typedef struct _MksScreen           MksScreen;
-typedef struct _MksSession          MksSession;
-typedef struct _MksScreenAttributes MksScreenAttributes;
-typedef struct _MksSpeaker          MksSpeaker;
-typedef struct _MksTouchable        MksTouchable;
+typedef struct _MksDevice              MksDevice;
+typedef struct _MksAudioFormat         MksAudioFormat;
+typedef struct _MksChardev             MksChardev;
+typedef struct _MksClipboard           MksClipboard;
+typedef struct _MksClipboardContent    MksClipboardContent;
+typedef struct _MksClipboardRedirector MksClipboardRedirector;
+typedef struct _MksKeyboard            MksKeyboard;
+typedef struct _MksMicrophone          MksMicrophone;
+typedef struct _MksMouse               MksMouse;
+typedef struct _MksScreen              MksScreen;
+typedef struct _MksSession             MksSession;
+typedef struct _MksScreenAttributes    MksScreenAttributes;
+typedef struct _MksSpeaker             MksSpeaker;
+typedef struct _MksTouchable           MksTouchable;
 
 G_END_DECLS

@@ -66,6 +66,8 @@ GDBusConnection *mks_session_get_connection                      (MksSession    
 MKS_AVAILABLE_IN_ALL
 GListModel      *mks_session_get_devices                         (MksSession           *self);
 MKS_AVAILABLE_IN_ALL
+MksClipboard    *mks_session_ref_clipboard                       (MksSession           *self);
+MKS_AVAILABLE_IN_ALL
 const char      *mks_session_get_name                            (MksSession           *self);
 MKS_AVAILABLE_IN_ALL
 const char      *mks_session_get_uuid                            (MksSession           *self);
