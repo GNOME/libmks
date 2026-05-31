@@ -161,7 +161,7 @@ subdir('tools')
 
 have_tests = get_option('tests')
 if have_tests
- subdir('tests')
+ subdir('testsuite')
 endif
 summary('Enabled', have_tests, section: 'Tests')
 
