@@ -165,6 +165,45 @@ mks_session_add_device (MksSession *self,
   g_list_store_append (self->devices, device);
 }
 
+static gboolean
+mks_session_has_device (MksSession    *self,
+                        GType          device_type,
+                        MksQemuObject *object)
+{
+  GListModel *model;
+  guint n_items;
+
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (g_type_is_a (device_type, MKS_TYPE_DEVICE));
+  g_assert (MKS_QEMU_IS_OBJECT (object));
+
+  model = G_LIST_MODEL (self->devices);
+  n_items = g_list_model_get_n_items (model);
+
+  for (guint i = 0; i < n_items; i++)
+    {
+      g_autoptr(MksDevice) device = g_list_model_get_item (model, i);
+
+      if (G_TYPE_CHECK_INSTANCE_TYPE (device, device_type) && device->object == object)
+        return TRUE;
+    }
+
+  return FALSE;
+}
+
+static void
+mks_session_add_device_once (MksSession    *self,
+                             GType          device_type,
+                             MksQemuObject *object)
+{
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (g_type_is_a (device_type, MKS_TYPE_DEVICE));
+  g_assert (MKS_QEMU_IS_OBJECT (object));
+
+  if (!mks_session_has_device (self, device_type, object))
+    mks_session_add_device (self, _mks_device_new (device_type, self, object));
+}
+
 static void
 mks_session_set_name (MksSession *self,
                       const char *name)
@@ -225,6 +264,28 @@ mks_session_set_vm (MksSession    *self,
 }
 
 static void
+mks_session_add_interface (MksSession     *self,
+                           MksQemuObject  *object,
+                           GDBusInterface *iface)
+{
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_QEMU_IS_OBJECT (object));
+  g_assert (G_IS_DBUS_INTERFACE (iface));
+
+  if (MKS_QEMU_IS_VM (iface))
+    mks_session_set_vm (self, object, MKS_QEMU_VM (iface));
+  else if (MKS_QEMU_IS_AUDIO (iface))
+    {
+      mks_session_add_device_once (self, MKS_TYPE_SPEAKER, object);
+      mks_session_add_device_once (self, MKS_TYPE_MICROPHONE, object);
+    }
+  else if (MKS_QEMU_IS_CONSOLE (iface))
+    mks_session_add_device_once (self, MKS_TYPE_SCREEN, object);
+  else if (MKS_QEMU_IS_CHARDEV (iface))
+    mks_session_add_device_once (self, MKS_TYPE_CHARDEV, object);
+}
+
+static void
 mks_session_object_manager_object_added_cb (MksSession         *self,
                                             MksQemuObject      *object,
                                             GDBusObjectManager *manager)
@@ -238,21 +299,21 @@ mks_session_object_manager_object_added_cb (MksSession         *self,
   interfaces = g_dbus_object_get_interfaces (G_DBUS_OBJECT (object));
 
   for (const GList *iter = interfaces; iter; iter = iter->next)
-    {
-      GDBusInterface *iface = iter->data;
+    mks_session_add_interface (self, object, iter->data);
+}
 
-      if (MKS_QEMU_IS_VM (iface))
-        mks_session_set_vm (self, object, MKS_QEMU_VM (iface));
-      else if (MKS_QEMU_IS_AUDIO (iface))
-        {
-          mks_session_add_device (self, _mks_device_new (MKS_TYPE_SPEAKER, self, object));
-          mks_session_add_device (self, _mks_device_new (MKS_TYPE_MICROPHONE, self, object));
-        }
-      else if (MKS_QEMU_IS_CONSOLE (iface))
-        mks_session_add_device (self, _mks_device_new (MKS_TYPE_SCREEN, self, object));
-      else if (MKS_QEMU_IS_CHARDEV (iface))
-        mks_session_add_device (self, _mks_device_new (MKS_TYPE_CHARDEV, self, object));
-    }
+static void
+mks_session_object_manager_interface_added_cb (MksSession         *self,
+                                               MksQemuObject      *object,
+                                               GDBusInterface     *iface,
+                                               GDBusObjectManager *manager)
+{
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_QEMU_IS_OBJECT (object));
+  g_assert (G_IS_DBUS_INTERFACE (iface));
+  g_assert (G_IS_DBUS_OBJECT_MANAGER (manager));
+
+  mks_session_add_interface (self, object, iface);
 }
 
 static void
@@ -292,6 +353,11 @@ mks_session_set_object_manager (MksSession         *self,
       g_signal_connect_object (object_manager,
                                "object-removed",
                                G_CALLBACK (mks_session_object_manager_object_removed_cb),
+                               self,
+                               G_CONNECT_SWAPPED);
+      g_signal_connect_object (object_manager,
+                               "interface-added",
+                               G_CALLBACK (mks_session_object_manager_interface_added_cb),
                                self,
                                G_CONNECT_SWAPPED);
 

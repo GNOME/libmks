@@ -438,14 +438,15 @@ mks_speaker_setup (MksDevice     *device,
                    MksQemuObject *object)
 {
   MksSpeaker *self = (MksSpeaker *)device;
+  g_autoptr(MksQemuAudio) audio = NULL;
   gint64 begin_time;
 
   g_assert (MKS_IS_SPEAKER (self));
   g_assert (MKS_QEMU_IS_OBJECT (object));
 
-  if (MKS_QEMU_IS_AUDIO (object))
+  if ((audio = mks_qemu_object_get_audio (object)))
     {
-      g_set_object (&self->audio, MKS_QEMU_AUDIO (object));
+      g_set_object (&self->audio, audio);
 
       begin_time = MKS_TRACE_BEGIN_MARK ();
       dex_future_disown (dex_future_finally (mks_marked_future (mks_socketpair_connection_new (G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT),
