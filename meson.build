@@ -43,6 +43,7 @@ endif
 libgio_dep = dependency('gio-2.0', version: glib_req)
 libgiounix_dep = dependency('gio-unix-2.0', version: glib_req)
 libgtk_dep = dependency('gtk4', version: gtk_req, fallback: ['gtk'])
+libdex_dep = dependency('libdex-1')
 
 # Ensure we restrict ABI usage to what we claim
 project_c_args += [

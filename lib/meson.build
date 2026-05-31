@@ -123,6 +123,7 @@ libmks_private_generated_headers = [
 ]
 
 libmks_deps = [
+  libdex_dep,
   libgio_dep,
   libgiounix_dep,
   libgtk_dep,
@@ -160,7 +161,7 @@ pkg.generate(
      filebase: 'libmks-' + api_version,
       version: meson.project_version(),
       subdirs: 'libmks-@0@'.format(api_version),
-     requires: ['gio-2.0', 'gio-unix-2.0', 'gtk4'],
+     requires: ['libdex-1', 'gio-2.0', 'gio-unix-2.0', 'gtk4'],
   install_dir: join_paths(get_option('libdir'), 'pkgconfig')
 )
 
@@ -182,7 +183,7 @@ if get_option('introspection').enabled()
       identifier_prefix: 'Mks',
         export_packages: 'libmks-@0@'.format(api_version),
     include_directories: libmks_include_directories,
-               includes: ['Gio-2.0', 'Gtk-4.0'],
+               includes: ['Dex-1', 'Gio-2.0', 'Gtk-4.0'],
                 install: true,
              extra_args: libmks_gir_extra_args,
   )
@@ -190,7 +191,7 @@ if get_option('introspection').enabled()
   if get_option('vapi')
     libmks_vapi = gnome.generate_vapi('libmks-' + api_version,
                    sources: libmks_gir[0],
-                  packages: [ 'gio-2.0', 'gtk4'],
+                  packages: [ 'libdex-1', 'gio-2.0', 'gtk4'],
                    install: true,
     )
   endif
