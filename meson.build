@@ -22,14 +22,18 @@ add_project_arguments(['-I' + meson.project_build_root()], language: 'c')
 # Check dependencies
 glib_req_version = '2.75.0'
 gtk_req_version = '4.20'
+dex_req_version = '1.2'
 
 glib_req = '>= @0@'.format(glib_req_version)
 gtk_req = '>= @0@'.format(gtk_req_version)
+dex_req = '>= @0@'.format(dex_req_version)
 
 glib_major = glib_req_version.split('.')[0].to_int()
 glib_minor = glib_req_version.split('.')[1].to_int()
 gtk_major = gtk_req_version.split('.')[0].to_int()
 gtk_minor = gtk_req_version.split('.')[1].to_int()
+dex_major = dex_req_version.split('.')[0].to_int()
+dex_minor = dex_req_version.split('.')[1].to_int()
 
 if glib_minor % 2 == 1
   glib_minor = glib_minor + 1
@@ -42,7 +46,7 @@ libgio_dep = dependency('gio-2.0', version: glib_req)
 libgiounix_dep = dependency('gio-unix-2.0', version: glib_req)
 libgtk_dep = dependency('gtk4', version: gtk_req, fallback: ['gtk'])
 libvte_dep = dependency('vte-2.91-gtk4')
-libdex_dep = dependency('libdex-1')
+libdex_dep = dependency('libdex-1', version: '>= 1.2')
 sysprof_dep = dependency('sysprof-capture-4', required: get_option('sysprof'))
 config_h.set10('HAVE_SYSPROF', sysprof_dep.found())
 
@@ -52,6 +56,8 @@ project_c_args += [
   '-DGLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_@0@_@1@'.format(glib_major, glib_minor),
   '-DGDK_VERSION_MIN_REQUIRED=GDK_VERSION_@0@_@1@'.format(gtk_major, gtk_minor),
   '-DGDK_VERSION_MAX_ALLOWED=GDK_VERSION_@0@_@1@'.format(gtk_major, gtk_minor),
+  '-DDEX_VERSION_MIN_REQUIRED=DEX_VERSION_@0@_@1@'.format(dex_major, dex_minor),
+  '-DDEX_VERSION_MAX_ALLOWED=DEX_VERSION_@0@_@1@'.format(dex_major, dex_minor),
 ]
 
 test_c_args = [
