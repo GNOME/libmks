@@ -226,7 +226,7 @@ static DexFuture *
 mks_clipboard_handle_request_complete_cb (DexFuture *future,
                                           gpointer   user_data)
 {
-  g_autoptr(GDBusMethodInvocation) invocation = user_data;
+  GDBusMethodInvocation *invocation = user_data;
   g_autoptr(MksClipboardContent) content = NULL;
   g_autoptr(GBytes) bytes = NULL;
   g_autoptr(GError) error = NULL;
@@ -245,7 +245,7 @@ mks_clipboard_handle_request_complete_cb (DexFuture *future,
   content = g_value_dup_boxed (value);
   bytes = mks_clipboard_content_ref_bytes (content);
   data = g_variant_new_from_bytes (G_VARIANT_TYPE ("ay"), bytes, TRUE);
-  g_dbus_method_invocation_return_value (g_steal_pointer (&invocation),
+  g_dbus_method_invocation_return_value (g_object_ref (invocation),
                                          g_variant_new ("(s@ay)",
                                                         mks_clipboard_content_get_mime_type (content),
                                                         data));
