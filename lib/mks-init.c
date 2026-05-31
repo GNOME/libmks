@@ -21,7 +21,6 @@
 
 #include "config.h"
 
-#include "gconstructor.h"
 
 #include "mks-device.h"
 #include "mks-display.h"
@@ -87,14 +86,6 @@ mks_init (void)
       mks_init_gtypes ();
       g_once_init_leave (&initialized, TRUE);
     }
-}
-
-G_DEFINE_CONSTRUCTOR (_mks_init)
-
-static void
-_mks_init (void)
-{
-  mks_init ();
 }
 
 /**
