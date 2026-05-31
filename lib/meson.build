@@ -6,31 +6,37 @@ libmks_include_directories = [
 ]
 
 libmks_sources = [
+  'mks-audio-format.c',
   'mks-chardev.c',
   'mks-chardev-pty.c',
   'mks-init.c',
   'mks-device.c',
   'mks-display.c',
   'mks-keyboard.c',
+  'mks-microphone.c',
   'mks-mouse.c',
   'mks-paintable.c',
   'mks-screen.c',
   'mks-screen-attributes.c',
   'mks-session.c',
+  'mks-speaker.c',
   'mks-touchable.c',
 ]
 
 libmks_headers = [
   'libmks.h',
+  'mks-audio-format.h',
   'mks-chardev.h',
   'mks-device.h',
   'mks-display.h',
   'mks-init.h',
   'mks-keyboard.h',
+  'mks-microphone.h',
   'mks-mouse.h',
   'mks-screen.h',
   'mks-screen-attributes.h',
   'mks-session.h',
+  'mks-speaker.h',
   'mks-touchable.h',
   'mks-types.h',
   'mks-version-macros.h',
@@ -131,6 +137,8 @@ libmks_deps = [
   libdex_dep,
   libgio_dep,
   libgiounix_dep,
+  dependency('gstreamer-1.0'),
+  dependency('gstreamer-app-1.0'),
   libgtk_dep,
   libvte_dep,
 
@@ -170,7 +178,7 @@ pkg.generate(
      filebase: 'libmks-' + api_version,
       version: meson.project_version(),
       subdirs: 'libmks-@0@'.format(api_version),
-     requires: ['libdex-1', 'gio-2.0', 'gio-unix-2.0', 'gtk4', 'vte-2.91-gtk4'],
+     requires: ['libdex-1', 'gio-2.0', 'gio-unix-2.0', 'gstreamer-1.0', 'gstreamer-app-1.0', 'gtk4', 'vte-2.91-gtk4'],
   install_dir: join_paths(get_option('libdir'), 'pkgconfig')
 )
 
@@ -179,6 +187,7 @@ if get_option('introspection').enabled()
      '--c-include=libmks.h',
      '--quiet',
      '-DMKS_COMPILATION',
+     '--library=' + libmks.full_path(),
    ]
   libmks_gir = gnome.generate_gir(libmks,
                 sources: libmks_sources +
@@ -192,7 +201,7 @@ if get_option('introspection').enabled()
       identifier_prefix: 'Mks',
         export_packages: 'libmks-@0@'.format(api_version),
     include_directories: libmks_include_directories,
-               includes: ['Dex-1', 'Gio-2.0', 'Gtk-4.0', 'Vte-3.91'],
+               includes: ['Dex-1', 'Gio-2.0', 'Gst-1.0', 'Gtk-4.0', 'Vte-3.91'],
                 install: true,
              extra_args: libmks_gir_extra_args,
   )
@@ -200,7 +209,7 @@ if get_option('introspection').enabled()
   if get_option('vapi')
     libmks_vapi = gnome.generate_vapi('libmks-' + api_version,
                    sources: libmks_gir[0],
-                  packages: [ 'libdex-1', 'gio-2.0', 'gtk4', 'vte-2.91-gtk4'],
+                  packages: [ 'libdex-1', 'gio-2.0', 'gstreamer-1.0', 'gtk4', 'vte-2.91-gtk4'],
                    install: true,
     )
   endif

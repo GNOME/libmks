@@ -21,11 +21,14 @@
 
 #pragma once
 
+#include <gst/gst.h>
+
+#include "mks-audio-format.h"
 #include "mks-device.h"
 
 G_BEGIN_DECLS
 
-#define MKS_TYPE_SPEAKER            (mks_speaker_get_type ())
+#define MKS_TYPE_SPEAKER            (mks_speaker_get_type())
 #define MKS_SPEAKER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_SPEAKER, MksSpeaker))
 #define MKS_SPEAKER_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_SPEAKER, MksSpeaker const))
 #define MKS_SPEAKER_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MKS_TYPE_SPEAKER, MksSpeakerClass))
@@ -36,13 +39,32 @@ G_BEGIN_DECLS
 typedef struct _MksSpeaker      MksSpeaker;
 typedef struct _MksSpeakerClass MksSpeakerClass;
 
+typedef void (*MksSpeakerPcmFunc) (MksSpeaker *speaker,
+                                   guint64     stream_id,
+                                   GBytes     *bytes,
+                                   gpointer    user_data);
+
 MKS_AVAILABLE_IN_ALL
-GType    mks_speaker_get_type  (void) G_GNUC_CONST;
+GType           mks_speaker_get_type            (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
-gboolean mks_speaker_get_muted (MksSpeaker *self);
+gboolean        mks_speaker_get_muted           (MksSpeaker        *self);
 MKS_AVAILABLE_IN_ALL
-void     mks_speaker_set_muted (MksSpeaker *self,
-                                gboolean    muted);
+void            mks_speaker_set_muted           (MksSpeaker        *self,
+                                                 gboolean           muted);
+MKS_AVAILABLE_IN_ALL
+MksAudioFormat *mks_speaker_dup_format          (MksSpeaker        *self,
+                                                 guint64            stream_id);
+MKS_AVAILABLE_IN_ALL
+guint           mks_speaker_add_pcm_observer    (MksSpeaker        *self,
+                                                 MksSpeakerPcmFunc  callback,
+                                                 gpointer           user_data,
+                                                 GDestroyNotify     user_data_destroy);
+MKS_AVAILABLE_IN_ALL
+void            mks_speaker_remove_pcm_observer (MksSpeaker        *self,
+                                                 guint              observer_id);
+MKS_AVAILABLE_IN_ALL
+GstElement     *mks_speaker_create_gst_source   (MksSpeaker        *self,
+                                                 guint64            stream_id);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksSpeaker, g_object_unref)
 

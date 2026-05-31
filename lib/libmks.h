@@ -26,16 +26,19 @@
 G_BEGIN_DECLS
 
 #define MKS_INSIDE
+# include "mks-audio-format.h"
 # include "mks-chardev.h"
 # include "mks-device.h"
 # include "mks-display.h"
 # include "mks-enums.h"
 # include "mks-init.h"
 # include "mks-keyboard.h"
+# include "mks-microphone.h"
 # include "mks-mouse.h"
 # include "mks-screen.h"
 # include "mks-screen-attributes.h"
 # include "mks-session.h"
+# include "mks-speaker.h"
 # include "mks-touchable.h"
 # include "mks-types.h"
 # include "mks-version.h"

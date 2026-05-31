@@ -23,10 +23,12 @@
 
 #include "mks-device-private.h"
 #include "mks-chardev.h"
+#include "mks-microphone.h"
 #include "mks-read-only-list-model-private.h"
 #include "mks-qemu.h"
 #include "mks-screen.h"
 #include "mks-session.h"
+#include "mks-speaker.h"
 #include "mks-util-private.h"
 
 /**
@@ -241,6 +243,11 @@ mks_session_object_manager_object_added_cb (MksSession         *self,
 
       if (MKS_QEMU_IS_VM (iface))
         mks_session_set_vm (self, object, MKS_QEMU_VM (iface));
+      else if (MKS_QEMU_IS_AUDIO (iface))
+        {
+          mks_session_add_device (self, _mks_device_new (MKS_TYPE_SPEAKER, self, object));
+          mks_session_add_device (self, _mks_device_new (MKS_TYPE_MICROPHONE, self, object));
+        }
       else if (MKS_QEMU_IS_CONSOLE (iface))
         mks_session_add_device (self, _mks_device_new (MKS_TYPE_SCREEN, self, object));
       else if (MKS_QEMU_IS_CHARDEV (iface))

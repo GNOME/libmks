@@ -21,11 +21,14 @@
 
 #include "config.h"
 
+#include <gst/gst.h>
 
+#include "mks-audio-format.h"
 #include "mks-device.h"
 #include "mks-display.h"
 #include "mks-init.h"
 #include "mks-keyboard.h"
+#include "mks-microphone.h"
 #include "mks-mouse.h"
 #include "mks-paintable-private.h"
 #include "mks-qemu.h"
@@ -34,6 +37,7 @@
 #include "mks-screen.h"
 #include "mks-screen-attributes.h"
 #include "mks-session.h"
+#include "mks-speaker.h"
 #include "mks-touchable.h"
 #include "mks-trace-private.h"
 #include "mks-version.h"
@@ -57,13 +61,16 @@ mks_init_gtypes (void)
   g_type_ensure (MKS_TYPE_PAINTABLE);
 
   /* GTypes that are part of our public API */
+  g_type_ensure (MKS_TYPE_AUDIO_FORMAT);
   g_type_ensure (MKS_TYPE_DEVICE);
   g_type_ensure (MKS_TYPE_DISPLAY);
   g_type_ensure (MKS_TYPE_KEYBOARD);
+  g_type_ensure (MKS_TYPE_MICROPHONE);
   g_type_ensure (MKS_TYPE_MOUSE);
   g_type_ensure (MKS_TYPE_SCREEN);
   g_type_ensure (MKS_TYPE_SCREEN_ATTRIBUTES);
   g_type_ensure (MKS_TYPE_SESSION);
+  g_type_ensure (MKS_TYPE_SPEAKER);
   g_type_ensure (MKS_TYPE_TOUCHABLE);
 }
 
@@ -82,6 +89,7 @@ mks_init (void)
   if (g_once_init_enter (&initialized))
     {
       mks_register_resource ();
+      gst_init (NULL, NULL);
       mks_trace_init ();
       mks_init_gtypes ();
       g_once_init_leave (&initialized, TRUE);

@@ -21,8 +21,10 @@
 
 #include "config.h"
 
-#include <glib/gstdio.h>
+#include <glib-unix.h>
+#include <gst/app/gstappsrc.h>
 
+#include "mks-audio-format.h"
 #include "mks-device-private.h"
 #include "mks-qemu.h"
 #include "mks-speaker.h"
@@ -30,7 +32,7 @@
 
 /**
  * MksSpeaker:
- * 
+ *
  * A virtualized QEMU speaker.
  */
 
@@ -40,6 +42,10 @@ struct _MksSpeaker
   MksQemuAudio *audio;
   MksQemuAudioOutListener *listener;
   GDBusConnection *connection;
+  GHashTable *streams;
+  GArray *pcm_observers;
+  guint next_pcm_observer_id;
+  guint dispatching_pcm : 1;
   guint muted : 1;
 };
 
@@ -56,7 +62,151 @@ enum {
   N_PROPS
 };
 
+enum {
+  STREAM_ADDED,
+  STREAM_REMOVED,
+  STREAM_ENABLED,
+  VOLUME_CHANGED,
+  N_SIGNALS
+};
+
 static GParamSpec *properties [N_PROPS];
+static guint signals [N_SIGNALS];
+
+typedef struct _MksSpeakerStream
+{
+  guint64         id;
+  MksAudioFormat *format;
+  guint           enabled : 1;
+  guint           muted : 1;
+} MksSpeakerStream;
+
+typedef struct _MksSpeakerGstSource
+{
+  MksSpeaker *speaker;
+  guint64     stream_id;
+  gulong      stream_added_handler;
+  gulong      stream_removed_handler;
+  gulong      stream_enabled_handler;
+  guint       pcm_observer_id;
+} MksSpeakerGstSource;
+
+typedef struct _PcmObserver
+{
+  guint             id;
+  MksSpeakerPcmFunc callback;
+  gpointer          user_data;
+  GDestroyNotify    user_data_destroy;
+} PcmObserver;
+
+static void
+mks_speaker_clear_pcm_observer (PcmObserver *observer)
+{
+  g_assert (observer != NULL);
+
+  if (observer->user_data_destroy != NULL)
+    {
+      observer->user_data_destroy (observer->user_data);
+      observer->user_data_destroy = NULL;
+    }
+}
+
+static void
+mks_speaker_stream_free (gpointer data)
+{
+  MksSpeakerStream *stream = data;
+
+  if (stream == NULL)
+    return;
+
+  g_clear_pointer (&stream->format, mks_audio_format_free);
+  g_free (stream);
+}
+
+static void
+mks_speaker_gst_source_free (gpointer data)
+{
+  MksSpeakerGstSource *source = data;
+
+  if (source == NULL)
+    return;
+
+  if (source->speaker != NULL)
+    {
+      if (source->pcm_observer_id != 0)
+        {
+          mks_speaker_remove_pcm_observer (source->speaker, source->pcm_observer_id);
+          source->pcm_observer_id = 0;
+        }
+
+      g_clear_signal_handler (&source->stream_added_handler, source->speaker);
+      g_clear_signal_handler (&source->stream_removed_handler, source->speaker);
+      g_clear_signal_handler (&source->stream_enabled_handler, source->speaker);
+      g_clear_object (&source->speaker);
+    }
+
+  g_free (source);
+}
+
+static MksSpeakerStream *
+mks_speaker_lookup_stream (MksSpeaker *self,
+                           guint64     id)
+{
+  g_assert (MKS_IS_SPEAKER (self));
+
+  return g_hash_table_lookup (self->streams, &id);
+}
+
+static MksSpeakerStream *
+mks_speaker_ensure_stream (MksSpeaker     *self,
+                           guint64         id,
+                           MksAudioFormat *format)
+{
+  MksSpeakerStream *stream;
+  guint64 *stream_id;
+
+  g_assert (MKS_IS_SPEAKER (self));
+  g_assert (format != NULL);
+
+  if ((stream = mks_speaker_lookup_stream (self, id)))
+    {
+      g_clear_pointer (&stream->format, mks_audio_format_free);
+      stream->format = mks_audio_format_copy (format);
+      return stream;
+    }
+
+  stream = g_new0 (MksSpeakerStream, 1);
+  stream->id = id;
+  stream->format = mks_audio_format_copy (format);
+  stream_id = g_new (guint64, 1);
+  *stream_id = id;
+  g_hash_table_insert (self->streams, stream_id, stream);
+
+  return stream;
+}
+
+static void
+mks_speaker_emit_pcm (MksSpeaker *self,
+                      guint64     stream_id,
+                      GBytes     *bytes)
+{
+  g_assert (MKS_IS_SPEAKER (self));
+  g_assert (bytes != NULL);
+
+  if (self->pcm_observers->len == 0)
+    return;
+
+  g_assert (!self->dispatching_pcm);
+
+  self->dispatching_pcm = TRUE;
+  for (guint i = 0; i < self->pcm_observers->len; i++)
+    {
+      PcmObserver *observer = &g_array_index (self->pcm_observers, PcmObserver, i);
+
+      observer->callback (self, stream_id, bytes, observer->user_data);
+    }
+  self->dispatching_pcm = FALSE;
+}
 
 static gboolean
 mks_speaker_handle_init (MksSpeaker            *self,
@@ -71,10 +221,25 @@ mks_speaker_handle_init (MksSpeaker            *self,
                          guint                  bytes_per_second,
                          gboolean               be)
 {
+  g_autoptr(MksAudioFormat) format = NULL;
+
   g_assert (MKS_IS_SPEAKER (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
 
-  return FALSE;
+  format = mks_audio_format_new (bits,
+                                 is_signed,
+                                 is_float,
+                                 freq,
+                                 nchannels,
+                                 bytes_per_frame,
+                                 bytes_per_second,
+                                 be);
+
+  mks_speaker_ensure_stream (self, id, format);
+  g_signal_emit (self, signals [STREAM_ADDED], 0, id, format);
+  mks_qemu_audio_out_listener_complete_init (self->listener, invocation);
+
+  return TRUE;
 }
 
 static gboolean
@@ -85,19 +250,31 @@ mks_speaker_handle_fini (MksSpeaker            *self,
   g_assert (MKS_IS_SPEAKER (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
 
-  return FALSE;
+  g_hash_table_remove (self->streams, &id);
+  g_signal_emit (self, signals [STREAM_REMOVED], 0, id);
+  mks_qemu_audio_out_listener_complete_fini (self->listener, invocation);
+
+  return TRUE;
 }
 
 static gboolean
 mks_speaker_handle_set_enabled (MksSpeaker            *self,
                                 GDBusMethodInvocation *invocation,
                                 guint64                id,
-                                gboolean               enbled)
+                                gboolean               enabled)
 {
+  MksSpeakerStream *stream;
+
   g_assert (MKS_IS_SPEAKER (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
 
-  return FALSE;
+  if ((stream = mks_speaker_lookup_stream (self, id)))
+    stream->enabled = !!enabled;
+
+  g_signal_emit (self, signals [STREAM_ENABLED], 0, id, enabled);
+  mks_qemu_audio_out_listener_complete_set_enabled (self->listener, invocation);
+
+  return TRUE;
 }
 
 static gboolean
@@ -107,10 +284,24 @@ mks_speaker_handle_set_volume (MksSpeaker            *self,
                                gboolean               mute,
                                GVariant              *volume)
 {
+  MksSpeakerStream *stream;
+  g_autoptr(GBytes) bytes = NULL;
+  gconstpointer element_data;
+  gsize n_elements;
+
   g_assert (MKS_IS_SPEAKER (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
 
-  return FALSE;
+  element_data = g_variant_get_fixed_array (volume, &n_elements, sizeof (guchar));
+  bytes = g_bytes_new (element_data, n_elements);
+
+  if ((stream = mks_speaker_lookup_stream (self, id)))
+    stream->muted = !!mute;
+
+  g_signal_emit (self, signals [VOLUME_CHANGED], 0, id, mute, bytes);
+  mks_qemu_audio_out_listener_complete_set_volume (self->listener, invocation);
+
+  return TRUE;
 }
 
 static gboolean
@@ -119,10 +310,26 @@ mks_speaker_handle_write (MksSpeaker            *self,
                           guint64                id,
                           GVariant              *data)
 {
+  MksSpeakerStream *stream;
+  g_autoptr(GBytes) bytes = NULL;
+  gconstpointer element_data;
+  gsize n_elements;
+
   g_assert (MKS_IS_SPEAKER (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
 
-  return FALSE;
+  stream = mks_speaker_lookup_stream (self, id);
+
+  if (!self->muted && (stream == NULL || !stream->muted))
+    {
+      element_data = g_variant_get_fixed_array (data, &n_elements, sizeof (guchar));
+      bytes = g_bytes_new (element_data, n_elements);
+      mks_speaker_emit_pcm (self, id, bytes);
+    }
+
+  mks_qemu_audio_out_listener_complete_write (self->listener, invocation);
+
+  return TRUE;
 }
 
 static DexFuture *
@@ -146,10 +353,10 @@ mks_speaker_connection_cb (DexFuture *future,
                            gpointer   user_data)
 {
   MksSpeaker *self = user_data;
+  MksSocketpairConnection *socketpair;
   g_autoptr(GUnixFDList) fd_list = NULL;
   g_autoptr(GError) error = NULL;
   const GValue *value;
-  MksSocketpairConnection *socketpair;
   g_autofd int peer_fd = -1;
   gint64 begin_time;
 
@@ -239,13 +446,15 @@ mks_speaker_setup (MksDevice     *device,
   if (MKS_QEMU_IS_AUDIO (object))
     {
       g_set_object (&self->audio, MKS_QEMU_AUDIO (object));
+
       begin_time = MKS_TRACE_BEGIN_MARK ();
       dex_future_disown (dex_future_finally (mks_marked_future (mks_socketpair_connection_new (G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT),
-                                                                 begin_time,
-                                                                 "speaker.socketpair-connection"),
+                                                                begin_time,
+                                                                "speaker.socketpair-connection"),
                                              mks_speaker_connection_cb,
                                              g_object_ref (self),
                                              g_object_unref));
+
       return TRUE;
     }
 
@@ -265,6 +474,8 @@ mks_speaker_dispose (GObject *object)
 
   g_clear_object (&self->connection);
   g_clear_object (&self->audio);
+  g_clear_pointer (&self->streams, g_hash_table_unref);
+  g_clear_pointer (&self->pcm_observers, g_array_unref);
 
   G_OBJECT_CLASS (mks_speaker_parent_class)->dispose (object);
 }
@@ -322,7 +533,7 @@ mks_speaker_class_init (MksSpeakerClass *klass)
   /**
    * MksSpeaker:muted:
    *
-   * If audio received from the instance is dropped and 
+   * If audio received from the instance is dropped and
    * the remote sound device should attempt to be set as muted.
    */
   properties [PROP_MUTED] =
@@ -331,11 +542,80 @@ mks_speaker_class_init (MksSpeakerClass *klass)
                           (G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_properties (object_class, N_PROPS, properties);
+
+  /**
+   * MksSpeaker::stream-added:
+   * @self: a `MksSpeaker`
+   * @stream_id: the QEMU audio stream id
+   * @format: the PCM stream format
+   *
+   * Emitted when QEMU initializes a playback stream.
+   */
+  signals [STREAM_ADDED] =
+    g_signal_new ("stream-added",
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0, NULL, NULL, NULL,
+                  G_TYPE_NONE, 2, G_TYPE_UINT64, MKS_TYPE_AUDIO_FORMAT);
+
+  /**
+   * MksSpeaker::stream-removed:
+   * @self: a `MksSpeaker`
+   * @stream_id: the QEMU audio stream id
+   *
+   * Emitted when QEMU finishes a playback stream.
+   */
+  signals [STREAM_REMOVED] =
+    g_signal_new ("stream-removed",
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0, NULL, NULL, NULL,
+                  G_TYPE_NONE, 1, G_TYPE_UINT64);
+
+  /**
+   * MksSpeaker::stream-enabled:
+   * @self: a `MksSpeaker`
+   * @stream_id: the QEMU audio stream id
+   * @enabled: if the stream is enabled
+   *
+   * Emitted when QEMU resumes or suspends a playback stream.
+   */
+  signals [STREAM_ENABLED] =
+    g_signal_new ("stream-enabled",
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0, NULL, NULL, NULL,
+                  G_TYPE_NONE, 2, G_TYPE_UINT64, G_TYPE_BOOLEAN);
+
+  /**
+   * MksSpeaker::volume-changed:
+   * @self: a `MksSpeaker`
+   * @stream_id: the QEMU audio stream id
+   * @muted: if the stream is muted
+   * @volume: (type GLib.Bytes): per-channel QEMU volume values
+   *
+   * Emitted when QEMU updates stream volume.
+   */
+  signals [VOLUME_CHANGED] =
+    g_signal_new ("volume-changed",
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0, NULL, NULL, NULL,
+                  G_TYPE_NONE, 3, G_TYPE_UINT64, G_TYPE_BOOLEAN, G_TYPE_BYTES);
+
 }
 
 static void
 mks_speaker_init (MksSpeaker *self)
 {
+  self->streams = g_hash_table_new_full (g_int64_hash,
+                                         g_int64_equal,
+                                         g_free,
+                                         mks_speaker_stream_free);
+  self->pcm_observers = g_array_new (FALSE, FALSE, sizeof (PcmObserver));
+  g_array_set_clear_func (self->pcm_observers,
+                          (GDestroyNotify)mks_speaker_clear_pcm_observer);
+  self->next_pcm_observer_id = 1;
 }
 
 /**
@@ -374,4 +654,251 @@ mks_speaker_set_muted (MksSpeaker *self,
       self->muted = muted;
       g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_MUTED]);
     }
+}
+
+/**
+ * mks_speaker_dup_format:
+ * @self: a `MksSpeaker`
+ * @stream_id: a QEMU audio stream id
+ *
+ * Gets the PCM format for @stream_id.
+ *
+ * Returns: (transfer full) (nullable): a copy of the stream format
+ */
+MksAudioFormat *
+mks_speaker_dup_format (MksSpeaker *self,
+                        guint64     stream_id)
+{
+  MksSpeakerStream *stream;
+
+  g_return_val_if_fail (MKS_IS_SPEAKER (self), NULL);
+
+  if (!(stream = mks_speaker_lookup_stream (self, stream_id)))
+    return NULL;
+
+  return mks_audio_format_copy (stream->format);
+}
+
+/**
+ * mks_speaker_add_pcm_observer:
+ * @self: a `MksSpeaker`
+ * @callback: (scope notified) (closure user_data): callback for PCM data delivery
+ * @user_data: user data for @callback
+ * @user_data_destroy: (destroy user_data) (nullable): destroy notify for @user_data
+ *
+ * Adds an observer for PCM playback frames.
+ *
+ * Observers must not add or remove PCM observers while a PCM callback is being
+ * dispatched.
+ *
+ * Returns: an observer id for use with [method@Mks.Speaker.remove_pcm_observer]
+ */
+guint
+mks_speaker_add_pcm_observer (MksSpeaker        *self,
+                              MksSpeakerPcmFunc  callback,
+                              gpointer           user_data,
+                              GDestroyNotify     user_data_destroy)
+{
+  PcmObserver observer;
+  guint id;
+
+  g_return_val_if_fail (MKS_IS_SPEAKER (self), 0);
+  g_return_val_if_fail (callback != NULL, 0);
+  g_return_val_if_fail (!self->dispatching_pcm, 0);
+
+  id = self->next_pcm_observer_id++;
+  if (id == 0)
+    id = self->next_pcm_observer_id++;
+
+  observer.id = id;
+  observer.callback = callback;
+  observer.user_data = user_data;
+  observer.user_data_destroy = user_data_destroy;
+
+  g_array_append_val (self->pcm_observers, observer);
+
+  return id;
+}
+
+/**
+ * mks_speaker_remove_pcm_observer:
+ * @self: a `MksSpeaker`
+ * @observer_id: an observer id returned by [method@Mks.Speaker.add_pcm_observer]
+ *
+ * Removes a PCM playback observer.
+ *
+ * Observers must not remove themselves or other observers while a PCM callback
+ * is being dispatched.
+ */
+void
+mks_speaker_remove_pcm_observer (MksSpeaker *self,
+                                 guint       observer_id)
+{
+  g_return_if_fail (MKS_IS_SPEAKER (self));
+  g_return_if_fail (observer_id != 0);
+  g_return_if_fail (!self->dispatching_pcm);
+
+  for (guint i = 0; i < self->pcm_observers->len; i++)
+    {
+      PcmObserver *observer = &g_array_index (self->pcm_observers, PcmObserver, i);
+
+      if (observer->id == observer_id)
+        {
+          g_array_remove_index (self->pcm_observers, i);
+          break;
+        }
+    }
+}
+
+static void
+mks_speaker_gst_source_update_caps (GstElement     *element,
+                                    MksAudioFormat *format)
+{
+  g_autoptr(GstCaps) caps = NULL;
+
+  g_assert (GST_IS_APP_SRC (element));
+  g_assert (format != NULL);
+
+  if ((caps = mks_audio_format_to_gst_caps (format)))
+    gst_app_src_set_caps (GST_APP_SRC (element), caps);
+}
+
+static void
+mks_speaker_gst_source_stream_added_cb (GstElement     *element,
+                                        guint64         stream_id,
+                                        MksAudioFormat *format,
+                                        MksSpeaker     *speaker)
+{
+  MksSpeakerGstSource *source;
+
+  g_assert (GST_IS_APP_SRC (element));
+  g_assert (format != NULL);
+  g_assert (MKS_IS_SPEAKER (speaker));
+
+  source = g_object_get_data (G_OBJECT (element), "MksSpeakerGstSource");
+
+  if (source != NULL && source->stream_id == stream_id)
+    mks_speaker_gst_source_update_caps (element, format);
+}
+
+static void
+mks_speaker_gst_source_stream_removed_cb (GstElement *element,
+                                          guint64     stream_id,
+                                          MksSpeaker *speaker)
+{
+  MksSpeakerGstSource *source;
+
+  g_assert (GST_IS_APP_SRC (element));
+  g_assert (MKS_IS_SPEAKER (speaker));
+
+  source = g_object_get_data (G_OBJECT (element), "MksSpeakerGstSource");
+
+  if (source != NULL && source->stream_id == stream_id)
+    gst_app_src_end_of_stream (GST_APP_SRC (element));
+}
+
+static void
+mks_speaker_gst_source_stream_enabled_cb (GstElement *element,
+                                          guint64     stream_id,
+                                          gboolean    enabled,
+                                          MksSpeaker *speaker)
+{
+  MksSpeakerGstSource *source;
+
+  g_assert (GST_IS_APP_SRC (element));
+  g_assert (MKS_IS_SPEAKER (speaker));
+
+  source = g_object_get_data (G_OBJECT (element), "MksSpeakerGstSource");
+
+  if (source != NULL && source->stream_id == stream_id && !enabled)
+    gst_app_src_end_of_stream (GST_APP_SRC (element));
+}
+
+static void
+mks_speaker_gst_source_pcm_cb (MksSpeaker *speaker,
+                               guint64     stream_id,
+                               GBytes     *bytes,
+                               gpointer    user_data)
+{
+  GstElement *element = user_data;
+  MksSpeakerGstSource *source;
+  g_autoptr(GstBuffer) buffer = NULL;
+
+  g_assert (GST_IS_APP_SRC (element));
+  g_assert (bytes != NULL);
+  g_assert (MKS_IS_SPEAKER (speaker));
+
+  source = g_object_get_data (G_OBJECT (element), "MksSpeakerGstSource");
+
+  if (source == NULL || source->stream_id != stream_id)
+    return;
+
+  buffer = gst_buffer_new_wrapped_bytes (g_bytes_ref (bytes));
+  gst_app_src_push_buffer (GST_APP_SRC (element), g_steal_pointer (&buffer));
+}
+
+/**
+ * mks_speaker_create_gst_source:
+ * @self: a `MksSpeaker`
+ * @stream_id: a QEMU audio stream id
+ *
+ * Creates a GStreamer `appsrc` for PCM frames from @stream_id.
+ *
+ * Returns: (transfer floating): a new `GstAppSrc`
+ */
+GstElement *
+mks_speaker_create_gst_source (MksSpeaker *self,
+                               guint64     stream_id)
+{
+  g_autoptr(MksAudioFormat) format = NULL;
+  MksSpeakerGstSource *source;
+  GstElement *element;
+
+  g_return_val_if_fail (MKS_IS_SPEAKER (self), NULL);
+
+  element = gst_element_factory_make ("appsrc", NULL);
+  g_return_val_if_fail (element != NULL, NULL);
+
+  g_object_set (element,
+                "format", GST_FORMAT_TIME,
+                "is-live", TRUE,
+                "do-timestamp", TRUE,
+                NULL);
+
+  if ((format = mks_speaker_dup_format (self, stream_id)))
+    mks_speaker_gst_source_update_caps (element, format);
+
+  source = g_new0 (MksSpeakerGstSource, 1);
+  source->speaker = g_object_ref (self);
+  source->stream_id = stream_id;
+  source->stream_added_handler =
+    g_signal_connect_object (self,
+                             "stream-added",
+                             G_CALLBACK (mks_speaker_gst_source_stream_added_cb),
+                             element,
+                             G_CONNECT_SWAPPED);
+  source->stream_removed_handler =
+    g_signal_connect_object (self,
+                             "stream-removed",
+                             G_CALLBACK (mks_speaker_gst_source_stream_removed_cb),
+                             element,
+                             G_CONNECT_SWAPPED);
+  source->stream_enabled_handler =
+    g_signal_connect_object (self,
+                             "stream-enabled",
+                             G_CALLBACK (mks_speaker_gst_source_stream_enabled_cb),
+                             element,
+                             G_CONNECT_SWAPPED);
+  source->pcm_observer_id =
+    mks_speaker_add_pcm_observer (self,
+                                  mks_speaker_gst_source_pcm_cb,
+                                  element,
+                                  NULL);
+
+  g_object_set_data_full (G_OBJECT (element),
+                          "MksSpeakerGstSource",
+                          source,
+                          mks_speaker_gst_source_free);
+
+  return element;
 }
