@@ -26,15 +26,27 @@
 
 G_BEGIN_DECLS
 
+#define MKS_DMABUF_MAX_PLANES 4
+
 typedef struct _MksDmabufScanoutData
 {
+  guint   x;
+  guint   y;
   guint   width;
   guint   height;
-  guint   stride;
+  guint   backing_width;
+  guint   backing_height;
+  guint   n_planes;
   guint   fourcc;
+  guint   offset[MKS_DMABUF_MAX_PLANES];
+  guint   stride[MKS_DMABUF_MAX_PLANES];
   guint64 modifier;
-  int     dmabuf_fd;
+  int     dmabuf_fd[MKS_DMABUF_MAX_PLANES];
 } MksDmabufScanoutData;
+
+void                mks_dmabuf_scanout_data_free (MksDmabufScanoutData *data);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksDmabufScanoutData, mks_dmabuf_scanout_data_free)
 
 #define MKS_TYPE_DMABUF_PAINTABLE (mks_dmabuf_paintable_get_type())
 

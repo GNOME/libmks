@@ -22,6 +22,10 @@
 
 #include "config.h"
 
+#include <errno.h>
+#include <fcntl.h>
+
+#include <glib-unix.h>
 #include <gtk/gtk.h>
 
 #include "mks-dmabuf-paintable-private.h"
@@ -40,8 +44,13 @@ struct _MksDmabufPaintable
   GObject parent_instance;
   GdkTexture *texture;
   GdkDmabufTextureBuilder *builder;
+  MksDmabufScanoutData *builder_data;
+  guint x;
+  guint y;
   guint width;
   guint height;
+  guint backing_width;
+  guint backing_height;
   guint dmabuf_updated : 1;
 };
 
@@ -78,6 +87,9 @@ mks_dmabuf_paintable_snapshot (GdkPaintable *paintable,
   g_autoptr(GdkTexture) texture = NULL;
   g_autoptr(GError) error = NULL;
   graphene_rect_t area;
+  graphene_rect_t clip;
+  double scale_x;
+  double scale_y;
 
   g_assert (MKS_IS_DMABUF_PAINTABLE (self));
   g_assert (GDK_IS_SNAPSHOT (snapshot));
@@ -96,21 +108,35 @@ mks_dmabuf_paintable_snapshot (GdkPaintable *paintable,
 
       gdk_dmabuf_texture_builder_set_update_texture (self->builder, self->texture);
       texture = gdk_dmabuf_texture_builder_build (self->builder,
-                                                  NULL, NULL, &error);
+                                                  (GDestroyNotify)mks_dmabuf_scanout_data_free,
+                                                  self->builder_data,
+                                                  &error);
       if (error != NULL)
         {
           g_warning ("Failed to build texture: %s", error->message);
           return;
         }
       g_assert (texture != NULL);
-      // Clear up the update region to not union it with the next UpdateDMABuf call
+      self->builder_data = NULL;
+      /* Clear the update region to avoid unioning it with the next UpdateDMABUF call. */
       gdk_dmabuf_texture_builder_set_update_region (self->builder, NULL);
       g_set_object (&self->texture, texture);
       self->dmabuf_updated = FALSE;
     }
 
-  area = GRAPHENE_RECT_INIT (0, 0, width, height);
+  if (self->width == 0 || self->height == 0 || self->texture == NULL)
+    return;
+
+  scale_x = width / self->width;
+  scale_y = height / self->height;
+  area = GRAPHENE_RECT_INIT (-(double)self->x * scale_x,
+                             -(double)self->y * scale_y,
+                             self->backing_width * scale_x,
+                             self->backing_height * scale_y);
+  clip = GRAPHENE_RECT_INIT (0, 0, width, height);
+  gtk_snapshot_push_clip (snapshot, &clip);
   gtk_snapshot_append_texture (snapshot, self->texture, &area);
+  gtk_snapshot_pop (snapshot);
 }
 
 static void
@@ -132,6 +158,7 @@ mks_dmabuf_paintable_dispose (GObject *object)
 
   g_clear_object (&self->texture);
   g_clear_object (&self->builder);
+  g_clear_pointer (&self->builder_data, mks_dmabuf_scanout_data_free);
 
   G_OBJECT_CLASS (mks_dmabuf_paintable_parent_class)->dispose (object);
 }
@@ -149,47 +176,117 @@ mks_dmabuf_paintable_init (MksDmabufPaintable *self)
 {
 }
 
-gboolean
-mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
-                             GdkDisplay           *display,
-                             MksDmabufScanoutData *data,
-                             cairo_region_t       *region,
-                             GError              **error)
+void
+mks_dmabuf_scanout_data_free (MksDmabufScanoutData *data)
 {
+  guint i;
+
+  g_return_if_fail (data != NULL);
+
+  for (i = 0; i < data->n_planes; i++)
+    g_clear_fd (&data->dmabuf_fd[i], NULL);
+
+  g_free (data);
+}
+
+static MksDmabufScanoutData *
+mks_dmabuf_scanout_data_copy_fds (MksDmabufScanoutData  *data,
+                                  GError               **error)
+{
+  MksDmabufScanoutData *copy;
+  guint i;
+
+  g_assert (data != NULL);
+
+  copy = g_new0 (MksDmabufScanoutData, 1);
+  *copy = *data;
+
+  for (i = 0; i < MKS_DMABUF_MAX_PLANES; i++)
+    copy->dmabuf_fd[i] = -1;
+
+  for (i = 0; i < data->n_planes; i++)
+    {
+      copy->dmabuf_fd[i] = fcntl (data->dmabuf_fd[i], F_DUPFD_CLOEXEC, 3);
+
+      if (copy->dmabuf_fd[i] == -1)
+        {
+          g_set_error (error,
+                       G_IO_ERROR,
+                       g_io_error_from_errno (errno),
+                       "Failed to duplicate DMA-BUF fd: %s",
+                       g_strerror (errno));
+          mks_dmabuf_scanout_data_free (copy);
+          return NULL;
+        }
+    }
+
+  return copy;
+}
+
+gboolean
+mks_dmabuf_paintable_import (MksDmabufPaintable    *self,
+                             GdkDisplay            *display,
+                             MksDmabufScanoutData  *data,
+                             cairo_region_t        *region,
+                             GError               **error)
+{
+  g_autoptr(MksDmabufScanoutData) builder_data = NULL;
   cairo_region_t *accumulated_damages;
   cairo_region_t *previous_region;
   g_autoptr(MksTraceScope) trace_scope = NULL;
-  guint plane = 0;
+  guint i;
 
   g_return_val_if_fail (MKS_IS_DMABUF_PAINTABLE (self), FALSE);
+  g_return_val_if_fail (GDK_IS_DISPLAY (display), FALSE);
+  g_return_val_if_fail (data != NULL, FALSE);
 
-  if (data->dmabuf_fd < 0)
+  if (data->n_planes == 0 || data->n_planes > MKS_DMABUF_MAX_PLANES)
     {
       g_set_error  (error,
                     G_IO_ERROR,
                     G_IO_ERROR_INVALID_ARGUMENT,
-                    "invalid dmabuf_fd (%d)",
-                    data->dmabuf_fd);
+                    "invalid number of DMA-BUF planes (%u)",
+                    data->n_planes);
       return FALSE;
     }
 
-  if (data->width == 0 || data->height == 0 || data->stride == 0)
+  if (data->width == 0 || data->height == 0 ||
+      data->backing_width == 0 || data->backing_height == 0)
     {
       g_set_error  (error,
                     G_IO_ERROR,
                     G_IO_ERROR_INVALID_ARGUMENT,
-                    "invalid width/height/stride (%u/%u/%u)",
-                    data->width, data->height, data->stride);
+                    "invalid width/height/backing-width/backing-height (%u/%u/%u/%u)",
+                    data->width, data->height, data->backing_width, data->backing_height);
       return FALSE;
     }
 
-  trace_scope = mks_trace_scope_new ("dmabuf.import",
-                                     "width=%u height=%u stride=%u fourcc=0x%x modifier=%" G_GUINT64_FORMAT,
-                                     data->width,
-                                     data->height,
-                                     data->stride,
-                                     data->fourcc,
-                                     data->modifier);
+  for (i = 0; i < data->n_planes; i++)
+    {
+      if (data->dmabuf_fd[i] < 0 || data->stride[i] == 0)
+        {
+          g_set_error  (error,
+                        G_IO_ERROR,
+                        G_IO_ERROR_INVALID_ARGUMENT,
+                        "invalid DMA-BUF plane %u fd/stride (%d/%u)",
+                        i, data->dmabuf_fd[i], data->stride[i]);
+          return FALSE;
+        }
+    }
+
+  if (!(builder_data = mks_dmabuf_scanout_data_copy_fds (data, error)))
+    return FALSE;
+
+  trace_scope =
+    mks_trace_scope_new ("dmabuf.import",
+                         "width=%u height=%u backing_width=%u backing_height=%u "
+                         "fourcc=0x%x modifier=%" G_GUINT64_FORMAT,
+                         data->width,
+                         data->height,
+                         data->backing_width,
+                         data->backing_height,
+                         data->fourcc,
+                         data->modifier);
 
   if (self->width != data->width || self->height != data->height)
     {
@@ -197,6 +294,11 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
       self->height = data->height;
       gdk_paintable_invalidate_size (GDK_PAINTABLE (self));
     }
+
+  self->x = data->x;
+  self->y = data->y;
+  self->backing_width = data->backing_width;
+  self->backing_height = data->backing_height;
 
   accumulated_damages = cairo_region_create ();
 
@@ -211,17 +313,25 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
     }
 
   g_clear_object (&self->builder);
+  g_clear_pointer (&self->builder_data, mks_dmabuf_scanout_data_free);
+  self->builder_data = g_steal_pointer (&builder_data);
 
   self->builder = gdk_dmabuf_texture_builder_new ();
   gdk_dmabuf_texture_builder_set_modifier (self->builder, data->modifier);
-  gdk_dmabuf_texture_builder_set_stride (self->builder, plane, data->stride);
   gdk_dmabuf_texture_builder_set_fourcc (self->builder, data->fourcc);
-  gdk_dmabuf_texture_builder_set_width (self->builder, data->width);
-  gdk_dmabuf_texture_builder_set_height (self->builder, data->height);
-  gdk_dmabuf_texture_builder_set_fd (self->builder, plane, data->dmabuf_fd);
-  gdk_dmabuf_texture_builder_set_offset (self->builder, plane, 0);
+  gdk_dmabuf_texture_builder_set_width (self->builder, data->backing_width);
+  gdk_dmabuf_texture_builder_set_height (self->builder, data->backing_height);
   gdk_dmabuf_texture_builder_set_display (self->builder, display);
-  gdk_dmabuf_texture_builder_set_n_planes (self->builder, 1);
+  gdk_dmabuf_texture_builder_set_n_planes (self->builder, data->n_planes);
+
+  for (i = 0; i < data->n_planes; i++)
+    {
+      gdk_dmabuf_texture_builder_set_fd (self->builder,
+                                         i,
+                                         self->builder_data->dmabuf_fd[i]);
+      gdk_dmabuf_texture_builder_set_offset (self->builder, i, data->offset[i]);
+      gdk_dmabuf_texture_builder_set_stride (self->builder, i, data->stride[i]);
+    }
 
   if (cairo_region_num_rectangles (accumulated_damages) > 0)
     gdk_dmabuf_texture_builder_set_update_region (self->builder,
@@ -241,7 +351,12 @@ mks_dmabuf_paintable_new (void)
 
   self = g_object_new (MKS_TYPE_DMABUF_PAINTABLE, NULL);
   self->dmabuf_updated = FALSE;
+  self->x = 0;
+  self->y = 0;
   self->width = 0;
   self->height = 0;
+  self->backing_width = 0;
+  self->backing_height = 0;
+
   return g_steal_pointer (&self);
 }
