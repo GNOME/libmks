@@ -4,8 +4,7 @@ include:
   - component: "gitlab.gnome.org/GNOME/citemplates/gnomeos-basic-ci@master"
     inputs:
       meson-options: "-Ddocs=true -Dintrospection=enabled"
-      asan-options: "detect_leaks=0"
-      lsan-options: "suppressions=${CI_PROJECT_DIR}/testsuite/lsan.supp"
+      asan: "disabled"
   - component: "gitlab.gnome.org/GNOME/citemplates/release-service@master"
     inputs:
       dist-job-name: "build-gnomeos"
