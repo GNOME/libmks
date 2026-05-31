@@ -56,7 +56,6 @@ MksDmabufPaintable *mks_dmabuf_paintable_new    (void);
 gboolean            mks_dmabuf_paintable_import (MksDmabufPaintable    *self,
                                                  GdkDisplay            *display,
                                                  MksDmabufScanoutData  *data,
-                                                 cairo_region_t        *region,
                                                  GError               **error);
 
 G_END_DECLS

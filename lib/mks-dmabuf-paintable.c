@@ -36,7 +36,7 @@
  * `ScanoutDMABUF` is called.
  *
  * The scanout data is then stored until we receive a `UpdateDMABUF` call
- * so we can pass the damage region to `GdkDmabufTextureBuilder`.
+ * so we can build the next texture from the full backing buffer.
  */
 
 struct _MksDmabufPaintable
@@ -227,12 +227,10 @@ gboolean
 mks_dmabuf_paintable_import (MksDmabufPaintable    *self,
                              GdkDisplay            *display,
                              MksDmabufScanoutData  *data,
-                             cairo_region_t        *region,
                              GError               **error)
 {
   g_autoptr(MksDmabufScanoutData) builder_data = NULL;
-  cairo_region_t *accumulated_damages;
-  cairo_region_t *previous_region;
+  cairo_region_t *update_region;
   g_autoptr(MksTraceScope) trace_scope = NULL;
   guint i;
 
@@ -300,17 +298,12 @@ mks_dmabuf_paintable_import (MksDmabufPaintable    *self,
   self->backing_width = data->backing_width;
   self->backing_height = data->backing_height;
 
-  accumulated_damages = cairo_region_create ();
-
-  if (region != NULL)
-    cairo_region_union (accumulated_damages, region);
-
-  if (self->builder != NULL)
-    {
-      previous_region = gdk_dmabuf_texture_builder_get_update_region (self->builder);
-      if (previous_region != NULL)
-        cairo_region_union (accumulated_damages, previous_region);
-    }
+  update_region = cairo_region_create_rectangle (&(cairo_rectangle_int_t) {
+    0,
+    0,
+    data->backing_width,
+    data->backing_height
+  });
 
   g_clear_object (&self->builder);
   g_clear_pointer (&self->builder_data, mks_dmabuf_scanout_data_free);
@@ -333,11 +326,9 @@ mks_dmabuf_paintable_import (MksDmabufPaintable    *self,
       gdk_dmabuf_texture_builder_set_stride (self->builder, i, data->stride[i]);
     }
 
-  if (cairo_region_num_rectangles (accumulated_damages) > 0)
-    gdk_dmabuf_texture_builder_set_update_region (self->builder,
-                                                  accumulated_damages);
+  gdk_dmabuf_texture_builder_set_update_region (self->builder, update_region);
 
-  g_clear_pointer (&accumulated_damages, cairo_region_destroy);
+  g_clear_pointer (&update_region, cairo_region_destroy);
   self->dmabuf_updated = TRUE;
   gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
   return TRUE;
