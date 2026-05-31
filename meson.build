@@ -117,7 +117,6 @@ foreach arg: test_c_args
     project_c_args += arg
   endif
 endforeach
-hidden_visibility_args = []
 if get_option('default_library') != 'static'
   if host_machine.system() == 'windows'
     config_h.set('DLL_EXPORT', true)
@@ -125,14 +124,11 @@ if get_option('default_library') != 'static'
       config_h.set('_MKS_EXTERN', '__declspec(dllexport) extern')
     elif cc.has_argument('-fvisibility=hidden')
       config_h.set('_MKS_EXTERN', '__attribute__((visibility("default"))) __declspec(dllexport) extern')
-      hidden_visibility_args = ['-fvisibility=hidden']
     endif
   elif cc.has_argument('-fvisibility=hidden')
     config_h.set('_MKS_EXTERN', '__attribute__((visibility("default"))) extern')
-    hidden_visibility_args = ['-fvisibility=hidden']
   endif
 endif
-project_c_args += hidden_visibility_args
 add_project_arguments(project_c_args, language: 'c')
 
 release_args = []

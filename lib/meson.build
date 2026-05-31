@@ -155,11 +155,12 @@ libmks = shared_library('mks-' + api_version,
     libmks_private_generated_sources +
     libmks_private_generated_headers +
     libmks_sources,
-  include_directories: libmks_include_directories,
-         dependencies: libmks_deps,
-              install: true,
-              version: '@0@.0.0'.format(api_version),
-      darwin_versions: '@0@.0'.format(api_version),
+    include_directories: libmks_include_directories,
+           dependencies: libmks_deps,
+                install: true,
+                version: '@0@.0.0'.format(api_version),
+        darwin_versions: '@0@.0'.format(api_version),
+  gnu_symbol_visibility: 'hidden',
 )
 
 libmks_dep = declare_dependency(
