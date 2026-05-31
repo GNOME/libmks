@@ -14,11 +14,9 @@ project_c_args = ['-DMKS_COMPILATION']
 
 # Setup config.h and ensure -I includes path to it
 config_h = configuration_data()
+config_h.set('_GNU_SOURCE', true)
 config_h.set_quoted('GETTEXT_PACKAGE', 'libmks-@0@'.format(api_version))
 config_h.set_quoted('PACKAGE_VERSION', meson.project_version())
-if get_option('tracing')
-  config_h.set10('MKS_DEBUG', true)
-endif
 add_project_arguments(['-I' + meson.project_build_root()], language: 'c')
 
 # Check dependencies
@@ -43,7 +41,10 @@ endif
 libgio_dep = dependency('gio-2.0', version: glib_req)
 libgiounix_dep = dependency('gio-unix-2.0', version: glib_req)
 libgtk_dep = dependency('gtk4', version: gtk_req, fallback: ['gtk'])
+libvte_dep = dependency('vte-2.91-gtk4')
 libdex_dep = dependency('libdex-1')
+sysprof_dep = dependency('sysprof-capture-4', required: get_option('sysprof'))
+config_h.set10('HAVE_SYSPROF', sysprof_dep.found())
 
 # Ensure we restrict ABI usage to what we claim
 project_c_args += [

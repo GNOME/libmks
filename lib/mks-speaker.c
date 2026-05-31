@@ -71,12 +71,10 @@ mks_speaker_handle_init (MksSpeaker            *self,
                          guint                  bytes_per_second,
                          gboolean               be)
 {
-  MKS_ENTRY;
-
   g_assert (MKS_IS_SPEAKER (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
 
-  MKS_RETURN (FALSE);
+  return FALSE;
 }
 
 static gboolean
@@ -84,12 +82,10 @@ mks_speaker_handle_fini (MksSpeaker            *self,
                          GDBusMethodInvocation *invocation,
                          guint64                id)
 {
-  MKS_ENTRY;
-
   g_assert (MKS_IS_SPEAKER (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
 
-  MKS_RETURN (FALSE);
+  return FALSE;
 }
 
 static gboolean
@@ -98,12 +94,10 @@ mks_speaker_handle_set_enabled (MksSpeaker            *self,
                                 guint64                id,
                                 gboolean               enbled)
 {
-  MKS_ENTRY;
-
   g_assert (MKS_IS_SPEAKER (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
 
-  MKS_RETURN (FALSE);
+  return FALSE;
 }
 
 static gboolean
@@ -113,12 +107,10 @@ mks_speaker_handle_set_volume (MksSpeaker            *self,
                                gboolean               mute,
                                GVariant              *volume)
 {
-  MKS_ENTRY;
-
   g_assert (MKS_IS_SPEAKER (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
 
-  MKS_RETURN (FALSE);
+  return FALSE;
 }
 
 static gboolean
@@ -127,52 +119,52 @@ mks_speaker_handle_write (MksSpeaker            *self,
                           guint64                id,
                           GVariant              *data)
 {
-  MKS_ENTRY;
-
   g_assert (MKS_IS_SPEAKER (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
 
-  MKS_RETURN (FALSE);
+  return FALSE;
 }
 
-static void
-mks_speaker_register_cb (GObject      *object,
-                         GAsyncResult *result,
-                         gpointer      user_data)
+static DexFuture *
+mks_speaker_register_cb (DexFuture *future,
+                         gpointer   user_data)
 {
-  MksQemuAudio *audio = (MksQemuAudio *)object;
-  g_autoptr(MksSpeaker) self = user_data;
+  MksSpeaker *self = user_data;
   g_autoptr(GError) error = NULL;
 
-  g_assert (MKS_QEMU_IS_AUDIO (audio));
-  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (DEX_IS_FUTURE (future));
   g_assert (MKS_IS_SPEAKER (self));
 
-  if (!mks_qemu_audio_call_register_out_listener_finish (audio, NULL, result, &error))
+  if (!dex_future_get_value (future, &error))
     g_warning ("Failed to register audio out listener: %s", error->message);
+
+  return dex_future_new_true ();
 }
 
-static void
-mks_speaker_connection_cb (GObject      *object,
-                           GAsyncResult *result,
-                           gpointer      user_data)
+static DexFuture *
+mks_speaker_connection_cb (DexFuture *future,
+                           gpointer   user_data)
 {
-  g_autoptr(GDBusConnection) connection = NULL;
-  g_autoptr(MksSpeaker) self = user_data;
+  MksSpeaker *self = user_data;
   g_autoptr(GUnixFDList) fd_list = NULL;
   g_autoptr(GError) error = NULL;
+  const GValue *value;
+  MksSocketpairConnection *socketpair;
   g_autofd int peer_fd = -1;
+  gint64 begin_time;
 
-  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (DEX_IS_FUTURE (future));
   g_assert (MKS_IS_SPEAKER (self));
 
-  if (!(connection = mks_socketpair_connection_new_finish (result, &peer_fd, &error)))
+  if (!(value = dex_future_get_value (future, &error)))
     {
       g_warning ("Failed to create socketpair D-Bus connection: %s", error->message);
-      return;
+      return dex_future_new_true ();
     }
 
-  g_set_object (&self->connection, connection);
+  socketpair = g_value_get_boxed (value);
+  peer_fd = mks_socketpair_connection_steal_fd (socketpair);
+  g_set_object (&self->connection, socketpair->connection);
 
   self->listener = mks_qemu_audio_out_listener_skeleton_new ();
 
@@ -203,32 +195,43 @@ mks_speaker_connection_cb (GObject      *object,
                            G_CONNECT_SWAPPED);
 
   if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self->listener),
-                                         connection,
+                                         self->connection,
                                          "/org/qemu/Display1/AudioOutListener",
                                          &error))
 
     {
       g_warning ("Failed to export AudioOutListener on D-Bus connection: %s",
                  error->message);
-      return;
+      return dex_future_new_true ();
     }
 
   fd_list = g_unix_fd_list_new_from_array (&peer_fd, 1);
   peer_fd = -1;
+  begin_time = MKS_TRACE_BEGIN_MARK ();
 
-  mks_qemu_audio_call_register_out_listener (self->audio,
-                                             g_variant_new_handle (0),
-                                             fd_list,
-                                             NULL,
-                                             mks_speaker_register_cb,
-                                             g_object_ref (self));
+  return dex_future_finally (mks_marked_future (dex_dbus_connection_call_with_unix_fd_list (g_dbus_proxy_get_connection (G_DBUS_PROXY (self->audio)),
+                                                                                            g_dbus_proxy_get_name (G_DBUS_PROXY (self->audio)),
+                                                                                            g_dbus_proxy_get_object_path (G_DBUS_PROXY (self->audio)),
+                                                                                            "org.qemu.Display1.Audio",
+                                                                                            "RegisterOutListener",
+                                                                                            g_variant_new ("(h)", 0),
+                                                                                            G_VARIANT_TYPE ("()"),
+                                                                                            G_DBUS_CALL_FLAGS_NONE,
+                                                                                            -1,
+                                                                                            fd_list),
+                                                begin_time,
+                                                "speaker.register-out-listener"),
+                             mks_speaker_register_cb,
+                             g_object_ref (self),
+                             g_object_unref);
 }
 
 static gboolean
 mks_speaker_setup (MksDevice     *device,
                    MksQemuObject *object)
 {
-  MksSpeaker *self = (MksSpeaker *)object;
+  MksSpeaker *self = (MksSpeaker *)device;
+  gint64 begin_time;
 
   g_assert (MKS_IS_SPEAKER (self));
   g_assert (MKS_QEMU_IS_OBJECT (object));
@@ -236,10 +239,13 @@ mks_speaker_setup (MksDevice     *device,
   if (MKS_QEMU_IS_AUDIO (object))
     {
       g_set_object (&self->audio, MKS_QEMU_AUDIO (object));
-      mks_socketpair_connection_new (G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT,
-                                     NULL,
-                                     mks_speaker_connection_cb,
-                                     g_object_ref (self));
+      begin_time = MKS_TRACE_BEGIN_MARK ();
+      dex_future_disown (dex_future_finally (mks_marked_future (mks_socketpair_connection_new (G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT),
+                                                                 begin_time,
+                                                                 "speaker.socketpair-connection"),
+                                             mks_speaker_connection_cb,
+                                             g_object_ref (self),
+                                             g_object_unref));
       return TRUE;
     }
 

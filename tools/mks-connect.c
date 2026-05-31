@@ -71,31 +71,39 @@ print_device_info (MksDevice *device,
     }
 }
 
-int
-main (int argc,
-      char *argv[])
+typedef struct
 {
+  int    argc;
+  char **argv;
+} Main;
+
+static DexFuture *
+main_fiber (gpointer user_data)
+{
+  Main *state = user_data;
   g_autoptr(GOptionContext) context = g_option_context_new ("DBUS_ADDRESS - Connect to QEMU at DBUS_ADDRESS");
   g_autoptr(GDBusConnection) connection = NULL;
   g_autoptr(MksSession) session = NULL;
   g_autoptr(GError) error = NULL;
   g_autoptr(GVariant) variant = NULL;
+  g_autoptr(GVariant) owners_variant = NULL;
   g_autoptr(GDBusProxy) proxy = NULL;
   g_autofree const char **queued_owners = NULL;
   gsize n_queued_owners;
   GListModel *devices = NULL;
   guint n_items;
+  int argc;
+  char **argv;
 
-  setlocale (LC_ALL, "");
-  bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
+  g_assert (state != NULL);
 
-  gtk_init ();
-  mks_init ();
+  argc = state->argc;
+  argv = state->argv;
 
   if (!g_option_context_parse (context, &argc, &argv, &error))
     {
       g_printerr ("%s\n", error->message);
-      return EXIT_FAILURE;
+      return dex_future_new_for_int (EXIT_FAILURE);
     }
 
   if (argc < 2)
@@ -107,7 +115,7 @@ main (int argc,
     {
       g_printerr ("Failed to connect to D-Bus: %s\n",
                   error->message);
-      return EXIT_FAILURE;
+      return dex_future_new_for_int (EXIT_FAILURE);
     }
 
   proxy = g_dbus_proxy_new_sync (connection,
@@ -123,7 +131,7 @@ main (int argc,
     {
       g_printerr ("Failed to connect to `org.freedesktop.DBus`: %s\n",
                   error->message);
-      return EXIT_FAILURE;
+      return dex_future_new_for_int (EXIT_FAILURE);
     }
   variant = g_dbus_proxy_call_sync (proxy, "ListQueuedOwners",
                                     g_variant_new ("(s)", "org.qemu"), G_DBUS_CALL_FLAGS_NONE,
@@ -132,19 +140,24 @@ main (int argc,
     {
       g_printerr ("Failed to ListQueuedOwners: %s\n",
                   error->message);
-      return EXIT_FAILURE;
+      return dex_future_new_for_int (EXIT_FAILURE);
     }
 
-  queued_owners  = g_variant_get_strv (g_variant_get_child_value (variant, 0),
-                                       &n_queued_owners);
+  owners_variant = g_variant_get_child_value (variant, 0);
+  queued_owners = g_variant_get_strv (owners_variant, &n_queued_owners);
 
   for (guint i = 0; i < n_queued_owners; i++)
     {
-      if (!(session = mks_session_new_for_connection_with_name_sync (connection, queued_owners[i], NULL, &error)))
+      g_clear_object (&session);
+
+      session = dex_await_object (mks_session_new_for_connection_with_name (connection,
+                                                                            queued_owners[i]),
+                                  &error);
+      if (session == NULL)
         {
           g_printerr ("Failed to create MksSession: %s\n",
                       error->message);
-          return EXIT_FAILURE;
+          return dex_future_new_for_int (EXIT_FAILURE);
         }
 
       g_print ("Session(uuid=\"%s\", name=\"%s\", bus-name=%s)\n",
@@ -161,5 +174,56 @@ main (int argc,
           print_device_info (device, 1);
         }
     }
-  return EXIT_SUCCESS;
+
+  return dex_future_new_for_int (EXIT_SUCCESS);
+}
+
+static DexFuture *
+main_loop_quit_cb (DexFuture *future,
+                   gpointer   user_data)
+{
+  g_main_loop_quit (user_data);
+
+  return dex_ref (future);
+}
+
+int
+main (int argc,
+      char *argv[])
+{
+  g_autoptr(GMainLoop) main_loop = NULL;
+  g_autoptr(DexFuture) future = NULL;
+  g_autoptr(GError) error = NULL;
+  const GValue *value;
+  Main state;
+
+  setlocale (LC_ALL, "");
+  bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
+
+  dex_init ();
+  gtk_init ();
+  mks_init ();
+
+  main_loop = g_main_loop_new (NULL, FALSE);
+  state = (Main) { argc, argv };
+
+  future = dex_future_finally (dex_scheduler_spawn (NULL,
+                                                    8 * 1024 * 1024,
+                                                    main_fiber,
+                                                    &state,
+                                                    NULL),
+                               main_loop_quit_cb,
+                               g_main_loop_ref (main_loop),
+                               (GDestroyNotify) g_main_loop_unref);
+
+  if (dex_future_is_pending (future))
+    g_main_loop_run (main_loop);
+
+  if (!(value = dex_future_get_value (future, &error)))
+    {
+      g_printerr ("%s\n", error->message);
+      return EXIT_FAILURE;
+    }
+
+  return g_value_get_int (value);
 }

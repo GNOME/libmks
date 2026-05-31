@@ -26,7 +26,7 @@
 #endif
 
 #include <gdk/gdk.h>
-#include <gio/gio.h>
+#include <libdex.h>
 
 #include "mks-types.h"
 #include "mks-version-macros.h"
@@ -75,7 +75,10 @@ guint          mks_screen_get_number         (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
 const char    *mks_screen_get_device_address (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-void           mks_screen_configure          (MksScreen            *self,
+DexFuture     *mks_screen_configure          (MksScreen            *self,
+                                              MksScreenAttributes  *attributes);
+MKS_AVAILABLE_IN_ALL
+void           mks_screen_configure_async    (MksScreen            *self,
                                               MksScreenAttributes  *attributes,
                                               GCancellable         *cancellable,
                                               GAsyncReadyCallback   callback,
@@ -85,12 +88,10 @@ gboolean       mks_screen_configure_finish   (MksScreen            *self,
                                               GAsyncResult         *result,
                                               GError              **error);
 MKS_AVAILABLE_IN_ALL
-gboolean       mks_screen_configure_sync     (MksScreen            *self,
-                                              MksScreenAttributes  *attributes,
-                                              GCancellable         *cancellable,
-                                              GError              **error);
+DexFuture     *mks_screen_attach             (MksScreen            *self,
+                                              GdkDisplay           *display);
 MKS_AVAILABLE_IN_ALL
-void           mks_screen_attach             (MksScreen            *self,
+void           mks_screen_attach_async       (MksScreen            *self,
                                               GdkDisplay           *display,
                                               GCancellable         *cancellable,
                                               GAsyncReadyCallback   callback,
@@ -98,11 +99,6 @@ void           mks_screen_attach             (MksScreen            *self,
 MKS_AVAILABLE_IN_ALL
 GdkPaintable  *mks_screen_attach_finish      (MksScreen            *self,
                                               GAsyncResult         *result,
-                                              GError              **error);
-MKS_AVAILABLE_IN_ALL
-GdkPaintable  *mks_screen_attach_sync        (MksScreen            *self,
-                                              GdkDisplay           *display,
-                                              GCancellable         *cancellable,
                                               GError              **error);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksScreen, g_object_unref)

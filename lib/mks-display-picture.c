@@ -57,88 +57,16 @@ G_DEFINE_FINAL_TYPE (MksDisplayPicture, mks_display_picture, GTK_TYPE_WIDGET)
 static GParamSpec *properties [N_PROPS];
 
 static void
-mks_display_picture_keyboard_press_cb (GObject      *object,
-                                       GAsyncResult *result,
-                                       gpointer      user_data)
+mks_display_picture_disown_operation (DexFuture  *future,
+                                      const char *operation)
 {
-  MksKeyboard *keyboard = (MksKeyboard *)object;
-  g_autoptr(MksDisplayPicture) self = user_data;
-  g_autoptr(GError) error = NULL;
+  g_assert (DEX_IS_FUTURE (future));
+  g_assert (operation != NULL);
 
-  g_assert (MKS_IS_KEYBOARD (keyboard));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (MKS_IS_DISPLAY_PICTURE (self));
-
-  if (!mks_keyboard_press_finish (keyboard, result, &error))
-    g_debug ("Keyboard press failed: %s", error->message);
-}
-
-static void
-mks_display_picture_keyboard_release_cb (GObject      *object,
-                                         GAsyncResult *result,
-                                         gpointer      user_data)
-{
-  MksKeyboard *keyboard = (MksKeyboard *)object;
-  g_autoptr(MksDisplayPicture) self = user_data;
-  g_autoptr(GError) error = NULL;
-
-  g_assert (MKS_IS_KEYBOARD (keyboard));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (MKS_IS_DISPLAY_PICTURE (self));
-
-  if (!mks_keyboard_release_finish (keyboard, result, &error))
-    g_debug ("Keyboard release failed: %s", error->message);
-}
-
-static void
-mks_display_picture_mouse_move_to_cb (GObject      *object,
-                                      GAsyncResult *result,
-                                      gpointer      user_data)
-{
-  MksMouse *mouse = (MksMouse *)object;
-  g_autoptr(MksDisplayPicture) self = user_data;
-  g_autoptr(GError) error = NULL;
-
-  g_assert (MKS_IS_MOUSE (mouse));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (MKS_IS_DISPLAY_PICTURE (self));
-
-  if (!mks_mouse_move_to_finish (mouse, result, &error))
-    g_debug ("Failed move_to: %s", error->message);
-}
-
-static void
-mks_display_picture_mouse_move_by_cb (GObject      *object,
-                                      GAsyncResult *result,
-                                      gpointer      user_data)
-{
-  MksMouse *mouse = (MksMouse *)object;
-  g_autoptr(MksDisplayPicture) self = user_data;
-  g_autoptr(GError) error = NULL;
-
-  g_assert (MKS_IS_MOUSE (mouse));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (MKS_IS_DISPLAY_PICTURE (self));
-
-  if (!mks_mouse_move_by_finish (mouse, result, &error))
-    g_debug ("Failed move_by: %s", error->message);
-}
-
-static void
-mks_display_picture_touchable_send_event_cb (GObject      *object,
-                                             GAsyncResult *result,
-                                             gpointer      user_data)
-{
-  MksTouchable *touchable = (MksTouchable *)object;
-  g_autoptr(MksDisplayPicture) self = user_data;
-  g_autoptr(GError) error = NULL;
-
-  g_assert (MKS_IS_TOUCHABLE (touchable));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (MKS_IS_DISPLAY_PICTURE (self));
-
-  if (!mks_touchable_send_event_finish (touchable, result, &error))
-    g_debug ("Failed to send touch event: %s", error->message);
+  dex_future_disown (mks_logged_future (future,
+                                        G_LOG_DOMAIN,
+                                        G_LOG_LEVEL_DEBUG,
+                                        operation));
 }
 
 static void
@@ -157,40 +85,6 @@ mks_display_picture_translate_button (MksDisplayPicture *self,
     case 9: *button = MKS_MOUSE_BUTTON_EXTRA;  break;
     default: break;
     }
-}
-
-static void
-mks_display_picture_mouse_press_cb (GObject      *object,
-                                    GAsyncResult *result,
-                                    gpointer      user_data)
-{
-  MksMouse *mouse = (MksMouse *)object;
-  g_autoptr(MksDisplayPicture) self = user_data;
-  g_autoptr(GError) error = NULL;
-
-  g_assert (MKS_IS_MOUSE (mouse));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (MKS_IS_DISPLAY_PICTURE (self));
-
-  if (!mks_mouse_press_finish (mouse, result, &error))
-    g_debug ("Mouse press failed: %s", error->message);
-}
-
-static void
-mks_display_picture_mouse_release_cb (GObject      *object,
-                                      GAsyncResult *result,
-                                      gpointer      user_data)
-{
-  MksMouse *mouse = (MksMouse *)object;
-  g_autoptr(MksDisplayPicture) self = user_data;
-  g_autoptr(GError) error = NULL;
-
-  g_assert (MKS_IS_MOUSE (mouse));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (MKS_IS_DISPLAY_PICTURE (self));
-
-  if (!mks_mouse_release_finish (mouse, result, &error))
-    g_debug ("Mouse release failed: %s", error->message);
 }
 
 gboolean
@@ -290,12 +184,12 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
 
         if (mks_display_picture_event_get_guest_position (self, event, &guest_x, &guest_y))
           {
-            mks_touchable_send_event (self->touchable, kind,
-                                      num_slot,
-                                      guest_x, guest_y,
-                                      NULL,
-                                      mks_display_picture_touchable_send_event_cb,
-                                      g_object_ref (self));
+            mks_display_picture_disown_operation (mks_touchable_send_event (self->touchable,
+                                                                            kind,
+                                                                            num_slot,
+                                                                            guest_x,
+                                                                            guest_y),
+                                                  "Sending touch event");
             return GDK_EVENT_STOP;
           }
 
@@ -310,12 +204,10 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
             double guest_x, guest_y;
             if (mks_display_picture_event_get_guest_position (self, event, &guest_x, &guest_y))
               {
-                mks_mouse_move_to (self->mouse,
-                                   guest_x,
-                                   guest_y,
-                                   NULL,
-                                   mks_display_picture_mouse_move_to_cb,
-                                   g_object_ref (self));
+                mks_display_picture_disown_operation (mks_mouse_move_to (self->mouse,
+                                                                         guest_x,
+                                                                         guest_y),
+                                                      "Moving mouse");
 
                 return GDK_EVENT_STOP;
               }
@@ -332,12 +224,10 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
                 self->last_mouse_x = guest_x;
                 self->last_mouse_y = guest_y;
 
-                mks_mouse_move_by (self->mouse,
-                                   delta_x,
-                                   delta_y,
-                                   NULL,
-                                   mks_display_picture_mouse_move_by_cb,
-                                   g_object_ref (self));
+                mks_display_picture_disown_operation (mks_mouse_move_by (self->mouse,
+                                                                         delta_x,
+                                                                         delta_y),
+                                                      "Moving mouse");
 
                 return GDK_EVENT_STOP;
               }
@@ -356,17 +246,11 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
         mks_display_picture_translate_button (self, &button);
 
         if (event_type == GDK_BUTTON_PRESS)
-          mks_mouse_press (self->mouse,
-                           button,
-                           NULL,
-                           mks_display_picture_mouse_press_cb,
-                           g_object_ref (self));
+          mks_display_picture_disown_operation (mks_mouse_press (self->mouse, button),
+                                                "Pressing mouse button");
         else
-          mks_mouse_release (self->mouse,
-                             button,
-                             NULL,
-                             mks_display_picture_mouse_release_cb,
-                             g_object_ref (self));
+          mks_display_picture_disown_operation (mks_mouse_release (self->mouse, button),
+                                                "Releasing mouse button");
 
         return GDK_EVENT_STOP;
       }
@@ -383,17 +267,11 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
         mks_keyboard_translate (keyval, keycode, &qkeycode);
 
         if (event_type == GDK_KEY_PRESS)
-          mks_keyboard_press (self->keyboard,
-                              qkeycode,
-                              NULL,
-                              mks_display_picture_keyboard_press_cb,
-                              g_object_ref (self));
+          mks_display_picture_disown_operation (mks_keyboard_press (self->keyboard, qkeycode),
+                                                "Pressing key");
         else
-          mks_keyboard_release (self->keyboard,
-                                qkeycode,
-                                NULL,
-                                mks_display_picture_keyboard_release_cb,
-                                g_object_ref (self));
+          mks_display_picture_disown_operation (mks_keyboard_release (self->keyboard, qkeycode),
+                                                "Releasing key");
 
         return GDK_EVENT_STOP;
       }
@@ -457,16 +335,10 @@ mks_display_picture_legacy_event_cb (MksDisplayPicture        *self,
                   button = MKS_MOUSE_BUTTON_WHEEL_UP;
               }
 
-            mks_mouse_press (self->mouse,
-                             button,
-                             NULL,
-                             mks_display_picture_mouse_press_cb,
-                             g_object_ref (self));
-            mks_mouse_release (self->mouse,
-                               button,
-                               NULL,
-                               mks_display_picture_mouse_release_cb,
-                               g_object_ref (self));
+            mks_display_picture_disown_operation (mks_mouse_press (self->mouse, button),
+                                                  "Pressing mouse button");
+            mks_display_picture_disown_operation (mks_mouse_release (self->mouse, button),
+                                                  "Releasing mouse button");
 
             return GDK_EVENT_STOP;
           }

@@ -25,7 +25,7 @@
 # error "Only <libmks.h> can be included directly."
 #endif
 
-#include <gio/gio.h>
+#include <libdex.h>
 
 #include "mks-types.h"
 #include "mks-version-macros.h"
@@ -60,29 +60,27 @@ typedef enum _MksTouchEventKind
 } MksTouchEventKind;
 
 MKS_AVAILABLE_IN_ALL
-GType               mks_touchable_get_type          (void) G_GNUC_CONST;
+GType      mks_touchable_get_type          (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
-void                mks_touchable_send_event        (MksTouchable       *self,
-                                                     MksTouchEventKind   kind,
-                                                     guint64             num_slot,
-                                                     double              x,
-                                                     double              y,
-                                                     GCancellable       *cancellable,
-                                                     GAsyncReadyCallback callback,
-                                                     gpointer            user_data);
+DexFuture *mks_touchable_send_event        (MksTouchable         *self,
+                                            MksTouchEventKind     kind,
+                                            guint64               num_slot,
+                                            double                x,
+                                            double                y);
 MKS_AVAILABLE_IN_ALL
-gboolean            mks_touchable_send_event_finish (MksTouchable       *self,
-                                                     GAsyncResult       *result,
-                                                     GError            **error);
+void       mks_touchable_send_event_async  (MksTouchable         *self,
+                                            MksTouchEventKind     kind,
+                                            guint64               num_slot,
+                                            double                x,
+                                            double                y,
+                                            GCancellable         *cancellable,
+                                            GAsyncReadyCallback   callback,
+                                            gpointer              user_data);
 MKS_AVAILABLE_IN_ALL
-gboolean            mks_touchable_send_event_sync   (MksTouchable       *self,
-                                                     MksTouchEventKind   kind,
-                                                     guint64             num_slot,
-                                                     double              x,
-                                                     double              y,
-                                                     GCancellable       *cancellable,
-                                                     GError            **error);
+gboolean   mks_touchable_send_event_finish (MksTouchable         *self,
+                                            GAsyncResult         *result,
+                                            GError              **error);
 MKS_AVAILABLE_IN_ALL
-int                 mks_touchable_get_max_slots     (MksTouchable       *self);
+int        mks_touchable_get_max_slots     (MksTouchable         *self);
 
 G_END_DECLS

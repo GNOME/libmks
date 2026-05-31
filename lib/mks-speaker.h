@@ -33,6 +33,7 @@ G_BEGIN_DECLS
 #define MKS_IS_SPEAKER_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MKS_TYPE_SPEAKER))
 #define MKS_SPEAKER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MKS_TYPE_SPEAKER, MksSpeakerClass))
 
+typedef struct _MksSpeaker      MksSpeaker;
 typedef struct _MksSpeakerClass MksSpeakerClass;
 
 MKS_AVAILABLE_IN_ALL

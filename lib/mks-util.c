@@ -30,6 +30,32 @@ static GSettings *mouse_settings;
 static GSettings *touchpad_settings;
 static gsize initialized;
 
+typedef struct
+{
+  gint64 begin_time;
+  const char *message;
+} MksMarkedFuture;
+
+typedef struct
+{
+  const char *log_domain;
+  GLogLevelFlags level;
+  char *message_prefix;
+} MksLoggedFuture;
+
+static void
+mks_marked_future_free (MksMarkedFuture *state)
+{
+  g_free (state);
+}
+
+static void
+mks_logged_future_free (MksLoggedFuture *state)
+{
+  g_clear_pointer (&state->message_prefix, g_free);
+  g_free (state);
+}
+
 static GSettings *
 load_gsettings (const char *schema_id)
 {
@@ -117,105 +143,245 @@ mks_socketpair_create (int     *us,
   return TRUE;
 }
 
-static void
-fdptr_clear (gpointer data)
+G_DEFINE_BOXED_TYPE (MksSocketpairConnection,
+                     mks_socketpair_connection,
+                     mks_socketpair_connection_ref,
+                     mks_socketpair_connection_unref)
+
+MksSocketpairConnection *
+mks_socketpair_connection_ref (MksSocketpairConnection *self)
 {
-  int *fdptr = data;
-  if (*fdptr != -1)
-    close (*fdptr);
-  *fdptr = -1;
-  g_free (fdptr);
+  g_return_val_if_fail (self != NULL, NULL);
+  g_return_val_if_fail (self->ref_count > 0, NULL);
+
+  g_atomic_int_inc (&self->ref_count);
+
+  return self;
+}
+
+void
+mks_socketpair_connection_unref (MksSocketpairConnection *self)
+{
+  g_return_if_fail (self != NULL);
+  g_return_if_fail (self->ref_count > 0);
+
+  if (g_atomic_int_dec_and_test (&self->ref_count))
+    {
+      g_clear_object (&self->connection);
+      if (self->peer_fd != -1)
+        close (self->peer_fd);
+      g_free (self);
+    }
+}
+
+int
+mks_socketpair_connection_steal_fd (MksSocketpairConnection *self)
+{
+  g_return_val_if_fail (self != NULL, -1);
+
+  return g_steal_fd (&self->peer_fd);
+}
+
+void
+mks_future_to_async_result (gpointer             source_object,
+                            GCancellable        *cancellable,
+                            GAsyncReadyCallback  callback,
+                            gpointer             user_data,
+                            const char          *static_name,
+                            DexFuture           *future)
+{
+  g_autoptr(DexAsyncResult) result = NULL;
+
+  g_return_if_fail (!source_object || G_IS_OBJECT (source_object));
+  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
+  g_return_if_fail (DEX_IS_FUTURE (future));
+
+  result = dex_async_result_new (source_object, cancellable, callback, user_data);
+  dex_async_result_set_static_name (result, static_name);
+  dex_async_result_await (result, future);
+}
+
+static DexFuture *
+mks_marked_future_cb (DexFuture *future,
+                      gpointer   user_data)
+{
+  MksMarkedFuture *state = user_data;
+
+  g_assert (DEX_IS_FUTURE (future));
+  g_assert (state != NULL);
+  g_assert (state->message != NULL);
+
+  MKS_TRACE_END_MARK (state->begin_time, "future", "%s", state->message);
+
+  return NULL;
+}
+
+DexFuture *
+mks_marked_future (DexFuture  *future,
+                   gint64      begin_time,
+                   const char *message)
+{
+  MksMarkedFuture *state;
+
+  dex_return_error_if_fail (DEX_IS_FUTURE (future));
+  dex_return_error_if_fail (message != NULL);
+
+  state = g_new0 (MksMarkedFuture, 1);
+  state->begin_time = begin_time;
+  state->message = g_intern_string (message);
+
+  return dex_future_finally (future,
+                             mks_marked_future_cb,
+                             state,
+                             (GDestroyNotify) mks_marked_future_free);
+}
+
+static DexFuture *
+mks_logged_future_cb (DexFuture *future,
+                      gpointer   user_data)
+{
+  MksLoggedFuture *state = user_data;
+  g_autoptr(GError) error = NULL;
+
+  g_assert (DEX_IS_FUTURE (future));
+  g_assert (state != NULL);
+
+  if (!dex_future_get_value (future, &error))
+    {
+      g_log (state->log_domain,
+             state->level,
+             "%s: %s",
+             state->message_prefix,
+             error->message);
+      MKS_TRACE_LOG (state->level,
+                     state->log_domain,
+                     "%s: %s",
+                     state->message_prefix,
+                     error->message);
+    }
+
+  return NULL;
+}
+
+DexFuture *
+mks_logged_future (DexFuture      *future,
+                   const char     *log_domain,
+                   GLogLevelFlags  level,
+                   const char     *message_prefix)
+{
+  MksLoggedFuture *state;
+
+  dex_return_error_if_fail (DEX_IS_FUTURE (future));
+  dex_return_error_if_fail (message_prefix != NULL);
+
+  state = g_new0 (MksLoggedFuture, 1);
+  state->log_domain = log_domain != NULL ? g_intern_string (log_domain) : NULL;
+  state->level = level;
+  state->message_prefix = g_strdup (message_prefix);
+
+  return dex_future_catch (future,
+                           mks_logged_future_cb,
+                           state,
+                           (GDestroyNotify) mks_logged_future_free);
 }
 
 static void
-mks_socketpair_connection_cb (GObject      *object,
-                              GAsyncResult *result,
-                              gpointer      user_data)
+mks_dbus_connection_new_cb (GObject      *object,
+                            GAsyncResult *result,
+                            gpointer      user_data)
 {
-  g_autoptr(GTask) task = user_data;
+  DexPromise *promise = user_data;
   g_autoptr(GDBusConnection) ret = NULL;
   g_autoptr(GError) error = NULL;
 
   g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (G_IS_TASK (task));
+  g_assert (DEX_IS_PROMISE (promise));
 
   if (!(ret = g_dbus_connection_new_finish (result, &error)))
-    g_task_return_error (task, g_steal_pointer (&error));
+    dex_promise_reject (promise, g_steal_pointer (&error));
   else
-    g_task_return_pointer (task, g_steal_pointer (&ret), g_object_unref);
+    dex_promise_resolve_object (promise, g_steal_pointer (&ret));
+
+  dex_unref (promise);
 }
 
-void
-mks_socketpair_connection_new (GDBusConnectionFlags  flags,
-                               GCancellable         *cancellable,
-                               GAsyncReadyCallback   callback,
-                               gpointer              user_data)
+DexFuture *
+mks_dbus_connection_new (GIOStream            *stream,
+                         GDBusConnectionFlags  flags,
+                         GCancellable         *cancellable)
 {
+  DexPromise *promise;
+
+  dex_return_error_if_fail (G_IS_IO_STREAM (stream));
+  dex_return_error_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
+
+  promise = dex_promise_new_cancellable ();
+
+  g_dbus_connection_new (stream,
+                         NULL,
+                         flags,
+                         NULL,
+                         cancellable ? cancellable : dex_promise_get_cancellable (promise),
+                         mks_dbus_connection_new_cb,
+                         dex_ref (promise));
+
+  return DEX_FUTURE (promise);
+}
+
+static DexFuture *
+mks_socketpair_connection_complete (DexFuture *future,
+                                    gpointer   user_data)
+{
+  MksSocketpairConnection *state = user_data;
+  g_autoptr(GError) error = NULL;
+  const GValue *value;
+
+  g_assert (DEX_IS_FUTURE (future));
+  g_assert (state != NULL);
+
+  if (!(value = dex_future_get_value (future, &error)))
+    return dex_future_new_for_error (g_steal_pointer (&error));
+
+  state->connection = g_value_dup_object (value);
+
+  {
+    GValue boxed = G_VALUE_INIT;
+    DexFuture *ret;
+
+    g_value_init (&boxed, MKS_TYPE_SOCKETPAIR_CONNECTION);
+    g_value_set_boxed (&boxed, state);
+    ret = dex_future_new_for_value (&boxed);
+    g_value_unset (&boxed);
+
+    return ret;
+  }
+}
+
+DexFuture *
+mks_socketpair_connection_new (GDBusConnectionFlags flags)
+{
+  MksSocketpairConnection *state;
   g_autoptr(GSocketConnection) io_stream = NULL;
   g_autoptr(GSocket) socket = NULL;
   g_autoptr(GError) error = NULL;
-  g_autoptr(GTask) task = NULL;
   g_autofd int us = -1;
   g_autofd int them = -1;
-  int *fdptr;
-
-  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
-
-  task = g_task_new (NULL, cancellable, callback, user_data);
-  g_task_set_source_tag (task, mks_socketpair_connection_new);
-  g_task_set_task_data (task, GINT_TO_POINTER (-1), NULL);
 
   if (!mks_socketpair_create (&us, &them, &error) ||
       !(socket = g_socket_new_from_fd (us, &error)))
-    {
-      g_task_return_error (task, g_steal_pointer (&error));
-      return;
-    }
+    return dex_future_new_for_error (g_steal_pointer (&error));
 
   io_stream = g_socket_connection_factory_create_connection (socket);
-  fdptr = g_memdup2 (&them, sizeof them);
-  g_task_set_task_data (task, fdptr, fdptr_clear);
+  state = g_new0 (MksSocketpairConnection, 1);
+  state->ref_count = 1;
+  state->peer_fd = g_steal_fd (&them);
 
   us = -1;
-  them = -1;
 
-  g_dbus_connection_new (G_IO_STREAM (io_stream),
-                         NULL,
-                         flags | G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING,
-                         NULL,
-                         cancellable,
-                         mks_socketpair_connection_cb,
-                         g_steal_pointer (&task));
-
-}
-
-/**
- * mks_socketpair_connection_new_finish:
- * @result: a #GAsyncResult
- * @peer_fd: (out): a location for a socketpair file-descriptor
- * @error: (out): a location for a #GError, or %NULL
- *
- * Completes the asynchronous request to create a socketpair()-based
- * D-Bus connection.
- *
- * Returns: (transfer full): a #GDBusConnection and @peer_fd is set
- *   if successful; otherwise %NULL and @error is set.
- */
-GDBusConnection *
-mks_socketpair_connection_new_finish (GAsyncResult  *result,
-                                      int           *peer_fd,
-                                      GError       **error)
-{
-  GDBusConnection *ret;
-  int *fdptr;
-
-  g_return_val_if_fail (G_IS_TASK (result), NULL);
-  g_return_val_if_fail (peer_fd != NULL, NULL);
-
-  fdptr = g_task_get_task_data (G_TASK (result));
-
-  if ((ret = g_task_propagate_pointer (G_TASK (result), error)))
-    *peer_fd = g_steal_fd (fdptr);
-
-  return ret;
+  return dex_future_then (mks_dbus_connection_new (G_IO_STREAM (io_stream),
+                                                   flags | G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING,
+                                                   NULL),
+                          mks_socketpair_connection_complete,
+                          state,
+                          (GDestroyNotify) mks_socketpair_connection_unref);
 }

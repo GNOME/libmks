@@ -35,6 +35,7 @@
 #include "mks-paintable-private.h"
 #include "mks-screen-attributes-private.h"
 #include "mks-screen.h"
+#include "mks-util-private.h"
 #include "mks-touchable.h"
 
 struct _MksScreenClass
@@ -470,74 +471,62 @@ check_console (MksScreen  *self,
   return TRUE;
 }
 
-static void
-mks_screen_configure_cb (GObject      *object,
-                         GAsyncResult *result,
-                         gpointer      user_data)
-{
-  MksQemuConsole *console = (MksQemuConsole *)object;
-  g_autoptr(GError) error = NULL;
-  g_autoptr(GTask) task = user_data;
-
-  g_assert (MKS_QEMU_IS_CONSOLE (console));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (G_IS_TASK (task));
-
-  if (!mks_qemu_console_call_set_uiinfo_finish (console, result, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    g_task_return_boolean (task, TRUE);
-}
-
 /**
- * mks_screen_configure_async:
+ * mks_screen_configure:
  * @self: an #MksScreen
  * @attributes: (transfer full): a #MksScreenAttributes
- * @cancellable: (nullable): a #GCancellable
- * @callback: a #GAsyncReadyCallback to execute upon completion
- * @user_data: closure data for @callback
  *
  * Requests the QEMU instance reconfigure the screen with @attributes.
  *
  * This function takes ownership of @attributes.
  *
- * @callback is executed upon acknowledgment from the QEMU instance or
- * if the request timed out.
- *
- * Call mks_screen_configure_finish() to get the result.
+ * Returns: (transfer full): a [class@Dex.Future] that resolves to %TRUE.
  */
-void
+DexFuture *
 mks_screen_configure (MksScreen           *self,
-                      MksScreenAttributes *attributes,
-                      GCancellable        *cancellable,
-                      GAsyncReadyCallback  callback,
-                      gpointer             user_data)
+                      MksScreenAttributes *attributes)
 {
-  g_autoptr(GTask) task = NULL;
   g_autoptr(GError) error = NULL;
+  DexFuture *ret;
+  gint64 begin_time;
 
-  g_return_if_fail (MKS_IS_SCREEN (self));
-  g_return_if_fail (attributes != NULL);
-  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
-
-  task = g_task_new (self, cancellable, callback, user_data);
-  g_task_set_source_tag (task, mks_screen_configure);
+  dex_return_error_if_fail (MKS_IS_SCREEN (self));
+  dex_return_error_if_fail (attributes != NULL);
 
   if (!check_console (self, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
+    ret = dex_future_new_for_error (g_steal_pointer (&error));
   else
-    mks_qemu_console_call_set_uiinfo (self->console,
-                                      attributes->width_mm,
-                                      attributes->height_mm,
-                                      attributes->x_offset,
-                                      attributes->y_offset,
-                                      attributes->width,
-                                      attributes->height,
-                                      cancellable,
-                                      mks_screen_configure_cb,
-                                      g_steal_pointer (&task));
+    {
+      begin_time = MKS_TRACE_BEGIN_MARK ();
+      ret = mks_marked_future (mks_qemu_console_call_set_uiinfo_future (self->console,
+                                                                        attributes->width_mm,
+                                                                        attributes->height_mm,
+                                                                        attributes->x_offset,
+                                                                        attributes->y_offset,
+                                                                        attributes->width,
+                                                                        attributes->height),
+                               begin_time,
+                               "screen.configure");
+    }
 
   mks_screen_attributes_free (attributes);
+
+  return ret;
+}
+
+void
+mks_screen_configure_async (MksScreen           *self,
+                            MksScreenAttributes *attributes,
+                            GCancellable        *cancellable,
+                            GAsyncReadyCallback  callback,
+                            gpointer             user_data)
+{
+  mks_future_to_async_result (self,
+                              cancellable,
+                              callback,
+                              user_data,
+                              G_STRFUNC,
+                              mks_screen_configure (self, attributes));
 }
 
 /**
@@ -557,122 +546,107 @@ mks_screen_configure_finish (MksScreen     *self,
                              GError       **error)
 {
   g_return_val_if_fail (MKS_IS_SCREEN (self), FALSE);
-  g_return_val_if_fail (g_task_is_valid (result, self), FALSE);
+  g_return_val_if_fail (DEX_IS_ASYNC_RESULT (result), FALSE);
 
-  return g_task_propagate_boolean (G_TASK (result), error);
+  return dex_async_result_propagate_boolean (DEX_ASYNC_RESULT (result), error);
 }
 
-/**
- * mks_screen_configure_sync:
- * @self: a #MksScreen
- * @attributes: (transfer full): a #MksScreenAttributes
- * @cancellable: a #GCancellable
- * @error: a location for a #GError, or %NULL
- *
- * Requests the QEMU instance reconfigure the screen using @attributes.
- *
- * This function takes ownership of @attributes.
- *
- * Returns: %TRUE if the operation completed successfully; otherwise %FALSE
- *   and @error is set.
- */
-gboolean
-mks_screen_configure_sync (MksScreen            *self,
-                           MksScreenAttributes  *attributes,
-                           GCancellable         *cancellable,
-                           GError              **error)
+typedef struct _MksScreenAttach
 {
-  g_return_val_if_fail (MKS_IS_SCREEN (self), FALSE);
-  g_return_val_if_fail (attributes != NULL, FALSE);
-  g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
-
-  if (!check_console (self, error))
-    return FALSE;
-
-  return mks_qemu_console_call_set_uiinfo_sync (self->console,
-                                                attributes->width_mm,
-                                                attributes->height_mm,
-                                                attributes->x_offset,
-                                                attributes->y_offset,
-                                                attributes->width,
-                                                attributes->height,
-                                                cancellable,
-                                                error);
-}
+  GdkPaintable *paintable;
+} MksScreenAttach;
 
 static void
-mks_screen_attach_cb (GObject      *object,
-                      GAsyncResult *result,
-                      gpointer      user_data)
+mks_screen_attach_free (MksScreenAttach *state)
 {
-  MksQemuConsole *console = (MksQemuConsole *)object;
-  g_autoptr(GTask) task = user_data;
+  g_clear_object (&state->paintable);
+  g_free (state);
+}
+
+static DexFuture *
+mks_screen_attach_complete (DexFuture *future,
+                            gpointer   user_data)
+{
+  MksScreenAttach *state = user_data;
   g_autoptr(GError) error = NULL;
 
-  g_assert (G_IS_OBJECT (object));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (G_IS_TASK (task));
+  g_assert (DEX_IS_FUTURE (future));
+  g_assert (state != NULL);
 
-  if (!mks_qemu_console_call_register_listener_finish (console, NULL, result, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    g_task_return_pointer (task,
-                           g_object_ref (g_task_get_task_data (task)),
-                           g_object_unref);
+  if (!dex_future_get_value (future, &error))
+    return dex_future_new_for_error (g_steal_pointer (&error));
+
+  return dex_future_new_for_object (state->paintable);
 }
 
 /**
  * mks_screen_attach:
  * @self: an #MksScreen
- * @cancellable: (nullable): a #GCancellable
- * @callback: a #GAsyncReadyCallback to execute upon completion
- * @user_data: closure data for @callback
+ * @display: a #GdkDisplay
  *
- * Asynchronously creates a #GdkPaintable that is updated with the
- * contents of the screen.
+ * Creates a #GdkPaintable that is updated with the contents of the screen.
  *
  * This function registers a new `socketpair()` which is shared with
  * the QEMU instance to receive rendering updates. Those updates are
- * propagated to the resulting #GdkPainable which can be retrieved
- * using mks_screen_attach_finish() from @callback.
+ * propagated to the resulting #GdkPaintable.
+ *
+ * Returns: (transfer full): a [class@Dex.Future] that resolves to a
+ *   #GdkPaintable.
  */
-void
+DexFuture *
 mks_screen_attach (MksScreen           *self,
-                   GdkDisplay          *display,
-                   GCancellable        *cancellable,
-                   GAsyncReadyCallback  callback,
-                   gpointer             user_data)
+                   GdkDisplay          *display)
 {
+  MksScreenAttach *state;
   g_autoptr(GUnixFDList) unix_fd_list = NULL;
   g_autoptr(GdkPaintable) paintable = NULL;
-  g_autoptr(GTask) task = NULL;
   g_autoptr(GError) error = NULL;
   g_autofd int fd = -1;
+  gint64 begin_time;
 
-  g_return_if_fail (MKS_IS_SCREEN (self));
-  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
-
-  task = g_task_new (self, cancellable, callback, user_data);
-  g_task_set_source_tag (task, mks_screen_attach);
+  dex_return_error_if_fail (MKS_IS_SCREEN (self));
+  dex_return_error_if_fail (GDK_IS_DISPLAY (display));
 
   if (!check_console (self, &error) ||
-      !(paintable = _mks_paintable_new (display, cancellable, &fd, &error)))
-    goto failure;
+      !(paintable = _mks_paintable_new (display, NULL, &fd, &error)))
+    return dex_future_new_for_error (g_steal_pointer (&error));
 
-  g_task_set_task_data (task, g_steal_pointer (&paintable), g_object_unref);
+  state = g_new0 (MksScreenAttach, 1);
+  state->paintable = g_object_ref (paintable);
 
   unix_fd_list = g_unix_fd_list_new_from_array (&fd, 1), fd = -1;
-  mks_qemu_console_call_register_listener (self->console,
-                                           g_variant_new_handle (0),
-                                           unix_fd_list,
-                                           cancellable,
-                                           mks_screen_attach_cb,
-                                           g_steal_pointer (&task));
+  begin_time = MKS_TRACE_BEGIN_MARK ();
 
-  return;
+  return mks_marked_future (dex_future_then (dex_dbus_connection_call_with_unix_fd_list (g_dbus_proxy_get_connection (G_DBUS_PROXY (self->console)),
+                                                                                         g_dbus_proxy_get_name (G_DBUS_PROXY (self->console)),
+                                                                                         g_dbus_proxy_get_object_path (G_DBUS_PROXY (self->console)),
+                                                                                         "org.qemu.Display1.Console",
+                                                                                         "RegisterListener",
+                                                                                         g_variant_new ("(h)", 0),
+                                                                                         G_VARIANT_TYPE ("()"),
+                                                                                         G_DBUS_CALL_FLAGS_NONE,
+                                                                                         -1,
+                                                                                         unix_fd_list),
+                                             mks_screen_attach_complete,
+                                             state,
+                                             (GDestroyNotify) mks_screen_attach_free),
+                            begin_time,
+                            "screen.attach");
+}
 
-failure:
-  g_task_return_error (task, g_steal_pointer (&error));
+void
+mks_screen_attach_async (MksScreen           *self,
+                         GdkDisplay          *display,
+                         GCancellable        *cancellable,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
+{
+  mks_future_to_async_result (self,
+                              cancellable,
+                              callback,
+                              user_data,
+                              G_STRFUNC,
+                              mks_screen_attach (self, display));
 }
 
 /**
@@ -697,48 +671,7 @@ mks_screen_attach_finish (MksScreen     *self,
                           GError       **error)
 {
   g_return_val_if_fail (MKS_IS_SCREEN (self), FALSE);
-  g_return_val_if_fail (g_task_is_valid (result, self), FALSE);
+  g_return_val_if_fail (DEX_IS_ASYNC_RESULT (result), FALSE);
 
-  return g_task_propagate_pointer (G_TASK (result), error);
-}
-
-/**
- * mks_screen_attach_sync:
- * @self: a #MksScreen
- * @cancellable: (nullable): a #GCancellable or %NULL
- * @error: (nullable): a location for a #GError, or %NULL
- *
- * Synchronous request to attach to screen, creating a paintable that can
- * be used to update display as the QEMU instance updates.
- *
- * Returns: (transfer full): a #GdkPaintable if successful; otherwise %NULL
- *   and @error is set.
- */
-GdkPaintable *
-mks_screen_attach_sync (MksScreen     *self,
-                        GdkDisplay    *display,
-                        GCancellable  *cancellable,
-                        GError       **error)
-{
-  g_autoptr(GUnixFDList) unix_fd_list = NULL;
-  g_autoptr(GdkPaintable) paintable = NULL;
-  g_autofd int fd = -1;
-
-  g_return_val_if_fail (MKS_IS_SCREEN (self), NULL);
-  g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), NULL);
-
-  if (!check_console (self, error) ||
-      !(paintable = _mks_paintable_new (display, cancellable, &fd, error)))
-    return NULL;
-
-  unix_fd_list = g_unix_fd_list_new_from_array (&fd, 1), fd = -1;
-  if (!mks_qemu_console_call_register_listener_sync (self->console,
-                                                     g_variant_new_handle (0),
-                                                     unix_fd_list,
-                                                     NULL,
-                                                     cancellable,
-                                                     error))
-    return NULL;
-
-  return g_steal_pointer (&paintable);
+  return dex_async_result_propagate_pointer (DEX_ASYNC_RESULT (result), error);
 }

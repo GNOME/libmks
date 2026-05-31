@@ -25,7 +25,7 @@
 # error "Only <libmks.h> can be included directly."
 #endif
 
-#include <gio/gio.h>
+#include <libdex.h>
 
 #include "mks-types.h"
 #include "mks-version-macros.h"
@@ -66,72 +66,63 @@ typedef enum _MksMouseButton
 } MksMouseButton;
 
 MKS_AVAILABLE_IN_ALL
-GType    mks_mouse_get_type        (void) G_GNUC_CONST;
+GType      mks_mouse_get_type        (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
-gboolean mks_mouse_get_is_absolute (MksMouse             *self);
+gboolean   mks_mouse_get_is_absolute (MksMouse             *self);
 MKS_AVAILABLE_IN_ALL
-void     mks_mouse_press           (MksMouse             *self,
-                                    MksMouseButton        button,
-                                    GCancellable         *cancellable,
-                                    GAsyncReadyCallback   callback,
-                                    gpointer              user_data);
+DexFuture *mks_mouse_press           (MksMouse             *self,
+                                      MksMouseButton        button);
 MKS_AVAILABLE_IN_ALL
-gboolean mks_mouse_press_finish    (MksMouse             *self,
-                                    GAsyncResult         *result,
-                                    GError              **error);
+void       mks_mouse_press_async     (MksMouse             *self,
+                                      MksMouseButton        button,
+                                      GCancellable         *cancellable,
+                                      GAsyncReadyCallback   callback,
+                                      gpointer              user_data);
 MKS_AVAILABLE_IN_ALL
-gboolean mks_mouse_press_sync      (MksMouse             *self,
-                                    MksMouseButton        button,
-                                    GCancellable         *cancellable,
-                                    GError              **error);
+gboolean   mks_mouse_press_finish    (MksMouse             *self,
+                                      GAsyncResult         *result,
+                                      GError              **error);
 MKS_AVAILABLE_IN_ALL
-void     mks_mouse_release         (MksMouse             *self,
-                                    MksMouseButton        button,
-                                    GCancellable         *cancellable,
-                                    GAsyncReadyCallback   callback,
-                                    gpointer              user_data);
+DexFuture *mks_mouse_release         (MksMouse             *self,
+                                      MksMouseButton        button);
 MKS_AVAILABLE_IN_ALL
-gboolean mks_mouse_release_finish  (MksMouse             *self,
-                                    GAsyncResult         *result,
-                                    GError              **error);
+void       mks_mouse_release_async   (MksMouse             *self,
+                                      MksMouseButton        button,
+                                      GCancellable         *cancellable,
+                                      GAsyncReadyCallback   callback,
+                                      gpointer              user_data);
 MKS_AVAILABLE_IN_ALL
-gboolean mks_mouse_release_sync    (MksMouse             *self,
-                                    MksMouseButton        button,
-                                    GCancellable         *cancellable,
-                                    GError              **error);
+gboolean   mks_mouse_release_finish  (MksMouse             *self,
+                                      GAsyncResult         *result,
+                                      GError              **error);
 MKS_AVAILABLE_IN_ALL
-void     mks_mouse_move_to         (MksMouse             *self,
-                                    guint                 x,
-                                    guint                 y,
-                                    GCancellable         *cancellable,
-                                    GAsyncReadyCallback   callback,
-                                    gpointer              user_data);
+DexFuture *mks_mouse_move_to         (MksMouse             *self,
+                                      guint                 x,
+                                      guint                 y);
 MKS_AVAILABLE_IN_ALL
-gboolean mks_mouse_move_to_finish  (MksMouse             *self,
-                                    GAsyncResult         *result,
-                                    GError              **error);
+void       mks_mouse_move_to_async   (MksMouse             *self,
+                                      guint                 x,
+                                      guint                 y,
+                                      GCancellable         *cancellable,
+                                      GAsyncReadyCallback   callback,
+                                      gpointer              user_data);
 MKS_AVAILABLE_IN_ALL
-gboolean mks_mouse_move_to_sync    (MksMouse             *self,
-                                    guint                 x,
-                                    guint                 y,
-                                    GCancellable         *cancellable,
-                                    GError              **error);
+gboolean   mks_mouse_move_to_finish  (MksMouse             *self,
+                                      GAsyncResult         *result,
+                                      GError              **error);
 MKS_AVAILABLE_IN_ALL
-void     mks_mouse_move_by         (MksMouse             *self,
-                                    int                   delta_x,
-                                    int                   delta_y,
-                                    GCancellable         *cancellable,
-                                    GAsyncReadyCallback   callback,
-                                    gpointer              user_data);
+DexFuture *mks_mouse_move_by         (MksMouse             *self,
+                                      int                   delta_x,
+                                      int                   delta_y);
 MKS_AVAILABLE_IN_ALL
-gboolean mks_mouse_move_by_finish  (MksMouse             *self,
-                                    GAsyncResult         *result,
-                                    GError              **error);
+void       mks_mouse_move_by_async   (MksMouse             *self,
+                                      int                   delta_x,
+                                      int                   delta_y,
+                                      GCancellable         *cancellable,
+                                      GAsyncReadyCallback   callback,
+                                      gpointer              user_data);
 MKS_AVAILABLE_IN_ALL
-gboolean mks_mouse_move_by_sync    (MksMouse             *self,
-                                    int                   delta_x,
-                                    int                   delta_y,
-                                    GCancellable         *cancellable,
-                                    GError              **error);
-
+gboolean   mks_mouse_move_by_finish  (MksMouse             *self,
+                                      GAsyncResult         *result,
+                                      GError              **error);
 G_END_DECLS

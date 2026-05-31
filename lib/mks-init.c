@@ -36,6 +36,7 @@
 #include "mks-screen-attributes.h"
 #include "mks-session.h"
 #include "mks-touchable.h"
+#include "mks-trace-private.h"
 #include "mks-version.h"
 
 static void
@@ -82,6 +83,7 @@ mks_init (void)
   if (g_once_init_enter (&initialized))
     {
       mks_register_resource ();
+      mks_trace_init ();
       mks_init_gtypes ();
       g_once_init_leave (&initialized, TRUE);
     }

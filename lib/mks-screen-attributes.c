@@ -29,7 +29,7 @@
  * Screen attributes.
  * 
  * The attributes are used to reconfigure the QEMU instance with
- * [method@Mks.Screen.configure] or [method@Mks.Screen.configure_sync].
+ * [method@Mks.Screen.configure].
  */
 
 G_DEFINE_BOXED_TYPE (MksScreenAttributes,

@@ -54,30 +54,34 @@ update_title_binding (GBinding     *binding,
   return TRUE;
 }
 
-int
-main (int   argc,
-      char *argv[])
+typedef struct
 {
+  int        argc;
+  char     **argv;
+  GMainLoop *main_loop;
+} Main;
+
+static DexFuture *
+main_fiber (gpointer user_data)
+{
+  Main *state = user_data;
   g_autoptr(GDBusConnection) connection = NULL;
   g_autoptr(MksSession) session = NULL;
   g_autoptr(MksScreen) screen = NULL;
-  g_autoptr(GMainLoop) main_loop = NULL;
   g_autoptr(GError) error = NULL;
   GtkWindow *window;
   GtkWidget *display;
   GtkSettings *settings;
   GdkSurface *surface;
 
-  gtk_init ();
-  mks_init ();
+  g_assert (state != NULL);
+  g_assert (state->main_loop != NULL);
 
-  if (!(connection = create_connection (argc, argv, &error)))
+  if (!(connection = create_connection (state->argc, state->argv, &error)))
     {
       g_printerr ("Failed to connect to D-Bus: %s\n", error->message);
-      return EXIT_FAILURE;
+      return dex_future_new_for_int (EXIT_FAILURE);
     }
-
-  main_loop = g_main_loop_new (NULL, FALSE);
 
   window = g_object_new (GTK_TYPE_WINDOW,
                          "default-width", 1280,
@@ -93,18 +97,18 @@ main (int   argc,
   g_signal_connect_swapped (window,
                             "close-request",
                             G_CALLBACK (g_main_loop_quit),
-                            main_loop);
+                            state->main_loop);
 
-  if (!(session = mks_session_new_for_connection_sync (connection, NULL, &error)))
+  if (!(session = dex_await_object (mks_session_new_for_connection (connection), &error)))
     {
       g_printerr ("Failed to create MksSession: %s\n", error->message);
-      return EXIT_FAILURE;
+      return dex_future_new_for_int (EXIT_FAILURE);
     }
 
   if (!(screen = mks_session_ref_screen (session)))
     {
       g_printerr ("No screen attached to session!\n");
-      return EXIT_FAILURE;
+      return dex_future_new_for_int (EXIT_FAILURE);
     }
 
   mks_display_set_screen (MKS_DISPLAY (display), screen);
@@ -117,7 +121,61 @@ main (int   argc,
                                G_BINDING_SYNC_CREATE,
                                update_title_binding, NULL, display, NULL);
 
+  return dex_future_new_for_int (EXIT_SUCCESS);
+}
+
+static DexFuture *
+main_loop_quit_cb (DexFuture *future,
+                   gpointer   user_data)
+{
+  g_main_loop_quit (user_data);
+
+  return dex_ref (future);
+}
+
+int
+main (int   argc,
+      char *argv[])
+{
+  g_autoptr(GMainLoop) setup_loop = NULL;
+  g_autoptr(GMainLoop) main_loop = NULL;
+  g_autoptr(DexFuture) future = NULL;
+  g_autoptr(GError) error = NULL;
+  const GValue *value;
+  Main state;
+  int ret;
+
+  dex_init ();
+  gtk_init ();
+  mks_init ();
+
+  setup_loop = g_main_loop_new (NULL, FALSE);
+  main_loop = g_main_loop_new (NULL, FALSE);
+  state = (Main) { argc, argv, main_loop };
+
+  future = dex_future_finally (dex_scheduler_spawn (NULL,
+                                                    8 * 1024 * 1024,
+                                                    main_fiber,
+                                                    &state,
+                                                    NULL),
+                               main_loop_quit_cb,
+                               g_main_loop_ref (setup_loop),
+                               (GDestroyNotify) g_main_loop_unref);
+
+  if (dex_future_is_pending (future))
+    g_main_loop_run (setup_loop);
+
+  if (!(value = dex_future_get_value (future, &error)))
+    {
+      g_printerr ("%s\n", error->message);
+      return EXIT_FAILURE;
+    }
+
+  ret = g_value_get_int (value);
+  if (ret != EXIT_SUCCESS)
+    return ret;
+
   g_main_loop_run (main_loop);
 
-  return EXIT_SUCCESS;
+  return ret;
 }

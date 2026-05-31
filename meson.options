@@ -1,0 +1,16 @@
+option('install-tools',
+       type: 'boolean', value: false)
+option('docs',
+       type: 'boolean', value: false,
+       description: 'Build reference manual')
+option('introspection',
+       type: 'feature', value: 'auto',
+       description: 'Generate gir data')
+option('vapi',
+       type: 'boolean', value: true)
+option('sysprof',
+       type: 'feature', value: 'auto',
+       description: 'Enable Sysprof capture integration')
+option('tests',
+       type: 'boolean', value: true,
+       description: 'Build unit tests')

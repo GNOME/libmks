@@ -6,6 +6,8 @@ libmks_include_directories = [
 ]
 
 libmks_sources = [
+  'mks-chardev.c',
+  'mks-chardev-pty.c',
   'mks-init.c',
   'mks-device.c',
   'mks-display.c',
@@ -20,6 +22,7 @@ libmks_sources = [
 
 libmks_headers = [
   'libmks.h',
+  'mks-chardev.h',
   'mks-device.h',
   'mks-display.h',
   'mks-init.h',
@@ -48,6 +51,7 @@ libmks_private_sources = [
   'mks-inhibitor.c',
   'mks-read-only-list-model.c',
   'mks-screen-resizer.c',
+  'mks-trace.c',
   'mks-util.c',
 ]
 
@@ -86,6 +90,7 @@ libmks_qemu = gnome.gdbus_codegen('mks-qemu',
          namespace: 'MksQemu',
            sources: 'dbus-display1.xml',
     object_manager: true,
+        extra_args: ['--extension-path=' + libdex_dep.get_variable(pkgconfig: 'gdbus_codegen_extension')],
 )
 libmks_private_sources += libmks_qemu
 
@@ -127,9 +132,13 @@ libmks_deps = [
   libgio_dep,
   libgiounix_dep,
   libgtk_dep,
+  libvte_dep,
 
   cc.find_library('m', required: false),
 ]
+if sysprof_dep.found()
+  libmks_deps += [sysprof_dep]
+endif
 
 libmks = shared_library('mks-' + api_version,
     libmks_generated_headers +
@@ -161,7 +170,7 @@ pkg.generate(
      filebase: 'libmks-' + api_version,
       version: meson.project_version(),
       subdirs: 'libmks-@0@'.format(api_version),
-     requires: ['libdex-1', 'gio-2.0', 'gio-unix-2.0', 'gtk4'],
+     requires: ['libdex-1', 'gio-2.0', 'gio-unix-2.0', 'gtk4', 'vte-2.91-gtk4'],
   install_dir: join_paths(get_option('libdir'), 'pkgconfig')
 )
 
@@ -183,7 +192,7 @@ if get_option('introspection').enabled()
       identifier_prefix: 'Mks',
         export_packages: 'libmks-@0@'.format(api_version),
     include_directories: libmks_include_directories,
-               includes: ['Dex-1', 'Gio-2.0', 'Gtk-4.0'],
+               includes: ['Dex-1', 'Gio-2.0', 'Gtk-4.0', 'Vte-3.91'],
                 install: true,
              extra_args: libmks_gir_extra_args,
   )
@@ -191,7 +200,7 @@ if get_option('introspection').enabled()
   if get_option('vapi')
     libmks_vapi = gnome.generate_vapi('libmks-' + api_version,
                    sources: libmks_gir[0],
-                  packages: [ 'libdex-1', 'gio-2.0', 'gtk4'],
+                  packages: [ 'libdex-1', 'gio-2.0', 'gtk4', 'vte-2.91-gtk4'],
                    install: true,
     )
   endif

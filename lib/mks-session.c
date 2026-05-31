@@ -22,10 +22,12 @@
 #include "config.h"
 
 #include "mks-device-private.h"
+#include "mks-chardev.h"
 #include "mks-read-only-list-model-private.h"
 #include "mks-qemu.h"
 #include "mks-screen.h"
 #include "mks-session.h"
+#include "mks-util-private.h"
 
 /**
  * MksSession:
@@ -45,7 +47,7 @@
  * address when connecting to QEMU.
  *
  * Using the same [class@Gio.DBusConnection], create a `MksSession` with
- * [func@Mks.Session.new_for_connection]. The `MksSession` instance will negotiate
+ * [ctor@Mks.Session.new_for_connection]. The `MksSession` instance will negotiate
  * with the peer to determine what devices are available and expose them
  * via the [property@Mks.Session:devices] [iface@Gio.ListModel].
  *
@@ -58,9 +60,6 @@
 
 #define QEMU_BUS_NAME "org.qemu"
 
-static gboolean mks_session_initable_init              (GInitable            *initable,
-                                                        GCancellable         *cancellable,
-                                                        GError              **error);
 static void     mks_session_async_initable_init_async  (GAsyncInitable       *async_initable,
                                                         int                   io_priority,
                                                         GCancellable         *cancellable,
@@ -115,12 +114,6 @@ struct _MksSession
 };
 
 static void
-initable_iface_init (GInitableIface *iface)
-{
-  iface->init = mks_session_initable_init;
-}
-
-static void
 async_initable_iface_init (GAsyncInitableIface *iface)
 {
   iface->init_async = mks_session_async_initable_init_async;
@@ -128,7 +121,6 @@ async_initable_iface_init (GAsyncInitableIface *iface)
 }
 
 G_DEFINE_FINAL_TYPE_WITH_CODE (MksSession, mks_session, G_TYPE_OBJECT,
-                               G_IMPLEMENT_INTERFACE (G_TYPE_INITABLE, initable_iface_init)
                                G_IMPLEMENT_INTERFACE (G_TYPE_ASYNC_INITABLE, async_initable_iface_init))
 
 enum {
@@ -251,6 +243,8 @@ mks_session_object_manager_object_added_cb (MksSession         *self,
         mks_session_set_vm (self, object, MKS_QEMU_VM (iface));
       else if (MKS_QEMU_IS_CONSOLE (iface))
         mks_session_add_device (self, _mks_device_new (MKS_TYPE_SCREEN, self, object));
+      else if (MKS_QEMU_IS_CHARDEV (iface))
+        mks_session_add_device (self, _mks_device_new (MKS_TYPE_CHARDEV, self, object));
     }
 }
 
@@ -410,7 +404,10 @@ mks_session_class_init (MksSessionClass *klass)
   /**
    * MksSession:bus-name:
    *
-   * The unique connection name to connect to or `org.qemu` as fallback.
+   * The unique connection name to connect to, or %NULL for a peer-to-peer
+   * connection.
+   *
+   * Defaults to `org.qemu`.
    */
   properties [PROP_BUS_NAME] =
     g_param_spec_string ("bus-name", NULL, NULL,
@@ -458,64 +455,74 @@ mks_session_init (MksSession *self)
   self->devices_read_only = mks_read_only_list_model_new (G_LIST_MODEL (self->devices));
 }
 
-static gboolean
-mks_session_initable_init (GInitable     *initable,
-                           GCancellable  *cancellable,
-                           GError       **error)
+typedef struct _MksSessionInit
 {
-  MksSession *self = (MksSession *)initable;
-  g_autoptr(GDBusObjectManager) object_manager = NULL;
+  MksSession *self;
+  DexPromise *promise;
+} MksSessionInit;
 
-  g_assert (MKS_IS_SESSION (self));
-  g_assert (!cancellable || G_IS_CANCELLABLE (cancellable));
-
-  if (self->connection == NULL)
-    {
-      g_set_error (error,
-                   G_IO_ERROR,
-                   G_IO_ERROR_NOT_CONNECTED,
-                   "Not connected");
-      return FALSE;
-    }
-
-  object_manager =
-    mks_qemu_object_manager_client_new_sync (self->connection,
-                                             G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
-                                             self->bus_name,
-                                             "/org/qemu/Display1",
-                                             cancellable,
-                                             error);
-
-  mks_session_set_object_manager (self, object_manager);
-
-  return object_manager != NULL;
+static void
+mks_session_init_free (MksSessionInit *state)
+{
+  g_clear_object (&state->self);
+  dex_clear (&state->promise);
+  g_free (state);
 }
 
 static void
-mks_session_async_initable_vm_cb (GObject      *object,
-                                  GAsyncResult *result,
-                                  gpointer      user_data)
+mks_session_init_cb (GObject      *object,
+                     GAsyncResult *result,
+                     gpointer      user_data)
 {
   g_autoptr(GDBusObjectManager) object_manager = NULL;
   g_autoptr(GError) error = NULL;
-  g_autoptr(GTask) task = user_data;
-  MksSession *self;
+  MksSessionInit *state = user_data;
 
   g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (G_IS_TASK (task));
+  g_assert (state != NULL);
 
-  self = g_task_get_source_object (task);
   object_manager = mks_qemu_object_manager_client_new_finish (result, &error);
 
-  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_IS_SESSION (state->self));
   g_assert (!object_manager || MKS_QEMU_IS_OBJECT_MANAGER_CLIENT (object_manager));
 
-  mks_session_set_object_manager (self, object_manager);
+  mks_session_set_object_manager (state->self, object_manager);
 
   if (error != NULL)
-    g_task_return_error (task, g_steal_pointer (&error));
+    dex_promise_reject (state->promise, g_steal_pointer (&error));
   else
-    g_task_return_boolean (task, TRUE);
+    dex_promise_resolve_boolean (state->promise, TRUE);
+
+  mks_session_init_free (state);
+}
+
+static DexFuture *
+mks_session_start (MksSession *self)
+{
+  MksSessionInit *state;
+  DexPromise *promise;
+
+  g_assert (MKS_IS_SESSION (self));
+
+  if (self->connection == NULL)
+    return dex_future_new_reject (G_IO_ERROR,
+                                  G_IO_ERROR_NOT_CONNECTED,
+                                  "Not connected");
+
+  promise = dex_promise_new_cancellable ();
+  state = g_new0 (MksSessionInit, 1);
+  state->self = g_object_ref (self);
+  state->promise = dex_ref (promise);
+
+  mks_qemu_object_manager_client_new (self->connection,
+                                      G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
+                                      self->bus_name,
+                                      "/org/qemu/Display1",
+                                      dex_promise_get_cancellable (promise),
+                                      mks_session_init_cb,
+                                      state);
+
+  return DEX_FUTURE (promise);
 }
 
 static void
@@ -526,28 +533,15 @@ mks_session_async_initable_init_async (GAsyncInitable      *async_initable,
                                        gpointer             user_data)
 {
   MksSession *self = (MksSession *)async_initable;
-  g_autoptr(GTask) task = NULL;
+  g_autoptr(DexAsyncResult) result = NULL;
 
   g_assert (MKS_IS_SESSION (self));
   g_assert (!cancellable || G_IS_CANCELLABLE (cancellable));
 
-  task = g_task_new (self, cancellable, callback, user_data);
-  g_task_set_source_tag (task, mks_session_async_initable_init_async);
-  g_task_set_priority (task, io_priority);
-
-  if (self->connection == NULL)
-    g_task_return_new_error (task,
-                             G_IO_ERROR,
-                             G_IO_ERROR_NOT_CONNECTED,
-                             "Not connected");
-  else
-    mks_qemu_object_manager_client_new (self->connection,
-                                        G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
-                                        self->bus_name,
-                                        "/org/qemu/Display1",
-                                        cancellable,
-                                        mks_session_async_initable_vm_cb,
-                                        g_steal_pointer (&task));
+  result = dex_async_result_new (self, cancellable, callback, user_data);
+  dex_async_result_set_priority (result, io_priority);
+  dex_async_result_set_static_name (result, G_STRFUNC);
+  dex_async_result_await (result, mks_session_start (self));
 }
 
 static gboolean
@@ -558,9 +552,9 @@ mks_session_async_initable_init_finish (GAsyncInitable  *async_initable,
   MksSession *self = (MksSession *)async_initable;
 
   g_assert (MKS_IS_SESSION (self));
-  g_assert (G_IS_TASK (result));
+  g_assert (DEX_IS_ASYNC_RESULT (result));
 
-  return g_task_propagate_boolean (G_TASK (result), error);
+  return dex_async_result_propagate_boolean (DEX_ASYNC_RESULT (result), error);
 }
 
 /**
@@ -579,59 +573,65 @@ mks_session_get_devices (MksSession *self)
   return self->devices_read_only;
 }
 
-static void
-mks_session_new_for_connection_cb (GObject      *object,
-                                   GAsyncResult *result,
-                                   gpointer      user_data)
+typedef struct _MksSessionNew
 {
-  MksSession *self = (MksSession *)object;
+  MksSession *self;
+} MksSessionNew;
+
+static void
+mks_session_new_free (MksSessionNew *state)
+{
+  g_clear_object (&state->self);
+  g_free (state);
+}
+
+static DexFuture *
+mks_session_new_complete (DexFuture *future,
+                          gpointer   user_data)
+{
+  MksSessionNew *state = user_data;
   g_autoptr(GError) error = NULL;
-  g_autoptr(GTask) task = user_data;
 
-  g_assert (MKS_IS_SESSION (self));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (G_IS_TASK (task));
+  g_assert (DEX_IS_FUTURE (future));
+  g_assert (state != NULL);
+  g_assert (MKS_IS_SESSION (state->self));
 
-  if (!g_async_initable_init_finish (G_ASYNC_INITABLE (self), result, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    g_task_return_pointer (task, g_object_ref (self), g_object_unref);
+  if (!dex_future_get_value (future, &error))
+    return dex_future_new_for_error (g_steal_pointer (&error));
+
+  return dex_future_new_for_object (state->self);
 }
 
 /**
  * mks_session_new_for_connection:
  * @connection: a #GDBusConnection
- * @io_priority: priority for IO operations
- * @cancellable: (nullable): a #GCancellable or %NULL
- * @callback: a callback to execute upon completion of the operation
- * @user_data: closure data for @callback
- *
  * Creates a #MksSession which communicates using @connection.
  *
  * The [class@Gio.DBusConnection] should be a private D-Bus connection to a QEMU
  * instance which has devices created using the "dbus" backend.
-
- * @callback will be executed when the session has been created or
- * failed to create.
  *
- * This function will not block the calling thread.
- *
- * use [ctor@Mks.Session.new_for_connection_finish] to get the result of
- * this operation.
+ * Returns: (transfer full): a [class@Dex.Future] that resolves to a
+ *   #MksSession.
  */
-void
-mks_session_new_for_connection (GDBusConnection     *connection,
-                                int                  io_priority,
-                                GCancellable        *cancellable,
-                                GAsyncReadyCallback  callback,
-                                gpointer             user_data)
+DexFuture *
+mks_session_new_for_connection (GDBusConnection *connection)
 {
-  mks_session_new_for_connection_with_name (connection,
-                                            QEMU_BUS_NAME,
-                                            io_priority,
-                                            cancellable,
-                                            callback,
-                                            user_data);
+  return mks_session_new_for_connection_with_name (connection, QEMU_BUS_NAME);
+}
+
+void
+mks_session_new_for_connection_async (GDBusConnection     *connection,
+                                      int                  io_priority,
+                                      GCancellable        *cancellable,
+                                      GAsyncReadyCallback  callback,
+                                      gpointer             user_data)
+{
+  g_autoptr(DexAsyncResult) result = NULL;
+
+  result = dex_async_result_new (NULL, cancellable, callback, user_data);
+  dex_async_result_set_priority (result, io_priority);
+  dex_async_result_set_static_name (result, G_STRFUNC);
+  dex_async_result_await (result, mks_session_new_for_connection (connection));
 }
 
 /**
@@ -648,82 +648,66 @@ MksSession *
 mks_session_new_for_connection_finish (GAsyncResult  *result,
                                        GError       **error)
 {
-  g_return_val_if_fail (G_IS_TASK (result), NULL);
+  g_return_val_if_fail (DEX_IS_ASYNC_RESULT (result), NULL);
 
-  return g_task_propagate_pointer (G_TASK (result), error);
-}
-
-/**
- * mks_session_new_for_connection_sync:
- * @connection: a private #GDBusConnetion to a QEMU instance
- * @cancellable: (nullable): a #GCancellable, or %NULL
- * @error: (nullable): a location for a #GError, or %NULL
- *
- * Synchronously creates a new #MksSession instance.
- *
- * This may block while the QEMU instance is contacted to query for
- * initial devices and VM status.
- *
- * Returns: (transfer full): a #MksSession if successful; otherwise %NULL
- *   and @error is set.
- */
-MksSession *
-mks_session_new_for_connection_sync (GDBusConnection  *connection,
-                                     GCancellable     *cancellable,
-                                     GError          **error)
-{
-  return mks_session_new_for_connection_with_name_sync (connection,
-                                                        QEMU_BUS_NAME,
-                                                        cancellable,
-                                                        error);
+  return dex_async_result_propagate_pointer (DEX_ASYNC_RESULT (result), error);
 }
 
 /**
  * mks_session_new_for_connection_with_name:
  * @connection: a #GDBusConnection
- * @bus_name: The unique name to connect
- * @io_priority: priority for IO operations
- * @cancellable: (nullable): a #GCancellable or %NULL
- * @callback: a callback to execute upon completion of the operation
- * @user_data: closure data for @callback
+ * @bus_name: (nullable): The unique name to connect, or %NULL for a peer
+ *   connection
  *
  * Creates a #MksSession which communicates using @connection.
  *
- * The constructor is similar to [func@Mks.Session.new_for_connection] but allows
- * to set the bus name to something else than the default `org.qemu`.
+ * The constructor is similar to [ctor@Mks.Session.new_for_connection] but allows
+ * to set the bus name to something else than the default `org.qemu`. Use %NULL
+ * when @connection is a peer-to-peer connection instead of a message bus.
  *
- * use [ctor@Mks.Session.new_for_connection_with_name_finish] to get the result of
- * this operation.
+ * Returns: (transfer full): a [class@Dex.Future] that resolves to a
+ *   #MksSession.
  */
-void
-mks_session_new_for_connection_with_name (GDBusConnection     *connection,
-                                          const char          *bus_name,
-                                          int                  io_priority,
-                                          GCancellable        *cancellable,
-                                          GAsyncReadyCallback  callback,
-                                          gpointer             user_data)
+DexFuture *
+mks_session_new_for_connection_with_name (GDBusConnection *connection,
+                                          const char      *bus_name)
 {
   g_autoptr(MksSession) self = NULL;
-  g_autoptr(GTask) task = NULL;
+  MksSessionNew *state;
+  gint64 begin_time;
 
-  g_return_if_fail (G_IS_DBUS_CONNECTION (connection));
-  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
-  g_return_if_fail (bus_name != NULL);
+  dex_return_error_if_fail (G_IS_DBUS_CONNECTION (connection));
 
   self = g_object_new (MKS_TYPE_SESSION,
                        "connection", connection,
                        "bus-name", bus_name,
                        NULL);
+  state = g_new0 (MksSessionNew, 1);
+  state->self = g_object_ref (self);
+  begin_time = MKS_TRACE_BEGIN_MARK ();
 
-  task = g_task_new (self, cancellable, callback, user_data);
-  g_task_set_source_tag (task, mks_session_new_for_connection);
-  g_task_set_priority (task, io_priority);
+  return mks_marked_future (dex_future_then (mks_session_start (self),
+                                             mks_session_new_complete,
+                                             state,
+                                             (GDestroyNotify) mks_session_new_free),
+                            begin_time,
+                            "session.new");
+}
 
-  g_async_initable_init_async (G_ASYNC_INITABLE (self),
-                               io_priority,
-                               cancellable,
-                               mks_session_new_for_connection_cb,
-                               g_steal_pointer (&task));
+void
+mks_session_new_for_connection_with_name_async (GDBusConnection     *connection,
+                                                const char          *bus_name,
+                                                int                  io_priority,
+                                                GCancellable        *cancellable,
+                                                GAsyncReadyCallback  callback,
+                                                gpointer             user_data)
+{
+  g_autoptr(DexAsyncResult) result = NULL;
+
+  result = dex_async_result_new (NULL, cancellable, callback, user_data);
+  dex_async_result_set_priority (result, io_priority);
+  dex_async_result_set_static_name (result, G_STRFUNC);
+  dex_async_result_await (result, mks_session_new_for_connection_with_name (connection, bus_name));
 }
 
 /**
@@ -740,46 +724,9 @@ MksSession *
 mks_session_new_for_connection_with_name_finish (GAsyncResult  *result,
                                                  GError       **error)
 {
-  g_return_val_if_fail (G_IS_TASK (result), NULL);
+  g_return_val_if_fail (DEX_IS_ASYNC_RESULT (result), NULL);
 
-  return g_task_propagate_pointer (G_TASK (result), error);
-}
-
-/**
- * mks_session_new_for_connection_with_name_sync:
- * @bus_name: The unique name to connect
- * @connection: a private #GDBusConnetion to a QEMU instance
- * @cancellable: (nullable): a #GCancellable, or %NULL
- * @error: (nullable): a location for a #GError, or %NULL
- *
- * Synchronously creates a new #MksSession instance.
- *
- * The constructor is similar to [ctor@Mks.Session.new_for_connection_sync] except
- * it allows to set the bus name to something else than the default `org.qemu`.
- *
- * Returns: (transfer full): a #MksSession if successful; otherwise %NULL
- *   and @error is set.
- */
-MksSession *
-mks_session_new_for_connection_with_name_sync (GDBusConnection  *connection,
-                                               const char       *bus_name,
-                                               GCancellable     *cancellable,
-                                               GError          **error)
-{
-  g_autoptr(MksSession) self = NULL;
-
-  g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
-  g_return_val_if_fail (bus_name != NULL, NULL);
-
-  self = g_object_new (MKS_TYPE_SESSION,
-                       "connection", connection,
-                       "bus-name", bus_name,
-                       NULL);
-
-  if (g_initable_init (G_INITABLE (self), cancellable, error))
-    return g_steal_pointer (&self);
-
-  return NULL;
+  return dex_async_result_propagate_pointer (DEX_ASYNC_RESULT (result), error);
 }
 
 /**
@@ -803,9 +750,10 @@ mks_session_get_connection (MksSession *self)
  * mks_session_get_bus_name:
  * @self: a #MksSession
  *
- * Gets the DBus connection unique name or `org.qemu` as a fallback.
+ * Gets the D-Bus connection unique name, or %NULL for a peer-to-peer
+ * connection.
  *
- * Returns: A unique name the session is connected to
+ * Returns: (nullable): A unique name the session is connected to, or %NULL
  */
 const char *
 mks_session_get_bus_name (MksSession *self)

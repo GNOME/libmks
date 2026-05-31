@@ -118,23 +118,18 @@ mks_screen_resizer_class_init (MksScreenResizerClass *klass)
   g_object_class_install_properties (object_class, N_PROPS, properties);
 }
 
-static void
-on_screen_configure_cb (GObject      *object,
-                        GAsyncResult *result,
-                        gpointer      user_data)
+static DexFuture *
+on_screen_configure_cb (DexFuture *future,
+                        gpointer   user_data)
 {
-  MksScreen *screen = (MksScreen *)object;
   g_autoptr(MksScreenAttributes) attributes = NULL;
-  g_autoptr(MksScreenResizer) self = user_data;
+  MksScreenResizer *self = user_data;
   g_autoptr(GError) error = NULL;
 
-  MKS_ENTRY;
-
-  g_assert (MKS_IS_SCREEN (screen));
-  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (DEX_IS_FUTURE (future));
   g_assert (MKS_IS_SCREEN_RESIZER (self));
 
-  if (!mks_screen_configure_finish (screen, result, &error))
+  if (!dex_future_get_value (future, &error))
     g_debug ("Screen configure failed: %s", error->message);
 
   self->in_progress = FALSE;
@@ -143,7 +138,7 @@ on_screen_configure_cb (GObject      *object,
   if (attributes && !mks_screen_attributes_equal (attributes, self->previous_op))
     mks_screen_resizer_reconfigure (self, g_steal_pointer (&attributes));
 
-  MKS_EXIT;
+  return dex_future_new_true ();
 }
 
 /**
@@ -174,15 +169,11 @@ void
 mks_screen_resizer_set_screen (MksScreenResizer *self,
                                MksScreen        *screen)
 {
-  MKS_ENTRY;
-
   g_return_if_fail (MKS_IS_SCREEN_RESIZER (self));
   g_return_if_fail (!screen || MKS_IS_SCREEN (screen));
 
   if (g_set_object (&self->screen, screen))
     g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_SCREEN]);
-
-  MKS_EXIT;
 }
 
 /**
@@ -198,23 +189,19 @@ void
 mks_screen_resizer_queue_resize (MksScreenResizer    *self,
                                  MksScreenAttributes *attributes)
 {
-  MKS_ENTRY;
-
   g_return_if_fail (MKS_IS_SCREEN_RESIZER (self));
 
   if (mks_screen_attributes_equal (attributes, self->previous_op))
-    MKS_EXIT;
+    return;
 
   if (self->in_progress)
     {
       g_clear_pointer (&self->next_op, mks_screen_attributes_free);
       self->next_op = g_steal_pointer (&attributes);
-      MKS_EXIT;
+      return;
     }
 
   mks_screen_resizer_reconfigure (self, attributes);
-
-  MKS_EXIT;
 }
 
 /**
@@ -228,8 +215,6 @@ static void
 mks_screen_resizer_reconfigure (MksScreenResizer    *self,
                                 MksScreenAttributes *attributes)
 {
-  MKS_ENTRY;
-
   g_assert (MKS_IS_SCREEN_RESIZER (self));
 
   self->in_progress = TRUE;
@@ -237,11 +222,9 @@ mks_screen_resizer_reconfigure (MksScreenResizer    *self,
   g_clear_pointer (&self->previous_op, mks_screen_attributes_free);
   self->previous_op = mks_screen_attributes_copy (attributes);
 
-  mks_screen_configure (self->screen,
-                        g_steal_pointer (&attributes),
-                        NULL,
-                        on_screen_configure_cb,
-                        g_object_ref (self));
-
-  MKS_EXIT;
+  dex_future_disown (dex_future_finally (mks_screen_configure (self->screen,
+                                                               g_steal_pointer (&attributes)),
+                                         on_screen_configure_cb,
+                                         g_object_ref (self),
+                                         g_object_unref));
 }

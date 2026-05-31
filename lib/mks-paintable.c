@@ -642,37 +642,37 @@ mks_paintable_listener_disable (MksPaintable          *self,
 }
 
 
-static void
-mks_paintable_connection_cb (GObject      *object,
-                             GAsyncResult *result,
-                             gpointer      user_data)
+static DexFuture *
+mks_paintable_connection_cb (DexFuture *future,
+                             gpointer   user_data)
 {
-  g_autoptr(MksPaintable) self = user_data;
-  g_autoptr(GDBusConnection) connection = NULL;
+  MksPaintable *self = user_data;
   g_autoptr(GError) error = NULL;
+  const GValue *value;
 
   g_assert (MKS_IS_PAINTABLE (self));
-  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (DEX_IS_FUTURE (future));
 
-  if (!(connection = g_dbus_connection_new_finish (result, &error)))
+  if (!(value = dex_future_get_value (future, &error)))
     {
       g_warning ("Failed to create D-Bus connection: %s", error->message);
-      return;
+      return dex_future_new_true ();
     }
 
-  g_set_object (&self->connection, connection);
+  g_set_object (&self->connection, g_value_get_object (value));
 
   if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self->listener),
-                                         connection,
+                                         self->connection,
                                          "/org/qemu/Display1/Listener",
                                          &error))
     {
       g_warning ("Failed to export listener on bus: %s", error->message);
-      return;
+      return dex_future_new_true ();
     }
 
-  g_dbus_connection_start_message_processing (connection);
+  g_dbus_connection_start_message_processing (self->connection);
 
+  return dex_future_new_true ();
 }
 
 GdkPaintable *
@@ -686,6 +686,7 @@ _mks_paintable_new (GdkDisplay    *display,
   g_autoptr(GSocket) socket = NULL;
   g_autofd int us = -1;
   g_autofd int them = -1;
+  gint64 begin_time;
 
   g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), NULL);
   g_return_val_if_fail (peer_fd != NULL, NULL);
@@ -749,13 +750,16 @@ _mks_paintable_new (GdkDisplay    *display,
   /* Asynchronously create connection because we can't do it synchronously
    * as the other side is doing AUTHENTICATION_SERVER for no good reason.
    */
-  g_dbus_connection_new (G_IO_STREAM (io_stream),
-                         NULL,
-                         G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING|G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT,
-                         NULL,
-                         cancellable,
-                         mks_paintable_connection_cb,
-                         g_object_ref (self));
+  begin_time = MKS_TRACE_BEGIN_MARK ();
+  dex_future_disown (dex_future_finally (mks_marked_future (mks_dbus_connection_new (G_IO_STREAM (io_stream),
+                                                                                     (G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING |
+                                                                                      G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT),
+                                                                                     cancellable),
+                                                                 begin_time,
+                                                                 "paintable.dbus-connection"),
+                                         mks_paintable_connection_cb,
+                                         g_object_ref (self),
+                                         g_object_unref));
 
   *peer_fd = g_steal_fd (&them);
 

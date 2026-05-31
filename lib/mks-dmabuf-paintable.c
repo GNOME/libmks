@@ -25,6 +25,7 @@
 #include <gtk/gtk.h>
 
 #include "mks-dmabuf-paintable-private.h"
+#include "mks-util-private.h"
 
 /*
  * MksDmabufPaintable is a GdkPaintable that gets created the first time
@@ -88,6 +89,10 @@ mks_dmabuf_paintable_snapshot (GdkPaintable *paintable,
    */
   if (self->dmabuf_updated)
     {
+      MKS_TRACE_SCOPE ("dmabuf.build-texture",
+                       "width=%u height=%u",
+                       self->width,
+                       self->height);
 
       gdk_dmabuf_texture_builder_set_update_texture (self->builder, self->texture);
       texture = gdk_dmabuf_texture_builder_build (self->builder,
@@ -153,6 +158,7 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
 {
   cairo_region_t *accumulated_damages;
   cairo_region_t *previous_region;
+  g_autoptr(MksTraceScope) trace_scope = NULL;
   guint plane = 0;
 
   g_return_val_if_fail (MKS_IS_DMABUF_PAINTABLE (self), FALSE);
@@ -176,6 +182,14 @@ mks_dmabuf_paintable_import (MksDmabufPaintable   *self,
                     data->width, data->height, data->stride);
       return FALSE;
     }
+
+  trace_scope = mks_trace_scope_new ("dmabuf.import",
+                                     "width=%u height=%u stride=%u fourcc=0x%x modifier=%" G_GUINT64_FORMAT,
+                                     data->width,
+                                     data->height,
+                                     data->stride,
+                                     data->fourcc,
+                                     data->modifier);
 
   if (self->width != data->width || self->height != data->height)
     {

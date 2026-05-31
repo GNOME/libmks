@@ -30,8 +30,8 @@ G_BEGIN_DECLS
 G_DECLARE_FINAL_TYPE (MksScreenResizer, mks_screen_resizer, MKS, SCREEN_RESIZER, GObject)
 
 MksScreenResizer *mks_screen_resizer_new          (void);
-void              mks_screen_resizer_set_screen   (MksScreenResizer *self,
-                                                   MksScreen        *screen);
+void              mks_screen_resizer_set_screen   (MksScreenResizer    *self,
+                                                   MksScreen           *screen);
 void              mks_screen_resizer_queue_resize (MksScreenResizer    *self,
                                                    MksScreenAttributes *attributes);
 

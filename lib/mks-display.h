@@ -42,26 +42,25 @@ struct _MksDisplayClass
 };
 
 MKS_AVAILABLE_IN_ALL
-GtkWidget          *mks_display_new                (void);
+GtkWidget          *mks_display_new                         (void);
 MKS_AVAILABLE_IN_ALL
-GtkShortcutTrigger *mks_display_get_ungrab_trigger (MksDisplay         *self);
+GtkShortcutTrigger *mks_display_get_ungrab_trigger          (MksDisplay         *self);
 MKS_AVAILABLE_IN_ALL
-void                mks_display_set_ungrab_trigger (MksDisplay         *self,
-                                                    GtkShortcutTrigger *trigger);
+void                mks_display_set_ungrab_trigger          (MksDisplay         *self,
+                                                             GtkShortcutTrigger *trigger);
 MKS_AVAILABLE_IN_ALL
-MksScreen          *mks_display_get_screen         (MksDisplay         *self);
+MksScreen          *mks_display_get_screen                  (MksDisplay         *self);
 MKS_AVAILABLE_IN_ALL
-void                mks_display_set_screen         (MksDisplay         *self,
-                                                    MksScreen          *screen);
+void                mks_display_set_screen                  (MksDisplay         *self,
+                                                             MksScreen          *screen);
 MKS_AVAILABLE_IN_ALL
-gboolean            mks_display_get_auto_resize    (MksDisplay         *self);
+gboolean            mks_display_get_auto_resize             (MksDisplay         *self);
 MKS_AVAILABLE_IN_ALL
-void                mks_display_set_auto_resize    (MksDisplay         *self,
-                                                    gboolean            auto_resize);
+void                mks_display_set_auto_resize             (MksDisplay         *self,
+                                                             gboolean            auto_resize);
 MKS_AVAILABLE_IN_ALL
-gboolean
-          mks_display_get_event_position_in_guest  (MksDisplay         *self,
-                                                    GdkEvent           *event,
-                                                    double             *guest_x,
-                                                    double             *guest_y);
+gboolean            mks_display_get_event_position_in_guest (MksDisplay         *self,
+                                                             GdkEvent           *event,
+                                                             double             *guest_x,
+                                                             double             *guest_y);
 G_END_DECLS

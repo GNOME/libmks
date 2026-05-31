@@ -26,6 +26,7 @@
 G_BEGIN_DECLS
 
 #define MKS_INSIDE
+# include "mks-chardev.h"
 # include "mks-device.h"
 # include "mks-display.h"
 # include "mks-enums.h"

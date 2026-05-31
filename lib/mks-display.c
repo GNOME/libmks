@@ -100,31 +100,26 @@ mks_display_get_paintable_area (MksDisplay      *self,
   *area = GRAPHENE_RECT_INIT (x, y, w, h);
 }
 
-static void
-mks_display_attach_cb (GObject      *object,
-                       GAsyncResult *result,
-                       gpointer      user_data)
+static DexFuture *
+mks_display_attach_cb (DexFuture *future,
+                       gpointer   user_data)
 {
-  g_autoptr(MksDisplay) self = user_data;
+  MksDisplay *self = user_data;
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-  MksScreen *screen = (MksScreen *)object;
   g_autoptr(GdkPaintable) paintable = NULL;
   g_autoptr(GError) error = NULL;
 
-  MKS_ENTRY;
-
-  g_assert (MKS_IS_SCREEN (screen));
-  g_assert (G_IS_ASYNC_RESULT (result));
+  g_assert (DEX_IS_FUTURE (future));
   g_assert (MKS_IS_DISPLAY (self));
 
-  paintable = mks_screen_attach_finish (screen, result, &error);
+  paintable = dex_await_object (dex_ref (future), &error);
 
-  if (priv->screen != screen)
-    MKS_EXIT;
+  if (paintable == NULL)
+    return dex_future_new_for_error (g_steal_pointer (&error));
 
   mks_display_picture_set_paintable (priv->picture, MKS_PAINTABLE (paintable));
 
-  MKS_EXIT;
+  return dex_future_new_true ();
 }
 
 static void
@@ -132,8 +127,6 @@ mks_display_connect (MksDisplay *self,
                      MksScreen  *screen)
 {
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-
-  MKS_ENTRY;
 
   g_assert (MKS_IS_DISPLAY (self));
   g_assert (!screen || MKS_IS_SCREEN (screen));
@@ -145,24 +138,20 @@ mks_display_connect (MksDisplay *self,
       mks_display_picture_set_touchable (priv->picture, mks_screen_get_touchable (screen));
       mks_screen_resizer_set_screen (priv->resizer, screen);
 
-      mks_screen_attach (screen,
-                         gtk_widget_get_display (GTK_WIDGET (self)),
-                         NULL,
-                         mks_display_attach_cb,
-                         g_object_ref (self));
+      dex_future_disown (dex_future_then (mks_screen_attach (screen,
+                                                             gtk_widget_get_display (GTK_WIDGET (self))),
+                                          mks_display_attach_cb,
+                                          g_object_ref (self),
+                                          g_object_unref));
 
       g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_SCREEN]);
     }
-
-  MKS_EXIT;
 }
 
 static void
 mks_display_disconnect (MksDisplay *self)
 {
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
-
-  MKS_ENTRY;
 
   g_assert (MKS_IS_DISPLAY (self));
 
@@ -177,8 +166,6 @@ mks_display_disconnect (MksDisplay *self)
       mks_display_picture_set_mouse (priv->picture, NULL);
       mks_display_picture_set_touchable (priv->picture, NULL);
     }
-
-  MKS_EXIT;
 }
 
 static gboolean
@@ -461,12 +448,10 @@ mks_display_set_screen (MksDisplay *self,
 {
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
 
-  MKS_ENTRY;
-
   g_return_if_fail (MKS_IS_DISPLAY (self));
 
   if (priv->screen == screen)
-    MKS_EXIT;
+    return;
 
   if (priv->screen != NULL)
     mks_display_disconnect (self);
@@ -475,8 +460,6 @@ mks_display_set_screen (MksDisplay *self,
     mks_display_connect (self, screen);
 
   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_SCREEN]);
-
-  MKS_EXIT;
 }
 
 /**
@@ -545,8 +528,6 @@ mks_display_set_ungrab_trigger (MksDisplay         *self,
 {
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
 
-  MKS_ENTRY;
-
   g_return_if_fail (MKS_IS_DISPLAY (self));
   g_return_if_fail (!ungrab_trigger || GTK_IS_SHORTCUT_TRIGGER (ungrab_trigger));
 
@@ -556,8 +537,6 @@ mks_display_set_ungrab_trigger (MksDisplay         *self,
         priv->ungrab_trigger = gtk_shortcut_trigger_parse_string (DEFAULT_UNGRAB_TRIGGER);
       g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_UNGRAB_TRIGGER]);
     }
-
-  MKS_EXIT;
 }
 
 /**

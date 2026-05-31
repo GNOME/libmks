@@ -74,16 +74,12 @@ mks_touchable_touch_notify_cb (MksTouchable      *self,
                                GParamSpec        *pspec,
                                MksQemuMultiTouch *touch)
 {
-  MKS_ENTRY;
-
   g_assert (MKS_IS_TOUCHABLE (self));
   g_assert (pspec != NULL);
   g_assert (MKS_QEMU_IS_MULTI_TOUCH (touch));
 
   if (strcmp (pspec->name, "max-slots") == 0)
     mks_touchable_set_max_slots (self, mks_qemu_multi_touch_get_max_slots (touch));
-
-  MKS_EXIT;
 }
 
 static void
@@ -202,72 +198,59 @@ check_touch (MksTouchable  *self,
   return TRUE;
 }
 
-static void
-mks_touchable_send_event_cb (GObject      *object,
-                             GAsyncResult *result,
-                             gpointer      user_data)
-{
-  MksQemuMultiTouch *touch = (MksQemuMultiTouch *)object;
-  g_autoptr(GTask) task = user_data;
-  g_autoptr(GError) error = NULL;
-
-  MKS_ENTRY;
-
-  g_assert (MKS_QEMU_IS_MULTI_TOUCH (touch));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (G_IS_TASK (task));
-
-  if (!mks_qemu_multi_touch_call_send_event_finish (touch, result, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    g_task_return_boolean (task, TRUE);
-
-  MKS_EXIT;
-}
-
 /**
  * mks_touchable_send_event:
  * @self: an #MksTouchable
  * @num_slot: the slot number
  * @x: the x absolute coordinate
  * @y: the y absolute coordinate
- * @cancellable: (nullable): a #GCancellable
- * @callback: a #GAsyncReadyCallback to execute upon completion
- * @user_data: closure data for @callback
  *
  * Send a touch event.
+ *
+ * Returns: (transfer full): a [class@Dex.Future] that resolves to %TRUE.
  */
-void
+DexFuture *
 mks_touchable_send_event (MksTouchable       *self,
                           MksTouchEventKind   kind,
                           guint64             num_slot,
                           double              x,
-                          double              y,
-                          GCancellable       *cancellable,
-                          GAsyncReadyCallback callback,
-                          gpointer            user_data)
+                          double              y)
 {
-  g_autoptr(GTask) task = NULL;
   g_autoptr(GError) error = NULL;
+  gint64 begin_time;
 
-  MKS_ENTRY;
-
-  g_return_if_fail (MKS_IS_TOUCHABLE (self));
-  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
-
-  task = g_task_new (self, cancellable, callback, user_data);
-  g_task_set_source_tag (task, mks_touchable_send_event);
+  dex_return_error_if_fail (MKS_IS_TOUCHABLE (self));
 
   if (!check_touch (self, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    mks_qemu_multi_touch_call_send_event (self->touch, kind,
-                                          num_slot, x, y,
-                                          cancellable,
-                                          mks_touchable_send_event_cb,
-                                          g_steal_pointer (&task));
+    return dex_future_new_for_error (g_steal_pointer (&error));
 
-  MKS_EXIT;
+  begin_time = MKS_TRACE_BEGIN_MARK ();
+
+  return mks_marked_future (mks_qemu_multi_touch_call_send_event_future (self->touch,
+                                                                         kind,
+                                                                         num_slot,
+                                                                         x,
+                                                                         y),
+                            begin_time,
+                            "touchable.send-event");
+}
+
+void
+mks_touchable_send_event_async (MksTouchable       *self,
+                                MksTouchEventKind   kind,
+                                guint64             num_slot,
+                                double              x,
+                                double              y,
+                                GCancellable       *cancellable,
+                                GAsyncReadyCallback callback,
+                                gpointer            user_data)
+{
+  mks_future_to_async_result (self,
+                              cancellable,
+                              callback,
+                              user_data,
+                              G_STRFUNC,
+                              mks_touchable_send_event (self, kind, num_slot, x, y));
 }
 
 /**
@@ -288,56 +271,12 @@ mks_touchable_send_event_finish (MksTouchable  *self,
 {
   gboolean ret;
 
-  MKS_ENTRY;
-
   g_return_val_if_fail (MKS_IS_TOUCHABLE (self), FALSE);
-  g_return_val_if_fail (g_task_is_valid (result, self), FALSE);
+  g_return_val_if_fail (DEX_IS_ASYNC_RESULT (result), FALSE);
 
-  ret = g_task_propagate_boolean (G_TASK (result), error);
+  ret = dex_async_result_propagate_boolean (DEX_ASYNC_RESULT (result), error);
 
-  MKS_RETURN (ret);
-}
-
-
-/**
- * mks_touchable_send_event_sync:
- * @self: a `MksTouchable`
- * @kind: the event kind
- * @num_slot: the slot number
- * @x: the x absolute coordinate
- * @y: the y absolute coordinate
- * @cancellable: (nullable): a #GCancellable
- * @error: a location for a #GError, or %NULL
- *
- * Synchronously send a touch event.
- *
- * Returns: %TRUE if the operation was acknowledged by the QEMU instance;
- *   otherwise %FALSE and @error is set.
- */
-gboolean
-mks_touchable_send_event_sync (MksTouchable      *self,
-                               MksTouchEventKind  kind,
-                               guint64            num_slot,
-                               double             x,
-                               double             y,
-                               GCancellable      *cancellable,
-                               GError           **error)
-{
-  gboolean ret;
-
-  MKS_ENTRY;
-
-  g_return_val_if_fail (MKS_IS_TOUCHABLE (self), FALSE);
-  g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
-
-  if (!check_touch (self, error))
-    MKS_RETURN (FALSE);
-
-  ret = mks_qemu_multi_touch_call_send_event_sync (self->touch, kind,
-                                                   num_slot, x, y,
-                                                   cancellable, error);
-
-  MKS_RETURN (ret);
+  return ret;
 }
 
 /**

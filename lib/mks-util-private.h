@@ -24,8 +24,22 @@
 #include <cairo.h>
 #include <gdk/gdk.h>
 #include <gio/gio.h>
+#include <libdex.h>
+
+#include "mks-trace-private.h"
 
 G_BEGIN_DECLS
+
+#define MKS_TYPE_SOCKETPAIR_CONNECTION (mks_socketpair_connection_get_type())
+
+typedef struct _MksSocketpairConnection MksSocketpairConnection;
+
+struct _MksSocketpairConnection
+{
+  int ref_count;
+  GDBusConnection *connection;
+  int peer_fd;
+};
 
 #define _CAIRO_CHECK_VERSION(major, minor, micro) \
   (CAIRO_VERSION_MAJOR > (major) || \
@@ -33,27 +47,30 @@ G_BEGIN_DECLS
    (CAIRO_VERSION_MAJOR == (major) && CAIRO_VERSION_MINOR == (minor) && \
     CAIRO_VERSION_MICRO >= (micro)))
 
-#ifdef MKS_DEBUG
-# define MKS_ENTRY      G_STMT_START { g_debug("ENTRY: %s():%u", G_STRFUNC, __LINE__); } G_STMT_END
-# define MKS_EXIT       G_STMT_START { g_debug(" EXIT: %s():%u", G_STRFUNC, __LINE__); return; } G_STMT_END
-# define MKS_RETURN(_r) G_STMT_START { typeof(_r) __ret = (_r); g_debug(" EXIT: %s():%u", G_STRFUNC, __LINE__); return __ret; } G_STMT_END
-#else
-# define MKS_ENTRY      G_STMT_START { } G_STMT_END
-# define MKS_EXIT       G_STMT_START { return; } G_STMT_END
-# define MKS_RETURN(_r) G_STMT_START { typeof(_r) __ret = (_r); return (__ret); } G_STMT_END
-#endif
-
-
-gboolean         mks_socketpair_create                (int     *us,
-                                                       int     *them,
-                                                       GError **error);
-gboolean         mks_scroll_event_is_inverted         (GdkEvent              *event);
-void             mks_socketpair_connection_new        (GDBusConnectionFlags   flags,
-                                                       GCancellable          *cancellable,
-                                                       GAsyncReadyCallback    callback,
-                                                       gpointer               user_data);
-GDBusConnection *mks_socketpair_connection_new_finish (GAsyncResult          *result,
-                                                       int                   *peer_fd,
-                                                       GError               **error);
+gboolean                 mks_socketpair_create              (int                      *us,
+                                                             int                      *them,
+                                                             GError                  **error);
+gboolean                 mks_scroll_event_is_inverted       (GdkEvent                 *event);
+GType                    mks_socketpair_connection_get_type (void) G_GNUC_CONST;
+MksSocketpairConnection *mks_socketpair_connection_ref      (MksSocketpairConnection  *self);
+void                     mks_socketpair_connection_unref    (MksSocketpairConnection  *self);
+int                      mks_socketpair_connection_steal_fd (MksSocketpairConnection  *self);
+DexFuture               *mks_dbus_connection_new            (GIOStream                *stream,
+                                                             GDBusConnectionFlags      flags,
+                                                             GCancellable             *cancellable);
+void                     mks_future_to_async_result         (gpointer                  source_object,
+                                                             GCancellable             *cancellable,
+                                                             GAsyncReadyCallback       callback,
+                                                             gpointer                  user_data,
+                                                             const char               *static_name,
+                                                             DexFuture                *future);
+DexFuture               *mks_socketpair_connection_new      (GDBusConnectionFlags      flags);
+DexFuture               *mks_marked_future                  (DexFuture                *future,
+                                                             gint64                    begin_time,
+                                                             const char               *message) G_GNUC_WARN_UNUSED_RESULT;
+DexFuture               *mks_logged_future                  (DexFuture                *future,
+                                                             const char               *log_domain,
+                                                             GLogLevelFlags            level,
+                                                             const char               *message_prefix) G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS

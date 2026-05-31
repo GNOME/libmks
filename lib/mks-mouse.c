@@ -74,16 +74,12 @@ mks_mouse_mouse_notify_cb (MksMouse     *self,
                            GParamSpec   *pspec,
                            MksQemuMouse *mouse)
 {
-  MKS_ENTRY;
-
   g_assert (MKS_IS_MOUSE (self));
   g_assert (pspec != NULL);
   g_assert (MKS_QEMU_IS_MOUSE (mouse));
 
   if (strcmp (pspec->name, "is-absolute") == 0)
     mks_mouse_set_is_absolute (self, mks_qemu_mouse_get_is_absolute (mouse));
-
-  MKS_EXIT;
 }
 
 static void
@@ -216,67 +212,47 @@ check_mouse (MksMouse  *self,
   return TRUE;
 }
 
-static void
-mks_mouse_press_cb (GObject      *object,
-                    GAsyncResult *result,
-                    gpointer      user_data)
-{
-  MksQemuMouse *mouse = (MksQemuMouse *)object;
-  g_autoptr(GTask) task = user_data;
-  g_autoptr(GError) error = NULL;
-
-  MKS_ENTRY;
-
-  g_assert (MKS_QEMU_IS_MOUSE (mouse));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (G_IS_TASK (task));
-
-  if (!mks_qemu_mouse_call_press_finish (mouse, result, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    g_task_return_boolean (task, TRUE);
-
-  MKS_EXIT;
-}
-
 /**
  * mks_mouse_press:
  * @self: an #MksMouse
  * @button: the #MksMouseButton that was pressed
- * @cancellable: (nullable): a #GCancellable
- * @callback: a #GAsyncReadyCallback to execute upon completion
- * @user_data: closure data for @callback
  *
  * Presses a mouse button.
+ *
+ * Returns: (transfer full): a [class@Dex.Future] that resolves to %TRUE.
  */
-void
+DexFuture *
 mks_mouse_press (MksMouse            *self,
-                 MksMouseButton       button,
-                 GCancellable        *cancellable,
-                 GAsyncReadyCallback  callback,
-                 gpointer             user_data)
+                 MksMouseButton       button)
 {
-  g_autoptr(GTask) task = NULL;
   g_autoptr(GError) error = NULL;
+  gint64 begin_time;
 
-  MKS_ENTRY;
-
-  g_return_if_fail (MKS_IS_MOUSE (self));
-  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
-
-  task = g_task_new (self, cancellable, callback, user_data);
-  g_task_set_source_tag (task, mks_mouse_press);
+  dex_return_error_if_fail (MKS_IS_MOUSE (self));
 
   if (!check_mouse (self, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    mks_qemu_mouse_call_press (self->mouse,
-                               button,
-                               cancellable,
-                               mks_mouse_press_cb,
-                               g_steal_pointer (&task));
+    return dex_future_new_for_error (g_steal_pointer (&error));
 
-  MKS_EXIT;
+  begin_time = MKS_TRACE_BEGIN_MARK ();
+
+  return mks_marked_future (mks_qemu_mouse_call_press_future (self->mouse, button),
+                            begin_time,
+                            "mouse.press");
+}
+
+void
+mks_mouse_press_async (MksMouse            *self,
+                       MksMouseButton       button,
+                       GCancellable        *cancellable,
+                       GAsyncReadyCallback  callback,
+                       gpointer             user_data)
+{
+  mks_future_to_async_result (self,
+                              cancellable,
+                              callback,
+                              user_data,
+                              G_STRFUNC,
+                              mks_mouse_press (self, button));
 }
 
 /**
@@ -297,110 +273,55 @@ mks_mouse_press_finish (MksMouse      *self,
 {
   gboolean ret;
 
-  MKS_ENTRY;
-
   g_return_val_if_fail (MKS_IS_MOUSE (self), FALSE);
-  g_return_val_if_fail (G_IS_TASK (result), FALSE);
+  g_return_val_if_fail (DEX_IS_ASYNC_RESULT (result), FALSE);
 
-  ret = g_task_propagate_boolean (G_TASK (result), error);
+  ret = dex_async_result_propagate_boolean (DEX_ASYNC_RESULT (result), error);
 
-  MKS_RETURN (ret);
-}
-
-/**
- * mks_mouse_press_sync:
- * @self: an #MksMouse
- * @button: the #MksMouseButton that was released
- * @cancellable: (nullable): a #GCancellable
- * @error: a location for a #GError, or %NULL
- *
- * Synchronously press a mouse button.
- *
- * Returns: %TRUE if the operation was acknowledged by the QEMU instance;
- *   otherwise %FALSE and @error is set.
- */
-gboolean
-mks_mouse_press_sync (MksMouse        *self,
-                      MksMouseButton   button,
-                      GCancellable    *cancellable,
-                      GError         **error)
-{
-  gboolean ret;
-
-  MKS_ENTRY;
-
-  g_return_val_if_fail (MKS_IS_MOUSE (self), FALSE);
-  g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
-
-  if (!check_mouse (self, error))
-    MKS_RETURN (FALSE);
-
-  ret = mks_qemu_mouse_call_press_sync (self->mouse, button, cancellable, error);
-
-  MKS_RETURN (ret);
-}
-
-static void
-mks_mouse_release_cb (GObject      *object,
-                      GAsyncResult *result,
-                      gpointer      user_data)
-{
-  MksQemuMouse *mouse = (MksQemuMouse *)object;
-  g_autoptr(GTask) task = user_data;
-  g_autoptr(GError) error = NULL;
-
-  MKS_ENTRY;
-
-  g_assert (MKS_QEMU_IS_MOUSE (mouse));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (G_IS_TASK (task));
-
-  if (!mks_qemu_mouse_call_release_finish (mouse, result, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    g_task_return_boolean (task, TRUE);
-
-  MKS_EXIT;
+  return ret;
 }
 
 /**
  * mks_mouse_release:
  * @self: an #MksMouse
  * @button: the #MksMouseButton that was released
- * @cancellable: (nullable): a #GCancellable
- * @callback: a #GAsyncReadyCallback to execute upon completion
- * @user_data: closure data for @callback
  *
  * Releases a mouse button.
+ *
+ * Returns: (transfer full): a [class@Dex.Future] that resolves to %TRUE.
  */
-void
+DexFuture *
 mks_mouse_release (MksMouse            *self,
-                   MksMouseButton       button,
-                   GCancellable        *cancellable,
-                   GAsyncReadyCallback  callback,
-                   gpointer             user_data)
+                   MksMouseButton       button)
 {
-  g_autoptr(GTask) task = NULL;
   g_autoptr(GError) error = NULL;
+  gint64 begin_time;
 
-  MKS_ENTRY;
-
-  g_return_if_fail (MKS_IS_MOUSE (self));
-  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
-
-  task = g_task_new (self, cancellable, callback, user_data);
-  g_task_set_source_tag (task, mks_mouse_release);
+  dex_return_error_if_fail (MKS_IS_MOUSE (self));
 
   if (!check_mouse (self, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    mks_qemu_mouse_call_release (self->mouse,
-                                 button,
-                                 cancellable,
-                                 mks_mouse_release_cb,
-                                 g_steal_pointer (&task));
+    return dex_future_new_for_error (g_steal_pointer (&error));
 
-  MKS_EXIT;
+  begin_time = MKS_TRACE_BEGIN_MARK ();
+
+  return mks_marked_future (mks_qemu_mouse_call_release_future (self->mouse, button),
+                            begin_time,
+                            "mouse.release");
+}
+
+void
+mks_mouse_release_async (MksMouse            *self,
+                         MksMouseButton       button,
+                         GCancellable        *cancellable,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
+{
+  mks_future_to_async_result (self,
+                              cancellable,
+                              callback,
+                              user_data,
+                              G_STRFUNC,
+                              mks_mouse_release (self, button));
 }
 
 /**
@@ -421,70 +342,12 @@ mks_mouse_release_finish (MksMouse      *self,
 {
   gboolean ret;
 
-  MKS_ENTRY;
-
   g_return_val_if_fail (MKS_IS_MOUSE (self), FALSE);
-  g_return_val_if_fail (G_IS_TASK (result), FALSE);
+  g_return_val_if_fail (DEX_IS_ASYNC_RESULT (result), FALSE);
 
-  ret = g_task_propagate_boolean (G_TASK (result), error);
+  ret = dex_async_result_propagate_boolean (DEX_ASYNC_RESULT (result), error);
 
-  MKS_RETURN (ret);
-}
-
-/**
- * mks_mouse_release_sync:
- * @self: an #MksMouse
- * @button: the #MksMouseButton that was released
- * @cancellable: (nullable): a #GCancellable
- * @error: a location for a #GError, or %NULL
- *
- * Synchronously releases a mouse button.
- *
- * Returns: %TRUE if the operation was acknowledged by the QEMU instance;
- *   otherwise %FALSE and @error is set.
- */
-gboolean
-mks_mouse_release_sync (MksMouse        *self,
-                        MksMouseButton   button,
-                        GCancellable    *cancellable,
-                        GError         **error)
-{
-  gboolean ret;
-
-  MKS_ENTRY;
-
-  g_return_val_if_fail (MKS_IS_MOUSE (self), FALSE);
-  g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
-
-  if (!check_mouse (self, error))
-    MKS_RETURN (FALSE);
-
-  ret = mks_qemu_mouse_call_release_sync (self->mouse, button, cancellable, error);
-
-  MKS_RETURN (ret);
-}
-
-static void
-mks_mouse_move_to_cb (GObject      *object,
-                      GAsyncResult *result,
-                      gpointer      user_data)
-{
-  MksQemuMouse *mouse = (MksQemuMouse *)object;
-  g_autoptr(GTask) task = user_data;
-  g_autoptr(GError) error = NULL;
-
-  MKS_ENTRY;
-
-  g_assert (MKS_QEMU_IS_MOUSE (mouse));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (G_IS_TASK (task));
-
-  if (!mks_qemu_mouse_call_set_abs_position_finish (mouse, result, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    g_task_return_boolean (task, TRUE);
-
-  MKS_EXIT;
+  return ret;
 }
 
 /**
@@ -492,44 +355,48 @@ mks_mouse_move_to_cb (GObject      *object,
  * @self: an #MksMouse
  * @x: the x coordinate
  * @y: the y coordinate
- * @cancellable: (nullable): a #GCancellable
- * @callback: a #GAsyncReadyCallback to execute upon completion
- * @user_data: closure data for @callback
  *
  * Moves to the absolute position at coordinates (x,y).
+ *
+ * Returns: (transfer full): a [class@Dex.Future] that resolves to %TRUE.
  */
-void
+DexFuture *
 mks_mouse_move_to (MksMouse            *self,
                    guint                x,
-                   guint                y,
-                   GCancellable        *cancellable,
-                   GAsyncReadyCallback  callback,
-                   gpointer             user_data)
+                   guint                y)
 {
-  g_autoptr(GTask) task = NULL;
   g_autoptr(GError) error = NULL;
+  gint64 begin_time;
 
-  MKS_ENTRY;
-
-  g_return_if_fail (MKS_IS_MOUSE (self));
-  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
-
-  task = g_task_new (self, cancellable, callback, user_data);
-  g_task_set_source_tag (task, mks_mouse_move_to);
+  dex_return_error_if_fail (MKS_IS_MOUSE (self));
 
   self->last_known_x = x;
   self->last_known_y = y;
 
   if (!check_mouse (self, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    mks_qemu_mouse_call_set_abs_position (self->mouse,
-                                          x, y,
-                                          cancellable,
-                                          mks_mouse_move_to_cb,
-                                          g_steal_pointer (&task));
+    return dex_future_new_for_error (g_steal_pointer (&error));
 
-  MKS_EXIT;
+  begin_time = MKS_TRACE_BEGIN_MARK ();
+
+  return mks_marked_future (mks_qemu_mouse_call_set_abs_position_future (self->mouse, x, y),
+                            begin_time,
+                            "mouse.move-to");
+}
+
+void
+mks_mouse_move_to_async (MksMouse            *self,
+                         guint                x,
+                         guint                y,
+                         GCancellable        *cancellable,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
+{
+  mks_future_to_async_result (self,
+                              cancellable,
+                              callback,
+                              user_data,
+                              G_STRFUNC,
+                              mks_mouse_move_to (self, x, y));
 }
 
 /**
@@ -550,75 +417,12 @@ mks_mouse_move_to_finish (MksMouse      *self,
 {
   gboolean ret;
 
-  MKS_ENTRY;
-
   g_return_val_if_fail (MKS_IS_MOUSE (self), FALSE);
-  g_return_val_if_fail (G_IS_TASK (result), FALSE);
+  g_return_val_if_fail (DEX_IS_ASYNC_RESULT (result), FALSE);
 
-  ret = g_task_propagate_boolean (G_TASK (result), error);
+  ret = dex_async_result_propagate_boolean (DEX_ASYNC_RESULT (result), error);
 
-  MKS_RETURN (ret);
-}
-
-/**
- * mks_mouse_move_to_sync:
- * @self: an #MksMouse
- * @x: the x coordinate
- * @y: the y coordinate
- * @cancellable: (nullable): a #GCancellable
- * @error: a location for a #GError, or %NULL
- *
- * Synchronously moves to the absolute position at coordinates (x,y).
- *
- * Returns: %TRUE if the operation was acknowledged by the QEMU instance;
- *   otherwise %FALSE and @error is set.
- */
-gboolean
-mks_mouse_move_to_sync (MksMouse      *self,
-                        guint          x,
-                        guint          y,
-                        GCancellable  *cancellable,
-                        GError       **error)
-{
-  gboolean ret;
-
-  MKS_ENTRY;
-
-  g_return_val_if_fail (MKS_IS_MOUSE (self), FALSE);
-  g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
-
-  self->last_known_x = x;
-  self->last_known_y = y;
-
-  if (!check_mouse (self, error))
-    MKS_RETURN (FALSE);
-
-  ret = mks_qemu_mouse_call_set_abs_position_sync (self->mouse, x, y, cancellable, error);
-
-  MKS_RETURN (ret);
-}
-
-static void
-mks_mouse_move_by_cb (GObject      *object,
-                      GAsyncResult *result,
-                      gpointer      user_data)
-{
-  MksQemuMouse *mouse = (MksQemuMouse *)object;
-  g_autoptr(GTask) task = user_data;
-  g_autoptr(GError) error = NULL;
-
-  MKS_ENTRY;
-
-  g_assert (MKS_QEMU_IS_MOUSE (mouse));
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (G_IS_TASK (task));
-
-  if (!mks_qemu_mouse_call_rel_motion_finish (mouse, result, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    g_task_return_boolean (task, TRUE);
-
-  MKS_EXIT;
+  return ret;
 }
 
 /**
@@ -626,44 +430,48 @@ mks_mouse_move_by_cb (GObject      *object,
  * @self: an #MksMouse
  * @delta_x: the x coordinate delta
  * @delta_y: the y coordinate delta
- * @cancellable: (nullable): a #GCancellable
- * @callback: a #GAsyncReadyCallback to execute upon completion
- * @user_data: closure data for @callback
  *
  * Moves the mouse by delta_x and delta_y.
+ *
+ * Returns: (transfer full): a [class@Dex.Future] that resolves to %TRUE.
  */
-void
+DexFuture *
 mks_mouse_move_by (MksMouse            *self,
                    int                  delta_x,
-                   int                  delta_y,
-                   GCancellable        *cancellable,
-                   GAsyncReadyCallback  callback,
-                   gpointer             user_data)
+                   int                  delta_y)
 {
-  g_autoptr(GTask) task = NULL;
   g_autoptr(GError) error = NULL;
+  gint64 begin_time;
 
-  MKS_ENTRY;
-
-  g_return_if_fail (MKS_IS_MOUSE (self));
-  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
-
-  task = g_task_new (self, cancellable, callback, user_data);
-  g_task_set_source_tag (task, mks_mouse_move_by);
+  dex_return_error_if_fail (MKS_IS_MOUSE (self));
 
   self->last_known_x += delta_x;
   self->last_known_y += delta_y;
 
   if (!check_mouse (self, &error))
-    g_task_return_error (task, g_steal_pointer (&error));
-  else
-    mks_qemu_mouse_call_rel_motion (self->mouse,
-                                    delta_x, delta_y,
-                                    cancellable,
-                                    mks_mouse_move_by_cb,
-                                    g_steal_pointer (&task));
+    return dex_future_new_for_error (g_steal_pointer (&error));
 
-  MKS_EXIT;
+  begin_time = MKS_TRACE_BEGIN_MARK ();
+
+  return mks_marked_future (mks_qemu_mouse_call_rel_motion_future (self->mouse, delta_x, delta_y),
+                            begin_time,
+                            "mouse.move-by");
+}
+
+void
+mks_mouse_move_by_async (MksMouse            *self,
+                         int                  delta_x,
+                         int                  delta_y,
+                         GCancellable        *cancellable,
+                         GAsyncReadyCallback  callback,
+                         gpointer             user_data)
+{
+  mks_future_to_async_result (self,
+                              cancellable,
+                              callback,
+                              user_data,
+                              G_STRFUNC,
+                              mks_mouse_move_by (self, delta_x, delta_y));
 }
 
 /**
@@ -684,50 +492,10 @@ mks_mouse_move_by_finish (MksMouse      *self,
 {
   gboolean ret;
 
-  MKS_ENTRY;
-
   g_return_val_if_fail (MKS_IS_MOUSE (self), FALSE);
-  g_return_val_if_fail (G_IS_TASK (result), FALSE);
+  g_return_val_if_fail (DEX_IS_ASYNC_RESULT (result), FALSE);
 
-  ret = g_task_propagate_boolean (G_TASK (result), error);
+  ret = dex_async_result_propagate_boolean (DEX_ASYNC_RESULT (result), error);
 
-  MKS_RETURN (ret);
-}
-
-/**
- * mks_mouse_move_by_sync:
- * @self: an #MksMouse
- * @delta_x: the x coordinate delta
- * @delta_y: the y coordinate delta
- * @cancellable: (nullable): a #GCancellable
- * @error: a location for a #GError, or %NULL
- *
- * Synchronously moves the mouse by delta_x and delta_y.
- *
- * Returns: %TRUE if the operation was acknowledged by the QEMU instance;
- *   otherwise %FALSE and @error is set.
- */
-gboolean
-mks_mouse_move_by_sync (MksMouse      *self,
-                        int            delta_x,
-                        int            delta_y,
-                        GCancellable  *cancellable,
-                        GError       **error)
-{
-  gboolean ret;
-
-  MKS_ENTRY;
-
-  g_return_val_if_fail (MKS_IS_MOUSE (self), FALSE);
-  g_return_val_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable), FALSE);
-
-  self->last_known_x += delta_x;
-  self->last_known_y += delta_y;
-
-  if (!check_mouse (self, error))
-    MKS_RETURN (FALSE);
-
-  ret = mks_qemu_mouse_call_rel_motion_sync (self->mouse, delta_x, delta_y, cancellable, error);
-
-  MKS_RETURN (ret);
+  return ret;
 }

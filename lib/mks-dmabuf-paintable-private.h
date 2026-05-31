@@ -28,23 +28,23 @@ G_BEGIN_DECLS
 
 typedef struct _MksDmabufScanoutData
 {
-  guint                  width;
-  guint                  height;
-  guint                  stride;
-  guint                  fourcc;
-  guint64                modifier;
-  int                    dmabuf_fd;
+  guint   width;
+  guint   height;
+  guint   stride;
+  guint   fourcc;
+  guint64 modifier;
+  int     dmabuf_fd;
 } MksDmabufScanoutData;
 
 #define MKS_TYPE_DMABUF_PAINTABLE (mks_dmabuf_paintable_get_type())
 
 G_DECLARE_FINAL_TYPE (MksDmabufPaintable, mks_dmabuf_paintable, MKS, DMABUF_PAINTABLE, GObject)
 
-MksDmabufPaintable *mks_dmabuf_paintable_new        (void);
-gboolean            mks_dmabuf_paintable_import     (MksDmabufPaintable   *self,
-                                                     GdkDisplay           *display,
-                                                     MksDmabufScanoutData *data,
-                                                     cairo_region_t       *region,
-                                                     GError              **error);
+MksDmabufPaintable *mks_dmabuf_paintable_new    (void);
+gboolean            mks_dmabuf_paintable_import (MksDmabufPaintable    *self,
+                                                 GdkDisplay            *display,
+                                                 MksDmabufScanoutData  *data,
+                                                 cairo_region_t        *region,
+                                                 GError               **error);
 
 G_END_DECLS

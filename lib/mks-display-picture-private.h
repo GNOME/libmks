@@ -32,22 +32,21 @@ G_BEGIN_DECLS
 
 G_DECLARE_FINAL_TYPE (MksDisplayPicture, mks_display_picture, MKS, DISPLAY_PICTURE, GtkWidget)
 
-GtkWidget    *mks_display_picture_new           (void);
-MksPaintable *mks_display_picture_get_paintable (MksDisplayPicture *self);
-void          mks_display_picture_set_paintable (MksDisplayPicture *self,
-                                                 MksPaintable      *paintable);
-MksMouse     *mks_display_picture_get_mouse     (MksDisplayPicture *self);
-void          mks_display_picture_set_mouse     (MksDisplayPicture *self,
-                                                 MksMouse          *mouse);
-MksKeyboard  *mks_display_picture_get_keyboard  (MksDisplayPicture *self);
-void          mks_display_picture_set_keyboard  (MksDisplayPicture *self,
-                                                 MksKeyboard       *keyboard);
-MksTouchable *mks_display_picture_get_touchable (MksDisplayPicture *self);
-void          mks_display_picture_set_touchable (MksDisplayPicture *self,
-                                                 MksTouchable      *touchable);
-gboolean
-   mks_display_picture_event_get_guest_position (MksDisplayPicture *self,
-                                                 GdkEvent          *event,
-                                                 double            *guest_x,
-                                                 double            *guest_y);
+GtkWidget    *mks_display_picture_new                      (void);
+MksPaintable *mks_display_picture_get_paintable            (MksDisplayPicture *self);
+void          mks_display_picture_set_paintable            (MksDisplayPicture *self,
+                                                            MksPaintable      *paintable);
+MksMouse     *mks_display_picture_get_mouse                (MksDisplayPicture *self);
+void          mks_display_picture_set_mouse                (MksDisplayPicture *self,
+                                                            MksMouse          *mouse);
+MksKeyboard  *mks_display_picture_get_keyboard             (MksDisplayPicture *self);
+void          mks_display_picture_set_keyboard             (MksDisplayPicture *self,
+                                                            MksKeyboard       *keyboard);
+MksTouchable *mks_display_picture_get_touchable            (MksDisplayPicture *self);
+void          mks_display_picture_set_touchable            (MksDisplayPicture *self,
+                                                            MksTouchable      *touchable);
+gboolean      mks_display_picture_event_get_guest_position (MksDisplayPicture *self,
+                                                            GdkEvent          *event,
+                                                            double            *guest_x,
+                                                            double            *guest_y);
 G_END_DECLS
