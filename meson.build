@@ -166,7 +166,7 @@ endif
 summary('Enabled', have_tests, section: 'Tests')
 
 if get_option('docs') and get_option('introspection').enabled()
-  subdir('docs')
+  subdir('doc')
 endif
 
 configure_file(output: 'config.h', configuration: config_h)
