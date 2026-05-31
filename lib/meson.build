@@ -5,6 +5,18 @@ libmks_include_directories = [
   include_directories('..'),
 ]
 
+pixman_cflags = run_command('pkg-config',
+                             '--cflags-only-I',
+                             'pixman-1',
+                             check: true).stdout().strip().split()
+pixman_include_directories = []
+foreach cflag : pixman_cflags
+  pixman_include_directories += include_directories(cflag.substring(2))
+endforeach
+pixman_headers_dep = declare_dependency(
+  include_directories: pixman_include_directories,
+)
+
 libmks_sources = [
   'mks-audio-format.c',
   'mks-chardev.c',
@@ -141,6 +153,7 @@ libmks_deps = [
   dependency('gstreamer-app-1.0'),
   libgtk_dep,
   libvte_dep,
+  pixman_headers_dep,
 
   cc.find_library('m', required: false),
 ]

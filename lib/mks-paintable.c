@@ -30,6 +30,7 @@
 
 #include "mks-cairo-framebuffer-private.h"
 #include "mks-dmabuf-paintable-private.h"
+#include "mks-mapped-paintable-private.h"
 #include "mks-paintable-private.h"
 #include "mks-qemu.h"
 #include "mks-util-private.h"
@@ -41,6 +42,7 @@ struct _MksPaintable
   GObject                            parent_instance;
   MksQemuListener                   *listener;
   MksQemuListenerUnixScanoutDMABUF2 *listener_dmabuf2;
+  MksQemuListenerUnixMap            *listener_map;
   GDBusConnection                   *connection;
   GdkDisplay                        *display;
   GdkPaintable                      *child;
@@ -154,6 +156,7 @@ mks_paintable_dispose (GObject *object)
   g_clear_object (&self->connection);
   g_clear_object (&self->listener);
   g_clear_object (&self->listener_dmabuf2);
+  g_clear_object (&self->listener_map);
   g_clear_object (&self->child);
   g_clear_object (&self->cursor);
   g_clear_object (&self->display);
@@ -292,6 +295,98 @@ mks_paintable_set_child (MksPaintable *self,
     gdk_paintable_invalidate_size (GDK_PAINTABLE (self));
 
   g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_PAINTABLE]);
+}
+
+static gboolean
+mks_paintable_listener_scanout_map (MksPaintable           *self,
+                                    GDBusMethodInvocation  *invocation,
+                                    GUnixFDList            *unix_fd_list,
+                                    GVariant               *handle,
+                                    guint                   offset,
+                                    guint                   width,
+                                    guint                   height,
+                                    guint                   stride,
+                                    guint                   pixman_format,
+                                    MksQemuListenerUnixMap *listener)
+{
+  g_autoptr(MksMappedPaintable) child = NULL;
+  g_autoptr(GError) error = NULL;
+  int map_fd = -1;
+  guint fd_index;
+
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER_UNIX_MAP (listener));
+  g_assert (g_variant_is_of_type (handle, G_VARIANT_TYPE_HANDLE));
+
+  fd_index = g_variant_get_handle (handle);
+  if (unix_fd_list == NULL || fd_index >= g_unix_fd_list_get_length (unix_fd_list))
+    {
+      g_dbus_method_invocation_return_error_literal (invocation,
+                                                     G_IO_ERROR,
+                                                     G_IO_ERROR_INVALID_ARGUMENT,
+                                                     "Invalid handle to shared map");
+      return TRUE;
+    }
+
+  if (!MKS_IS_MAPPED_PAINTABLE (self->child))
+    {
+      child = mks_mapped_paintable_new ();
+      mks_paintable_set_child (self, GDK_PAINTABLE (child));
+    }
+
+  if (-1 == (map_fd = g_unix_fd_list_get (unix_fd_list, fd_index, &error)))
+    {
+      g_dbus_method_invocation_return_gerror (invocation, error);
+      return TRUE;
+    }
+
+  if (!mks_mapped_paintable_import (MKS_MAPPED_PAINTABLE (self->child),
+                                    map_fd,
+                                    offset,
+                                    width,
+                                    height,
+                                    stride,
+                                    pixman_format,
+                                    NULL,
+                                    &error))
+    {
+      g_dbus_method_invocation_return_gerror (invocation, error);
+      g_clear_fd (&map_fd, NULL);
+      return TRUE;
+    }
+
+  g_clear_fd (&map_fd, NULL);
+  mks_qemu_listener_unix_map_complete_scanout_map (listener, invocation, NULL);
+  return TRUE;
+}
+
+static gboolean
+mks_paintable_listener_update_map (MksPaintable           *self,
+                                   GDBusMethodInvocation  *invocation,
+                                   int                     x,
+                                   int                     y,
+                                   int                     width,
+                                   int                     height,
+                                   MksQemuListenerUnixMap *listener)
+{
+  cairo_region_t *region;
+
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER_UNIX_MAP (listener));
+
+  if (!MKS_IS_MAPPED_PAINTABLE (self->child))
+    {
+      mks_qemu_listener_unix_map_complete_update_map (listener, invocation);
+      return TRUE;
+    }
+
+  region = cairo_region_create_rectangle (&(cairo_rectangle_int_t) { x, y, width, height });
+  mks_mapped_paintable_damage (MKS_MAPPED_PAINTABLE (self->child), region);
+  cairo_region_destroy (region);
+  mks_qemu_listener_unix_map_complete_update_map (listener, invocation);
+  return TRUE;
 }
 
 static gboolean
@@ -750,6 +845,8 @@ mks_paintable_listener_disable (MksPaintable          *self,
 
   if (MKS_IS_CAIRO_FRAMEBUFFER (self->child))
     mks_cairo_framebuffer_clear (MKS_CAIRO_FRAMEBUFFER (self->child));
+  else if (MKS_IS_MAPPED_PAINTABLE (self->child))
+    mks_mapped_paintable_clear (MKS_MAPPED_PAINTABLE (self->child));
 
   gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
 
@@ -796,6 +893,15 @@ mks_paintable_connection_cb (DexFuture *future,
       return dex_future_new_true ();
     }
 
+  if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self->listener_map),
+                                         self->connection,
+                                         "/org/qemu/Display1/Listener",
+                                         &error))
+    {
+      g_warning ("Failed to export map listener on bus: %s", error->message);
+      return dex_future_new_true ();
+    }
+
   g_dbus_connection_start_message_processing (self->connection);
 
   return dex_future_new_true ();
@@ -838,8 +944,10 @@ _mks_paintable_new (GdkDisplay    *display,
   /* Setup our listener and callbacks to process requests */
   self->listener = mks_qemu_listener_skeleton_new ();
   self->listener_dmabuf2 = mks_qemu_listener_unix_scanout_dmabuf2_skeleton_new ();
+  self->listener_map = mks_qemu_listener_unix_map_skeleton_new ();
   mks_qemu_listener_set_interfaces (self->listener,
                                     (const char * const[]) {
+                                      "org.qemu.Display1.Listener.Unix.Map",
                                       "org.qemu.Display1.Listener.Unix.ScanoutDMABUF2",
                                       NULL
                                     });
@@ -866,6 +974,16 @@ _mks_paintable_new (GdkDisplay    *display,
   g_signal_connect_object (self->listener_dmabuf2,
                            "handle-scanout-dmabuf2",
                            G_CALLBACK (mks_paintable_listener_scanout_dmabuf2),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->listener_map,
+                           "handle-scanout-map",
+                           G_CALLBACK (mks_paintable_listener_scanout_map),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->listener_map,
+                           "handle-update-map",
+                           G_CALLBACK (mks_paintable_listener_update_map),
                            self,
                            G_CONNECT_SWAPPED);
   g_signal_connect_object (self->listener,
