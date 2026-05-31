@@ -63,11 +63,15 @@ libmks_enums = gnome.mkenums_simple('mks-enums',
 
 # Setup mks-version.h for version checking
 version_split = meson.project_version().split('.')
+micro_version = version_split[2]
+if version_split[2][0] in ['a', 'b', 'r']
+  micro_version = '0'
+endif
 version_conf = configuration_data()
 version_conf.set('VERSION', meson.project_version())
 version_conf.set('MAJOR_VERSION', version_split[0])
 version_conf.set('MINOR_VERSION', version_split[1])
-version_conf.set('MICRO_VERSION', version_split[2])
+version_conf.set('MICRO_VERSION', micro_version)
 mks_version_h = configure_file(
           input: 'mks-version.h.in',
          output: 'mks-version.h',
@@ -136,7 +140,8 @@ libmks = shared_library('mks-' + api_version,
   include_directories: libmks_include_directories,
          dependencies: libmks_deps,
               install: true,
-              version: meson.project_version(),
+              version: '@0@.0.0'.format(api_version),
+      darwin_versions: '@0@.0'.format(api_version),
 )
 
 libmks_dep = declare_dependency(

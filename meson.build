@@ -1,6 +1,6 @@
 project('libmks', 'c',
-          version: '0.1.6',
-    meson_version: '>= 0.62.0',
+          version: '1.0.alpha',
+    meson_version: '>= 1.1',
   default_options: ['warning_level=2', 'werror=false', 'c_std=gnu11'],
 )
 
