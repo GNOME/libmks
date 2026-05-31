@@ -7,7 +7,7 @@ docs_url = "https://gnome.pages.gitlab.gnome.org/libmks/libmks1"
 authors = "Christian Hergert"
 license = "LGPL-2.1-or-later"
 description = "Mouse, Keyboard, and Screen to QEMU"
-dependencies = [ "GObject-2.0", "Gdk-4.0", "Gtk-4.0" ]
+dependencies = [ "GObject-2.0", "Gdk-4.0", "Gtk-4.0", "Dex-1", "Vte-3.91", "Gst-1.0" ]
 devhelp = true
 search_index = true
 
@@ -36,6 +36,21 @@ search_index = true
   description = "The GTK toolkit"
   docs_url = "https://docs.gtk.org/gtk4/"
 
+  [dependencies."Dex-1"]
+  name = "Dex"
+  description = "Future-based programming for GNOME"
+  docs_url = "https://gnome.pages.gitlab.gnome.org/libdex/"
+
+  [dependencies."Vte-3.91"]
+  name = "Vte"
+  description = "Virtual terminal widget for GTK"
+  docs_url = "https://gnome.pages.gitlab.gnome.org/vte/gtk4/"
+
+  [dependencies."Gst-1.0"]
+  name = "GStreamer"
+  description = "Streaming media framework"
+  docs_url = "https://gstreamer.freedesktop.org/documentation/gstreamer/"
+
 [theme]
 name = "basic"
 show_index_summary = true
@@ -49,4 +64,3 @@ content_files = [
 ]
 
 urlmap_file = "urlmap.js"
-
