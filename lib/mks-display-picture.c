@@ -389,6 +389,19 @@ mks_display_picture_notify_cursor_cb (MksDisplayPicture *self,
 }
 
 static void
+mks_display_picture_sync_cursor (MksDisplayPicture *self)
+{
+  GdkCursor *cursor = NULL;
+
+  g_assert (MKS_IS_DISPLAY_PICTURE (self));
+
+  if (self->paintable != NULL)
+    cursor = _mks_paintable_get_cursor (self->paintable);
+
+  gtk_widget_set_cursor (GTK_WIDGET (self), cursor);
+}
+
+static void
 mks_display_picture_mouse_set_cb (MksDisplayPicture *self,
                                   int                x,
                                   int                y,
@@ -681,6 +694,7 @@ mks_display_picture_set_paintable (MksDisplayPicture *self,
   if (g_set_object (&self->paintable, paintable))
     {
       g_signal_group_set_target (self->paintable_signals, paintable);
+      mks_display_picture_sync_cursor (self);
       g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_PAINTABLE]);
       gtk_widget_queue_resize (GTK_WIDGET (self));
     }
