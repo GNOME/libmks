@@ -245,7 +245,7 @@ mks_clipboard_handle_request_complete_cb (DexFuture *future,
   content = g_value_dup_boxed (value);
   bytes = mks_clipboard_content_ref_bytes (content);
   data = g_variant_new_from_bytes (G_VARIANT_TYPE ("ay"), bytes, TRUE);
-  g_dbus_method_invocation_return_value (g_object_ref (invocation),
+  g_dbus_method_invocation_return_value (invocation,
                                          g_variant_new ("(s@ay)",
                                                         mks_clipboard_content_get_mime_type (content),
                                                         data));
@@ -278,7 +278,7 @@ mks_clipboard_handle_request_cb (MksClipboard          *self,
   future = self->read_func (self, selection, mime_types, self->read_func_data);
   dex_future_disown (dex_future_finally (future,
                                          mks_clipboard_handle_request_complete_cb,
-                                         g_steal_pointer (&invocation),
+                                         g_object_ref (invocation),
                                          g_object_unref));
 
   return TRUE;
