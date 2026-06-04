@@ -50,7 +50,7 @@ struct _MksPaintable
   MksDmabufScanoutData              *scanout_data;
   int                                mouse_x;
   int                                mouse_y;
-  guint                              y_inverted : 1;
+  guint                              y0_top : 1;
 };
 
 enum {
@@ -436,7 +436,7 @@ mks_paintable_listener_scanout_dmabuf (MksPaintable          *self,
       return TRUE;
     }
 
-  self->y_inverted = !y0_top;
+  self->y0_top = y0_top;
   scanout_data = g_new0 (MksDmabufScanoutData, 1);
 
   scanout_data->dmabuf_fd[0] = dmabuf_fd;
@@ -557,7 +557,7 @@ mks_paintable_listener_scanout_dmabuf2 (MksPaintable                     *self,
       scanout_data->stride[i] = strides[i];
     }
 
-  self->y_inverted = !y0_top;
+  self->y0_top = y0_top;
 
   g_clear_pointer (&self->scanout_data, mks_dmabuf_scanout_data_free);
   self->scanout_data = g_steal_pointer (&scanout_data);
@@ -586,7 +586,7 @@ mks_paintable_listener_update_dmabuf (MksPaintable          *self,
   if (MKS_IS_DMABUF_PAINTABLE (self->child))
     {
       g_assert (self->scanout_data != NULL);
-      if (!self->y_inverted)
+      if (self->y0_top)
         y = self->scanout_data->backing_height - (self->scanout_data->y + y) - height;
       else
         y = self->scanout_data->y + y;
@@ -747,7 +747,7 @@ mks_paintable_listener_scanout (MksPaintable          *self,
       mks_paintable_set_child (self, GDK_PAINTABLE (child));
     }
 
-  self->y_inverted = FALSE;
+  self->y0_top = TRUE;
 
   source = cairo_image_surface_create_for_data ((guint8 *)data, format, width, height, stride);
   cr = mks_cairo_framebuffer_update (MKS_CAIRO_FRAMEBUFFER (self->child), 0, 0, width, height);
@@ -1067,7 +1067,7 @@ _mks_paintable_snapshot (MksPaintable *self,
                                       surface_y,
                                       scale);
     }
-  else if (MKS_IS_DMABUF_PAINTABLE (self->child) && !self->y_inverted)
+  else if (MKS_IS_DMABUF_PAINTABLE (self->child) && self->y0_top)
     {
       gtk_snapshot_save (snapshot);
       gtk_snapshot_translate (snapshot, &GRAPHENE_POINT_INIT (0, height));
