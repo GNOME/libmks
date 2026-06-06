@@ -1,7 +1,6 @@
-/*
- * mks-keyboard.h
+/* mks-keyboard.h
  *
- * Copyright 2023 Christian Hergert <christian@sourceandstack.com>
+ * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
  * This library is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -10,11 +9,11 @@
  *
  * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
@@ -32,15 +31,10 @@
 
 G_BEGIN_DECLS
 
-#define MKS_TYPE_KEYBOARD            (mks_keyboard_get_type ())
-#define MKS_KEYBOARD(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_KEYBOARD, MksKeyboard))
-#define MKS_KEYBOARD_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_KEYBOARD, MksKeyboard const))
-#define MKS_KEYBOARD_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MKS_TYPE_KEYBOARD, MksKeyboardClass))
-#define MKS_IS_KEYBOARD(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MKS_TYPE_KEYBOARD))
-#define MKS_IS_KEYBOARD_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MKS_TYPE_KEYBOARD))
-#define MKS_KEYBOARD_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MKS_TYPE_KEYBOARD, MksKeyboardClass))
+#define MKS_TYPE_KEYBOARD            (mks_keyboard_get_type())
 
-typedef struct _MksKeyboardClass MksKeyboardClass;
+MKS_AVAILABLE_IN_ALL
+MKS_DECLARE_INTERNAL_TYPE (MksKeyboard, mks_keyboard, MKS, KEYBOARD, MksDevice)
 
 /**
  * MksKeyboardModifier:
@@ -59,8 +53,6 @@ typedef enum _MksKeyboardModifier
   MKS_KEYBOARD_MODIFIER_CAPS_LOCK   = 1 << 2,
 } MksKeyboardModifier;
 
-MKS_AVAILABLE_IN_ALL
-GType                mks_keyboard_get_type       (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
 MksKeyboardModifier  mks_keyboard_get_modifiers  (MksKeyboard          *self);
 MKS_AVAILABLE_IN_ALL

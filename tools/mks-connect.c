@@ -1,20 +1,19 @@
-/*
- * mks-connect.c
+/* mks-connect.c
  *
- * Copyright 2023 Christian Hergert <christian@sourceandstack.com>
+ * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
- * This program is free software; you can redistribute it and/or modify
+ * This library is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation; either version 2.1 of the
  * License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but
+ * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
@@ -148,11 +147,12 @@ main_fiber (gpointer user_data)
 
   for (guint i = 0; i < n_queued_owners; i++)
     {
+      g_autoptr(MksTransport) transport = NULL;
+
       g_clear_object (&session);
 
-      session = dex_await_object (mks_session_new_for_connection_with_name (connection,
-                                                                            queued_owners[i]),
-                                  &error);
+      transport = mks_dbus_transport_new (connection, queued_owners[i]);
+      session = dex_await_object (mks_session_new (transport), &error);
       if (session == NULL)
         {
           g_printerr ("Failed to create MksSession: %s\n",
@@ -163,7 +163,7 @@ main_fiber (gpointer user_data)
       g_print ("Session(uuid=\"%s\", name=\"%s\", bus-name=%s)\n",
               mks_session_get_uuid (session),
               mks_session_get_name (session),
-              mks_session_get_bus_name (session));
+              queued_owners[i]);
 
       devices = mks_session_get_devices (session);
       n_items = g_list_model_get_n_items (devices);
@@ -188,7 +188,7 @@ main_loop_quit_cb (DexFuture *future,
 }
 
 int
-main (int argc,
+main (int   argc,
       char *argv[])
 {
   g_autoptr(GMainLoop) main_loop = NULL;

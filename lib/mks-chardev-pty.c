@@ -1,5 +1,4 @@
-/*
- * mks-chardev-pty.c
+/* mks-chardev-pty.c
  *
  * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
@@ -10,11 +9,11 @@
  *
  * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
@@ -37,11 +36,11 @@
 #include "mks-util-private.h"
 
 #define BUFFER_SIZE (16 * 1024)
-#define MKS_TYPE_CHARDEV_PTY (mks_chardev_pty_get_type ())
+#define MKS_TYPE_CHARDEV_PTY (mks_chardev_pty_get_type())
 #define MKS_CHARDEV_PTY(obj) (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_CHARDEV_PTY, MksChardevPty))
 #define MKS_IS_CHARDEV_PTY(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MKS_TYPE_CHARDEV_PTY))
 
-typedef struct _MksChardevPty MksChardevPty;
+typedef struct _MksChardevPty      MksChardevPty;
 typedef struct _MksChardevPtyClass MksChardevPtyClass;
 
 GType mks_chardev_pty_get_type (void) G_GNUC_CONST;
@@ -62,29 +61,29 @@ struct _MksChardevPty
   GBytes       *to_socket;
   GBytes       *to_slave;
 
-  guint         socket_read_id;
-  guint         socket_write_id;
-  guint         slave_read_id;
-  guint         slave_write_id;
+  guint socket_read_id;
+  guint socket_write_id;
+  guint slave_read_id;
+  guint slave_write_id;
 
-  int           master_fd;
-  int           slave_fd;
-  int           socket_fd;
+  int master_fd;
+  int slave_fd;
+  int socket_fd;
 };
 
 G_DEFINE_FINAL_TYPE (MksChardevPty, mks_chardev_pty, G_TYPE_OBJECT)
 
-static void mks_chardev_pty_start_socket_read (MksChardevPty *self);
-static void mks_chardev_pty_start_slave_read  (MksChardevPty *self);
-static void mks_chardev_pty_close             (MksChardevPty *self);
-static int  mks_chardev_pty_dup_fd            (MksChardevPty *self,
-                                               GError       **error);
-static gboolean socket_write_cb               (GIOChannel    *channel,
-                                               GIOCondition   condition,
-                                               gpointer       user_data);
-static gboolean slave_write_cb                (GIOChannel    *channel,
-                                               GIOCondition   condition,
-                                               gpointer       user_data);
+static void     mks_chardev_pty_start_socket_read (MksChardevPty  *self);
+static void     mks_chardev_pty_start_slave_read  (MksChardevPty  *self);
+static void     mks_chardev_pty_close             (MksChardevPty  *self);
+static int      mks_chardev_pty_dup_fd            (MksChardevPty  *self,
+                                                   GError        **error);
+static gboolean socket_write_cb                   (GIOChannel     *channel,
+                                                   GIOCondition    condition,
+                                                   gpointer        user_data);
+static gboolean slave_write_cb                    (GIOChannel     *channel,
+                                                   GIOCondition    condition,
+                                                   gpointer        user_data);
 
 static void
 mks_chardev_pty_setup_channels (MksChardevPty *self)
@@ -175,9 +174,9 @@ is_blocking_errno (int errnum)
 }
 
 static gboolean
-set_fd_flags (int      fd,
-              gboolean nonblock,
-              GError **error)
+set_fd_flags (int        fd,
+              gboolean   nonblock,
+              GError   **error)
 {
   int flags;
 
@@ -582,9 +581,9 @@ mks_chardev_pty_start_slave_read (MksChardevPty *self)
 }
 
 static gboolean
-open_pty (int      *master_fd,
-          int      *slave_fd,
-          GError  **error)
+open_pty (int     *master_fd,
+          int     *slave_fd,
+          GError **error)
 {
   g_autofree char *name = NULL;
   g_autofd int master = -1;

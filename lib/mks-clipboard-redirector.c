@@ -1,5 +1,6 @@
-/*
- * Copyright 2026 Christian Hergert
+/* mks-clipboard-redirector.c
+ *
+ * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
  * This library is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -8,11 +9,11 @@
  *
  * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
@@ -26,10 +27,10 @@
 typedef struct
 {
   MksClipboardRedirector *redirector;
-  MksClipboardSelection selection;
-  DexPromise *promise;
-  GOutputStream *stream;
-  char *mime_type;
+  MksClipboardSelection   selection;
+  DexPromise             *promise;
+  GOutputStream          *stream;
+  char                   *mime_type;
 } ReadState;
 
 static void mks_remote_content_provider_set_property (GObject      *object,
@@ -39,41 +40,35 @@ static void mks_remote_content_provider_set_property (GObject      *object,
 
 #define MKS_TYPE_REMOTE_CONTENT_PROVIDER (mks_remote_content_provider_get_type())
 
-G_DECLARE_FINAL_TYPE (MksRemoteContentProvider,
-                      mks_remote_content_provider,
-                      MKS,
-                      REMOTE_CONTENT_PROVIDER,
-                      GdkContentProvider)
+G_DECLARE_FINAL_TYPE (MksRemoteContentProvider, mks_remote_content_provider, MKS, REMOTE_CONTENT_PROVIDER, GdkContentProvider)
 
 struct _MksRemoteContentProvider
 {
   GdkContentProvider parent_instance;
 
-  MksClipboard *clipboard;
-  MksClipboardSelection selection;
-  char **mime_types;
+  MksClipboard           *clipboard;
+  MksClipboardSelection   selection;
+  char                  **mime_types;
 };
 
 struct _MksClipboardRedirector
 {
   GObject parent_instance;
 
-  MksClipboard *clipboard;
-  GdkDisplay *display;
-  GdkClipboard *gdk_clipboard;
-  GdkClipboard *gdk_primary;
-  MksClipboardRedirectorSelections selections;
-  gboolean enabled;
-  gboolean applying_remote;
+  MksClipboard                     *clipboard;
+  GdkDisplay                       *display;
+  GdkClipboard                     *gdk_clipboard;
+  GdkClipboard                     *gdk_primary;
+  MksClipboardRedirectorSelections  selections;
+  gboolean                          enabled;
+  gboolean                          applying_remote;
 
   gulong clipboard_changed_handler;
   gulong primary_changed_handler;
   gulong mks_changed_handler;
 };
 
-G_DEFINE_FINAL_TYPE (MksRemoteContentProvider,
-                     mks_remote_content_provider,
-                     GDK_TYPE_CONTENT_PROVIDER)
+G_DEFINE_FINAL_TYPE (MksRemoteContentProvider, mks_remote_content_provider, GDK_TYPE_CONTENT_PROVIDER)
 G_DEFINE_FINAL_TYPE (MksClipboardRedirector, mks_clipboard_redirector, G_TYPE_OBJECT)
 
 enum {
@@ -491,8 +486,7 @@ mks_clipboard_redirector_class_init (MksClipboardRedirectorClass *klass)
 
   properties[PROP_SELECTIONS] =
     g_param_spec_flags ("selections", NULL, NULL,
-                        MKS_TYPE_CLIPBOARD_REDIRECTOR_SELECTIONS,
-                        MKS_CLIPBOARD_REDIRECTOR_SELECTION_CLIPBOARD,
+                        MKS_TYPE_CLIPBOARD_REDIRECTOR_SELECTIONS, MKS_CLIPBOARD_REDIRECTOR_SELECTION_CLIPBOARD,
                         (G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_properties (object_class, N_PROPS, properties);
@@ -557,7 +551,7 @@ mks_remote_content_provider_request_cb (GObject      *object,
     }
 
   stream = g_task_get_task_data (task);
-  bytes = mks_clipboard_content_ref_bytes (content);
+  bytes = mks_clipboard_content_dup_bytes (content);
   data = g_bytes_get_data (bytes, &size);
 
   g_output_stream_write_all_async (stream,

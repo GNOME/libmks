@@ -1,7 +1,6 @@
-/*
- * mks-session.c
+/* mks-session.c
  *
- * Copyright 2023 Christian Hergert <christian@sourceandstack.com>
+ * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
  * This library is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -10,58 +9,52 @@
  *
  * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #include "config.h"
 
-#include "mks-device-private.h"
+#include "mks-transport-private.h"
 #include "mks-chardev.h"
 #include "mks-clipboard-private.h"
+#include "mks-device-private.h"
 #include "mks-microphone.h"
 #include "mks-read-only-list-model-private.h"
-#include "mks-qemu.h"
 #include "mks-screen.h"
 #include "mks-session.h"
 #include "mks-speaker.h"
 #include "mks-util-private.h"
 
+
 /**
  * MksSession:
  *
- * Session connected to a QEMU VM
+ * Session connected to a transport
  *
- * The `MksSession` represents a connection to a QEMU VM instance. It contains
+ * The `MksSession` represents a connection to a transport. It contains
  * devices such as the mouse, keyboard, and screen which can be used with GTK.
  *
  * You may monitor [property@Mks.Session:devices] using [signal@Gio.ListModel::items-changed] to be
  * notified of changes to available devices in the session.
  *
- * # Connecting To QEMU
+ * # Connecting
  *
- * To use `MksSession`, you should create your QEMU instance using `dbus` for
- * the various devices that support it. You'll need to provide your P2P D-Bus
- * address when connecting to QEMU.
- *
- * Using the same [class@Gio.DBusConnection], create a `MksSession` with
- * [ctor@Mks.Session.new_for_connection]. The `MksSession` instance will negotiate
- * with the peer to determine what devices are available and expose them
- * via the [property@Mks.Session:devices] [iface@Gio.ListModel].
+ * Create a [class@Mks.Transport] and then a `MksSession` with
+ * [ctor@Mks.Session.new]. The `MksSession` instance exposes devices via the
+ * [property@Mks.Session:devices] [iface@Gio.ListModel].
  *
  * # Creating Widgets
  *
  * You can create a new widget to embed in your application by calling
- * [method@Mks.Session.ref_screen] and set the screen for the [class@Mks.Display]
+ * [method@Mks.Session.dup_screen] and set the screen for the [class@Mks.Display]
  * with [method@Mks.Display.set_screen].
  */
-
-#define QEMU_BUS_NAME "org.qemu"
 
 static void     mks_session_async_initable_init_async  (GAsyncInitable       *async_initable,
                                                         int                   io_priority,
@@ -76,17 +69,11 @@ struct _MksSession
 {
   GObject parent_instance;
 
-  /* @connection is used to communicate with the QEMU instance. It is expected
-   * to be a private point-to-point connection over a Unix socket, socketpair(),
-   * or other channel capable of passing FDs between peers.
-   */
-  GDBusConnection *connection;
+  /* @transport is used to communicate with the underlying session provider. */
+  MksTransport         *transport;
+  MksTransportObserver  transport_observer;
 
-  /* As devices are discovered from the QEMU instance, MksDevice-based objects
-   * are created for them and stored in @devices. Applications will work with
-   * these objects to perform operations on the QEMU instance. When we discover
-   * the devices have been removed, we drop them from the listmodel.
-   */
+  /* As devices are discovered, MksDevice-based objects are stored in @devices. */
   GListStore *devices;
 
   /* @devices_read_only is a #MksReadOnlyListModel of @devices so that we may
@@ -96,27 +83,10 @@ struct _MksSession
    */
   GListModel *devices_read_only;
 
-  MksQemuObject *clipboard_object;
   MksClipboard *clipboard;
 
-  /* An object manager client is used to monitor for new objects exported by
-   * the QEMU instance. Those objects are then wrapped by MksDevice objects
-   * as necessary and exported to consumers via @devices.
-   */
-  GDBusObjectManager *object_manager;
-
-  /* A GDBusObjectProxy to the `/org/qemu/Display1/VM` instance. Generally
-   * this used via the `org.qemu.Display1.VM` interface. We track the
-   * top-level object-manager instance so that we can detect easily when
-   * the VM has been removed from the peer. (Which could happen if it is
-   * running on a private D-Bus rather than a socketpair().
-   */
-  MksQemuObject *vm_object;
-  MksQemuVM *vm;
-
-  char  *name;
-  char  *uuid;
-  char  *bus_name;
+  char *name;
+  char *uuid;
 };
 
 static void
@@ -131,8 +101,7 @@ G_DEFINE_FINAL_TYPE_WITH_CODE (MksSession, mks_session, G_TYPE_OBJECT,
 
 enum {
   PROP_0,
-  PROP_CONNECTION,
-  PROP_BUS_NAME,
+  PROP_TRANSPORT,
   PROP_DEVICES,
   PROP_CLIPBOARD,
   PROP_NAME,
@@ -141,21 +110,6 @@ enum {
 };
 
 static GParamSpec *properties [N_PROPS];
-
-static void
-mks_session_set_connection (MksSession      *self,
-                            GDBusConnection *connection)
-{
-  g_assert (MKS_IS_SESSION (self));
-  g_assert (!connection || G_IS_DBUS_CONNECTION (connection));
-  g_assert (self->connection == NULL);
-
-  if (connection == NULL)
-    g_critical ("%s created without a GDBusConnection, this cannot work.",
-                G_OBJECT_TYPE_NAME (self));
-  else
-    self->connection = g_object_ref (connection);
-}
 
 static void
 mks_session_add_device (MksSession *self,
@@ -170,43 +124,27 @@ mks_session_add_device (MksSession *self,
   g_list_store_append (self->devices, device);
 }
 
-static gboolean
-mks_session_has_device (MksSession    *self,
-                        GType          device_type,
-                        MksQemuObject *object)
+static void
+mks_session_remove_device (MksSession *self,
+                           MksDevice  *device)
 {
-  GListModel *model;
   guint n_items;
 
   g_assert (MKS_IS_SESSION (self));
-  g_assert (g_type_is_a (device_type, MKS_TYPE_DEVICE));
-  g_assert (MKS_QEMU_IS_OBJECT (object));
+  g_assert (MKS_IS_DEVICE (device));
 
-  model = G_LIST_MODEL (self->devices);
-  n_items = g_list_model_get_n_items (model);
+  n_items = g_list_model_get_n_items (G_LIST_MODEL (self->devices));
 
   for (guint i = 0; i < n_items; i++)
     {
-      g_autoptr(MksDevice) device = g_list_model_get_item (model, i);
+      g_autoptr(MksDevice) item = g_list_model_get_item (G_LIST_MODEL (self->devices), i);
 
-      if (G_TYPE_CHECK_INSTANCE_TYPE (device, device_type) && device->object == object)
-        return TRUE;
+      if (item == device)
+        {
+          g_list_store_remove (self->devices, i);
+          return;
+        }
     }
-
-  return FALSE;
-}
-
-static void
-mks_session_add_device_once (MksSession    *self,
-                             GType          device_type,
-                             MksQemuObject *object)
-{
-  g_assert (MKS_IS_SESSION (self));
-  g_assert (g_type_is_a (device_type, MKS_TYPE_DEVICE));
-  g_assert (MKS_QEMU_IS_OBJECT (object));
-
-  if (!mks_session_has_device (self, device_type, object))
-    mks_session_add_device (self, _mks_device_new (device_type, self, object));
 }
 
 static void
@@ -230,160 +168,86 @@ mks_session_set_uuid (MksSession *self,
 }
 
 static void
-mks_session_vm_notify_cb (MksSession *self,
-                          GParamSpec *pspec,
-                          MksQemuVM  *vm)
+mks_session_transport_name_changed_cb (gpointer    user_data,
+                                       const char *name)
 {
-  g_assert (MKS_IS_SESSION (self));
-  g_assert (pspec != NULL);
-  g_assert (MKS_QEMU_IS_VM (vm));
+  MksSession *self = user_data;
 
-  if (strcmp (pspec->name, "name") == 0)
-    mks_session_set_name (self, mks_qemu_vm_get_name (vm));
-  else if (strcmp (pspec->name, "uuid") == 0)
-    mks_session_set_uuid (self, mks_qemu_vm_get_uuid (vm));
+  g_assert (MKS_IS_SESSION (self));
+
+  mks_session_set_name (self, name);
 }
 
 static void
-mks_session_set_vm (MksSession    *self,
-                    MksQemuObject *vm_object,
-                    MksQemuVM     *vm)
+mks_session_transport_uuid_changed_cb (gpointer    user_data,
+                                       const char *uuid)
 {
+  MksSession *self = user_data;
+
   g_assert (MKS_IS_SESSION (self));
-  g_assert (MKS_QEMU_IS_OBJECT (vm_object));
-  g_assert (MKS_QEMU_IS_VM (vm));
 
-  if (self->vm != NULL)
-    return;
-
-  g_set_object (&self->vm_object, vm_object);
-  g_set_object (&self->vm, vm);
-
-  g_signal_connect_object (vm,
-                           "notify",
-                           G_CALLBACK (mks_session_vm_notify_cb),
-                           self,
-                           G_CONNECT_SWAPPED);
-  mks_session_set_name (self, mks_qemu_vm_get_name (vm));
-  mks_session_set_uuid (self, mks_qemu_vm_get_uuid (vm));
+  mks_session_set_uuid (self, uuid);
 }
 
 static void
-mks_session_add_interface (MksSession     *self,
-                           MksQemuObject  *object,
-                           GDBusInterface *iface)
+mks_session_transport_clipboard_changed_cb (gpointer      user_data,
+                                            MksClipboard *clipboard)
+{
+  MksSession *self = user_data;
+
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (!clipboard || MKS_IS_CLIPBOARD (clipboard));
+
+  if (g_set_object (&self->clipboard, clipboard))
+    g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_CLIPBOARD]);
+}
+
+static void
+mks_session_transport_device_added_cb (gpointer   user_data,
+                                       MksDevice *device)
+{
+  MksSession *self = user_data;
+
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_IS_DEVICE (device));
+
+  mks_session_add_device (self, device);
+}
+
+static void
+mks_session_transport_device_removed_cb (gpointer   user_data,
+                                         MksDevice *device)
+{
+  MksSession *self = user_data;
+
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_IS_DEVICE (device));
+
+  mks_session_remove_device (self, device);
+}
+
+static void
+mks_session_set_transport (MksSession   *self,
+                           MksTransport *transport)
 {
   g_assert (MKS_IS_SESSION (self));
-  g_assert (MKS_QEMU_IS_OBJECT (object));
-  g_assert (G_IS_DBUS_INTERFACE (iface));
+  g_assert (!transport || MKS_IS_TRANSPORT (transport));
+  g_assert (self->transport == NULL);
 
-  if (MKS_QEMU_IS_VM (iface))
-    mks_session_set_vm (self, object, MKS_QEMU_VM (iface));
-  else if (MKS_QEMU_IS_CLIPBOARD (iface))
+  if (transport == NULL)
+    g_critical ("%s created without a MksTransport, this cannot work.",
+                G_OBJECT_TYPE_NAME (self));
+  else
     {
-      if (self->clipboard == NULL)
-        {
-          self->clipboard_object = g_object_ref (object);
-          self->clipboard = _mks_clipboard_new (self, object);
-          g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_CLIPBOARD]);
-        }
-    }
-  else if (MKS_QEMU_IS_AUDIO (iface))
-    {
-      mks_session_add_device_once (self, MKS_TYPE_SPEAKER, object);
-      mks_session_add_device_once (self, MKS_TYPE_MICROPHONE, object);
-    }
-  else if (MKS_QEMU_IS_CONSOLE (iface))
-    mks_session_add_device_once (self, MKS_TYPE_SCREEN, object);
-  else if (MKS_QEMU_IS_CHARDEV (iface))
-    mks_session_add_device_once (self, MKS_TYPE_CHARDEV, object);
-}
+      self->transport_observer.user_data = self;
+      self->transport_observer.name_changed = mks_session_transport_name_changed_cb;
+      self->transport_observer.uuid_changed = mks_session_transport_uuid_changed_cb;
+      self->transport_observer.clipboard_changed = mks_session_transport_clipboard_changed_cb;
+      self->transport_observer.device_added = mks_session_transport_device_added_cb;
+      self->transport_observer.device_removed = mks_session_transport_device_removed_cb;
 
-static void
-mks_session_object_manager_object_added_cb (MksSession         *self,
-                                            MksQemuObject      *object,
-                                            GDBusObjectManager *manager)
-{
-  g_autolist(GDBusInterface) interfaces = NULL;
-
-  g_assert (MKS_IS_SESSION (self));
-  g_assert (MKS_QEMU_IS_OBJECT (object));
-  g_assert (G_IS_DBUS_OBJECT_MANAGER (manager));
-
-  interfaces = g_dbus_object_get_interfaces (G_DBUS_OBJECT (object));
-
-  for (const GList *iter = interfaces; iter; iter = iter->next)
-    mks_session_add_interface (self, object, iter->data);
-}
-
-static void
-mks_session_object_manager_interface_added_cb (MksSession         *self,
-                                               MksQemuObject      *object,
-                                               GDBusInterface     *iface,
-                                               GDBusObjectManager *manager)
-{
-  g_assert (MKS_IS_SESSION (self));
-  g_assert (MKS_QEMU_IS_OBJECT (object));
-  g_assert (G_IS_DBUS_INTERFACE (iface));
-  g_assert (G_IS_DBUS_OBJECT_MANAGER (manager));
-
-  mks_session_add_interface (self, object, iface);
-}
-
-static void
-mks_session_object_manager_object_removed_cb (MksSession         *self,
-                                              MksQemuObject      *object,
-                                              GDBusObjectManager *manager)
-{
-  g_assert (MKS_IS_SESSION (self));
-  g_assert (MKS_QEMU_IS_OBJECT (object));
-  g_assert (G_IS_DBUS_OBJECT_MANAGER (manager));
-
-  if (object == self->vm_object)
-    {
-      g_clear_object (&self->vm);
-      g_clear_object (&self->vm_object);
-      g_list_store_remove_all (self->devices);
-    }
-  else if (object == self->clipboard_object)
-    {
-      g_clear_object (&self->clipboard);
-      g_clear_object (&self->clipboard_object);
-      g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_CLIPBOARD]);
-    }
-}
-
-static void
-mks_session_set_object_manager (MksSession         *self,
-                                GDBusObjectManager *object_manager)
-{
-  g_assert (MKS_IS_SESSION (self));
-  g_assert (!object_manager || MKS_QEMU_IS_OBJECT_MANAGER_CLIENT (object_manager));
-  g_assert (self->object_manager == NULL);
-
-  if (g_set_object (&self->object_manager, object_manager))
-    {
-      g_autolist(GDBusObjectProxy) objects = NULL;
-
-      g_signal_connect_object (object_manager,
-                               "object-added",
-                               G_CALLBACK (mks_session_object_manager_object_added_cb),
-                               self,
-                               G_CONNECT_SWAPPED);
-      g_signal_connect_object (object_manager,
-                               "object-removed",
-                               G_CALLBACK (mks_session_object_manager_object_removed_cb),
-                               self,
-                               G_CONNECT_SWAPPED);
-      g_signal_connect_object (object_manager,
-                               "interface-added",
-                               G_CALLBACK (mks_session_object_manager_interface_added_cb),
-                               self,
-                               G_CONNECT_SWAPPED);
-
-      objects = g_dbus_object_manager_get_objects (object_manager);
-      for (const GList *iter = objects; iter; iter = iter->next)
-        mks_session_object_manager_object_added_cb (self, iter->data, object_manager);
+      self->transport = g_object_ref (transport);
+      _mks_transport_add_observer (self->transport, &self->transport_observer);
     }
 }
 
@@ -392,17 +256,15 @@ mks_session_dispose (GObject *object)
 {
   MksSession *self = (MksSession *)object;
 
+  if (self->transport != NULL)
+    _mks_transport_remove_observer (self->transport, &self->transport_observer);
+
   if (self->devices != NULL)
     g_list_store_remove_all (self->devices);
 
-  g_clear_object (&self->object_manager);
   g_clear_object (&self->clipboard);
-  g_clear_object (&self->clipboard_object);
-  g_clear_object (&self->vm);
-  g_clear_object (&self->vm_object);
   g_clear_pointer (&self->name, g_free);
   g_clear_pointer (&self->uuid, g_free);
-  g_clear_pointer (&self->bus_name, g_free);
 
   G_OBJECT_CLASS (mks_session_parent_class)->dispose (object);
 }
@@ -414,7 +276,7 @@ mks_session_finalize (GObject *object)
 
   g_clear_object (&self->devices);
   g_clear_object (&self->devices_read_only);
-  g_clear_object (&self->connection);
+  g_clear_object (&self->transport);
 
   G_OBJECT_CLASS (mks_session_parent_class)->finalize (object);
 }
@@ -429,13 +291,10 @@ mks_session_get_property (GObject    *object,
 
   switch (prop_id)
     {
-    case PROP_CONNECTION:
-      g_value_set_object (value, mks_session_get_connection (self));
+    case PROP_TRANSPORT:
+      g_value_set_object (value, self->transport);
       break;
 
-    case PROP_BUS_NAME:
-      g_value_set_string (value, self->bus_name);
-      break;
 
     case PROP_DEVICES:
       g_value_set_object (value, mks_session_get_devices (self));
@@ -468,12 +327,10 @@ mks_session_set_property (GObject      *object,
 
   switch (prop_id)
     {
-    case PROP_CONNECTION:
-      mks_session_set_connection (self, g_value_get_object (value));
+    case PROP_TRANSPORT:
+      mks_session_set_transport (self, g_value_get_object (value));
       break;
-    case PROP_BUS_NAME:
-      g_set_str (&self->bus_name, g_value_get_string (value));
-      break;
+
 
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -491,33 +348,19 @@ mks_session_class_init (MksSessionClass *klass)
   object_class->set_property = mks_session_set_property;
 
   /**
-   * MksSession:connection:
+   * MksSession:transport:
    *
-   * The [class@Gio.DBusConnection] that is used to communicate with QEMU.
+   * The [class@Mks.Transport] that provides the session devices.
    */
-  properties [PROP_CONNECTION] =
-    g_param_spec_object ("connection", NULL, NULL,
-                         G_TYPE_DBUS_CONNECTION,
-                         (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS));
-
-  /**
-   * MksSession:bus-name:
-   *
-   * The unique connection name to connect to, or %NULL for a peer-to-peer
-   * connection.
-   *
-   * Defaults to `org.qemu`.
-   */
-  properties [PROP_BUS_NAME] =
-    g_param_spec_string ("bus-name", NULL, NULL,
-                         QEMU_BUS_NAME,
+  properties [PROP_TRANSPORT] =
+    g_param_spec_object ("transport", NULL, NULL,
+                         MKS_TYPE_TRANSPORT,
                          (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS));
 
   /**
    * MksSession:devices:
    *
-   * A [iface@Gio.ListModel] of devices that have been
-   * discovered on the [class@Gio.DBusConnection] to QEMU.
+   * A [iface@Gio.ListModel] of devices discovered by the transport.
    */
   properties [PROP_DEVICES] =
     g_param_spec_object ("devices", NULL, NULL,
@@ -538,7 +381,7 @@ mks_session_class_init (MksSessionClass *klass)
   /**
    * MksSession:name:
    *
-   * The VM name as specified by the QEMU instance.
+   * The session name as specified by the transport.
    */
   properties [PROP_NAME] =
     g_param_spec_string ("name", NULL, NULL,
@@ -548,7 +391,7 @@ mks_session_class_init (MksSessionClass *klass)
   /**
    * MksSession:uuid:
    *
-   * The VM unique identifier specified by the QEMU instance.
+   * The session unique identifier specified by the transport.
    */
   properties [PROP_UUID] =
     g_param_spec_string ("uuid", NULL, NULL,
@@ -565,74 +408,17 @@ mks_session_init (MksSession *self)
   self->devices_read_only = mks_read_only_list_model_new (G_LIST_MODEL (self->devices));
 }
 
-typedef struct _MksSessionInit
-{
-  MksSession *self;
-  DexPromise *promise;
-} MksSessionInit;
-
-static void
-mks_session_init_free (MksSessionInit *state)
-{
-  g_clear_object (&state->self);
-  dex_clear (&state->promise);
-  g_free (state);
-}
-
-static void
-mks_session_init_cb (GObject      *object,
-                     GAsyncResult *result,
-                     gpointer      user_data)
-{
-  g_autoptr(GDBusObjectManager) object_manager = NULL;
-  g_autoptr(GError) error = NULL;
-  MksSessionInit *state = user_data;
-
-  g_assert (G_IS_ASYNC_RESULT (result));
-  g_assert (state != NULL);
-
-  object_manager = mks_qemu_object_manager_client_new_finish (result, &error);
-
-  g_assert (MKS_IS_SESSION (state->self));
-  g_assert (!object_manager || MKS_QEMU_IS_OBJECT_MANAGER_CLIENT (object_manager));
-
-  mks_session_set_object_manager (state->self, object_manager);
-
-  if (error != NULL)
-    dex_promise_reject (state->promise, g_steal_pointer (&error));
-  else
-    dex_promise_resolve_boolean (state->promise, TRUE);
-
-  mks_session_init_free (state);
-}
-
 static DexFuture *
 mks_session_start (MksSession *self)
 {
-  MksSessionInit *state;
-  DexPromise *promise;
-
   g_assert (MKS_IS_SESSION (self));
 
-  if (self->connection == NULL)
+  if (self->transport == NULL)
     return dex_future_new_reject (G_IO_ERROR,
                                   G_IO_ERROR_NOT_CONNECTED,
                                   "Not connected");
 
-  promise = dex_promise_new_cancellable ();
-  state = g_new0 (MksSessionInit, 1);
-  state->self = g_object_ref (self);
-  state->promise = dex_ref (promise);
-
-  mks_qemu_object_manager_client_new (self->connection,
-                                      G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_DO_NOT_AUTO_START,
-                                      self->bus_name,
-                                      "/org/qemu/Display1",
-                                      dex_promise_get_cancellable (promise),
-                                      mks_session_init_cb,
-                                      state);
-
-  return DEX_FUTURE (promise);
+  return _mks_transport_start (self->transport);
 }
 
 static void
@@ -713,84 +499,25 @@ mks_session_new_complete (DexFuture *future,
 }
 
 /**
- * mks_session_new_for_connection:
- * @connection: a #GDBusConnection
- * Creates a #MksSession which communicates using @connection.
+ * mks_session_new:
+ * @transport: a #MksTransport
  *
- * The [class@Gio.DBusConnection] should be a private D-Bus connection to a QEMU
- * instance which has devices created using the "dbus" backend.
+ * Creates a #MksSession which communicates using @transport.
  *
  * Returns: (transfer full): a [class@Dex.Future] that resolves to a
  *   #MksSession.
  */
 DexFuture *
-mks_session_new_for_connection (GDBusConnection *connection)
-{
-  return mks_session_new_for_connection_with_name (connection, QEMU_BUS_NAME);
-}
-
-void
-mks_session_new_for_connection_async (GDBusConnection     *connection,
-                                      int                  io_priority,
-                                      GCancellable        *cancellable,
-                                      GAsyncReadyCallback  callback,
-                                      gpointer             user_data)
-{
-  g_autoptr(DexAsyncResult) result = NULL;
-
-  result = dex_async_result_new (NULL, cancellable, callback, user_data);
-  dex_async_result_set_priority (result, io_priority);
-  dex_async_result_set_static_name (result, G_STRFUNC);
-  dex_async_result_await (result, mks_session_new_for_connection (connection));
-}
-
-/**
- * mks_session_new_for_connection_finish:
- * @result: a #GAsyncResult provided to callback
- * @error: (nullable): a location for a #GError or %NULL
- *
- * Completes a request to create a #MksSession for a [class@Gio.DBusConnection].
- *
- * Returns: (transfer full): a #MksSession if successful; otherwise %NULL
- *   and @error is set.
- */
-MksSession *
-mks_session_new_for_connection_finish (GAsyncResult  *result,
-                                       GError       **error)
-{
-  g_return_val_if_fail (DEX_IS_ASYNC_RESULT (result), NULL);
-
-  return dex_async_result_propagate_pointer (DEX_ASYNC_RESULT (result), error);
-}
-
-/**
- * mks_session_new_for_connection_with_name:
- * @connection: a #GDBusConnection
- * @bus_name: (nullable): The unique name to connect, or %NULL for a peer
- *   connection
- *
- * Creates a #MksSession which communicates using @connection.
- *
- * The constructor is similar to [ctor@Mks.Session.new_for_connection] but allows
- * to set the bus name to something else than the default `org.qemu`. Use %NULL
- * when @connection is a peer-to-peer connection instead of a message bus.
- *
- * Returns: (transfer full): a [class@Dex.Future] that resolves to a
- *   #MksSession.
- */
-DexFuture *
-mks_session_new_for_connection_with_name (GDBusConnection *connection,
-                                          const char      *bus_name)
+mks_session_new (MksTransport *transport)
 {
   g_autoptr(MksSession) self = NULL;
   MksSessionNew *state;
   gint64 begin_time;
 
-  dex_return_error_if_fail (G_IS_DBUS_CONNECTION (connection));
+  dex_return_error_if_fail (MKS_IS_TRANSPORT (transport));
 
   self = g_object_new (MKS_TYPE_SESSION,
-                       "connection", connection,
-                       "bus-name", bus_name,
+                       "transport", transport,
                        NULL);
   state = g_new0 (MksSessionNew, 1);
   state->self = g_object_ref (self);
@@ -804,74 +531,27 @@ mks_session_new_for_connection_with_name (GDBusConnection *connection,
                             "session.new");
 }
 
-void
-mks_session_new_for_connection_with_name_async (GDBusConnection     *connection,
-                                                const char          *bus_name,
-                                                int                  io_priority,
-                                                GCancellable        *cancellable,
-                                                GAsyncReadyCallback  callback,
-                                                gpointer             user_data)
-{
-  g_autoptr(DexAsyncResult) result = NULL;
 
-  result = dex_async_result_new (NULL, cancellable, callback, user_data);
-  dex_async_result_set_priority (result, io_priority);
-  dex_async_result_set_static_name (result, G_STRFUNC);
-  dex_async_result_await (result, mks_session_new_for_connection_with_name (connection, bus_name));
-}
+
+
 
 /**
- * mks_session_new_for_connection_with_name_finish:
- * @result: a #GAsyncResult provided to callback
- * @error: (nullable): a location for a #GError or %NULL
- *
- * Completes a request to create a #MksSession for a [class@Gio.DBusConnection].
- *
- * Returns: (transfer full): a #MksSession if successful; otherwise %NULL
- *   and @error is set.
- */
-MksSession *
-mks_session_new_for_connection_with_name_finish (GAsyncResult  *result,
-                                                 GError       **error)
-{
-  g_return_val_if_fail (DEX_IS_ASYNC_RESULT (result), NULL);
-
-  return dex_async_result_propagate_pointer (DEX_ASYNC_RESULT (result), error);
-}
-
-/**
- * mks_session_get_connection:
+ * mks_session_dup_transport:
  * @self: a #MksSession
  *
- * Gets the DBus connection used for this session.
+ * Gets the transport used for this session.
  *
- * Returns: (transfer none) (nullable): a #GDBusConnection or %NULL if
- *   the connection has not been set, or was disposed.
+ * Returns: (transfer full): a #MksTransport
  */
-GDBusConnection *
-mks_session_get_connection (MksSession *self)
+MksTransport *
+mks_session_dup_transport (MksSession *self)
 {
   g_return_val_if_fail (MKS_IS_SESSION (self), NULL);
 
-  return self->connection;
+  return g_object_ref (self->transport);
 }
 
-/**
- * mks_session_get_bus_name:
- * @self: a #MksSession
- *
- * Gets the D-Bus connection unique name, or %NULL for a peer-to-peer
- * connection.
- *
- * Returns: (nullable): A unique name the session is connected to, or %NULL
- */
-const char *
-mks_session_get_bus_name (MksSession *self)
-{
-  g_return_val_if_fail (MKS_IS_SESSION (self), NULL);
 
-  return self->bus_name;
-}
 
 /**
  * mks_session_get_uuid:
@@ -902,7 +582,7 @@ mks_session_get_name (MksSession *self)
 }
 
 /**
- * mks_session_ref_screen:
+ * mks_session_dup_screen:
  * @self: a #MksSession
  *
  * Gets the main screen for the session.
@@ -910,7 +590,7 @@ mks_session_get_name (MksSession *self)
  * Returns: (transfer full) (nullable): a #MksScreen or %NULL
  */
 MksScreen *
-mks_session_ref_screen (MksSession *self)
+mks_session_dup_screen (MksSession *self)
 {
   GListModel *model;
   guint n_items;
@@ -932,7 +612,7 @@ mks_session_ref_screen (MksSession *self)
 }
 
 /**
- * mks_session_ref_clipboard:
+ * mks_session_dup_clipboard:
  * @self: a `MksSession`
  *
  * Gets the clipboard for the session, if available.
@@ -940,7 +620,7 @@ mks_session_ref_screen (MksSession *self)
  * Returns: (transfer full) (nullable): an `MksClipboard`
  */
 MksClipboard *
-mks_session_ref_clipboard (MksSession *self)
+mks_session_dup_clipboard (MksSession *self)
 {
   g_return_val_if_fail (MKS_IS_SESSION (self), NULL);
 

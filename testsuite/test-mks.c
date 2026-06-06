@@ -1,5 +1,4 @@
-/*
- * test-mks.c
+/* test-mks.c
  *
  * Copyright 2023 Sandro Bonazzola
  * Copyright 2026 Christian Hergert
@@ -11,11 +10,11 @@
  *
  * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
@@ -67,7 +66,7 @@ test_mks_clipboard_content (void)
 
   g_assert_cmpstr (mks_clipboard_content_get_mime_type (content), ==, "text/plain");
 
-  copy = mks_clipboard_content_ref_bytes (content);
+  copy = mks_clipboard_content_dup_bytes (content);
   copy_data = g_bytes_get_data (copy, &copy_size);
 
   g_assert_cmpmem (copy_data, copy_size, data, sizeof data - 1);

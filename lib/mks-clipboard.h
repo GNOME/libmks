@@ -1,4 +1,5 @@
-/*
+/* mks-clipboard.h
+ *
  * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
  * This library is free software; you can redistribute it and/or modify
@@ -8,11 +9,11 @@
  *
  * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
@@ -36,7 +37,7 @@ G_BEGIN_DECLS
 typedef enum _MksClipboardSelection
 {
   MKS_CLIPBOARD_SELECTION_CLIPBOARD = 0,
-  MKS_CLIPBOARD_SELECTION_PRIMARY = 1,
+  MKS_CLIPBOARD_SELECTION_PRIMARY   = 1,
   MKS_CLIPBOARD_SELECTION_SECONDARY = 2,
 } MksClipboardSelection;
 
@@ -48,7 +49,7 @@ typedef enum _MksClipboardOwner
 } MksClipboardOwner;
 
 MKS_AVAILABLE_IN_ALL
-G_DECLARE_FINAL_TYPE (MksClipboard, mks_clipboard, MKS, CLIPBOARD, GObject)
+MKS_DECLARE_INTERNAL_TYPE (MksClipboard, mks_clipboard, MKS, CLIPBOARD, GObject)
 
 MKS_AVAILABLE_IN_ALL
 GType                 mks_clipboard_content_get_type      (void) G_GNUC_CONST;
@@ -62,7 +63,7 @@ void                  mks_clipboard_content_unref         (MksClipboardContent  
 MKS_AVAILABLE_IN_ALL
 const char           *mks_clipboard_content_get_mime_type (MksClipboardContent    *self);
 MKS_AVAILABLE_IN_ALL
-GBytes               *mks_clipboard_content_ref_bytes     (MksClipboardContent    *self);
+GBytes               *mks_clipboard_content_dup_bytes     (MksClipboardContent    *self);
 MKS_AVAILABLE_IN_ALL
 gboolean              mks_clipboard_get_registered        (MksClipboard           *self);
 MKS_AVAILABLE_IN_ALL

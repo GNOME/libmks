@@ -1,7 +1,6 @@
-/*
- * mks-init.c
+/* mks-init.c
  *
- * Copyright 2023 Christian Hergert <christian@sourceandstack.com>
+ * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
  * This library is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -10,11 +9,11 @@
  *
  * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
@@ -24,8 +23,10 @@
 #include <gst/gst.h>
 
 #include "mks-audio-format.h"
+#include "mks-transport.h"
 #include "mks-clipboard.h"
 #include "mks-clipboard-redirector.h"
+#include "mks-dbus-transport.h"
 #include "mks-device.h"
 #include "mks-display.h"
 #include "mks-init.h"
@@ -64,9 +65,11 @@ mks_init_gtypes (void)
 
   /* GTypes that are part of our public API */
   g_type_ensure (MKS_TYPE_AUDIO_FORMAT);
+  g_type_ensure (MKS_TYPE_TRANSPORT);
   g_type_ensure (MKS_TYPE_CLIPBOARD);
   g_type_ensure (MKS_TYPE_CLIPBOARD_CONTENT);
   g_type_ensure (MKS_TYPE_CLIPBOARD_REDIRECTOR);
+  g_type_ensure (MKS_TYPE_DBUS_TRANSPORT);
   g_type_ensure (MKS_TYPE_DEVICE);
   g_type_ensure (MKS_TYPE_DISPLAY);
   g_type_ensure (MKS_TYPE_KEYBOARD);

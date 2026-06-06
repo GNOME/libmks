@@ -1,19 +1,19 @@
 /* mks.c
  *
- * Copyright 2023 Christian Hergert <christian@sourceandstack.com>
+ * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
- * This program is free software; you can redistribute it and/or modify
+ * This library is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
  * published by the Free Software Foundation; either version 2.1 of the
  * License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but
+ * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
@@ -56,15 +56,16 @@ update_title_binding (GBinding     *binding,
 
 typedef struct
 {
-  int        argc;
-  char     **argv;
-  GMainLoop *main_loop;
+  int         argc;
+  char      **argv;
+  GMainLoop  *main_loop;
 } Main;
 
 static DexFuture *
 main_fiber (gpointer user_data)
 {
   Main *state = user_data;
+  g_autoptr(MksTransport) transport = NULL;
   g_autoptr(GDBusConnection) connection = NULL;
   g_autoptr(MksSession) session = NULL;
   g_autoptr(MksScreen) screen = NULL;
@@ -90,7 +91,9 @@ main_fiber (gpointer user_data)
                          NULL);
 
   settings = gtk_settings_get_default ();
-  g_object_set (settings, "gtk-application-prefer-dark-theme", TRUE, NULL);
+  g_object_set (settings,
+                "gtk-application-prefer-dark-theme", TRUE,
+                NULL);
 
   display = mks_display_new ();
   gtk_window_set_child (window, display);
@@ -99,13 +102,15 @@ main_fiber (gpointer user_data)
                             G_CALLBACK (g_main_loop_quit),
                             state->main_loop);
 
-  if (!(session = dex_await_object (mks_session_new_for_connection (connection), &error)))
+  transport = mks_dbus_transport_new (connection, "org.qemu");
+
+  if (!(session = dex_await_object (mks_session_new (transport), &error)))
     {
       g_printerr ("Failed to create MksSession: %s\n", error->message);
       return dex_future_new_for_int (EXIT_FAILURE);
     }
 
-  if (!(screen = mks_session_ref_screen (session)))
+  if (!(screen = mks_session_dup_screen (session)))
     {
       g_printerr ("No screen attached to session!\n");
       return dex_future_new_for_int (EXIT_FAILURE);

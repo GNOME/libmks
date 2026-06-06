@@ -1,7 +1,6 @@
-/*
- * mks-util.c
+/* mks-util.c
  *
- * Copyright 2023 Christian Hergert <christian@sourceandstack.com>
+ * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
  * This library is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -10,11 +9,11 @@
  *
  * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
@@ -32,15 +31,15 @@ static gsize initialized;
 
 typedef struct
 {
-  gint64 begin_time;
+  gint64      begin_time;
   const char *message;
 } MksMarkedFuture;
 
 typedef struct
 {
-  const char *log_domain;
-  GLogLevelFlags level;
-  char *message_prefix;
+  const char     *log_domain;
+  GLogLevelFlags  level;
+  char           *message_prefix;
 } MksLoggedFuture;
 
 static void

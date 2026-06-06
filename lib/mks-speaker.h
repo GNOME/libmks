@@ -1,7 +1,6 @@
-/*
- * mks-speaker.h
+/* mks-speaker.h
  *
- * Copyright 2023 Christian Hergert <christian@sourceandstack.com>
+ * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
  * This library is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -10,42 +9,38 @@
  *
  * This library is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #pragma once
 
+#if !defined(MKS_INSIDE) && !defined(MKS_COMPILATION)
+# error "Only <libmks.h> can be included directly."
+#endif
+
 #include <gst/gst.h>
 
-#include "mks-audio-format.h"
-#include "mks-device.h"
+#include "mks-types.h"
+#include "mks-version-macros.h"
 
 G_BEGIN_DECLS
 
 #define MKS_TYPE_SPEAKER            (mks_speaker_get_type())
-#define MKS_SPEAKER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_SPEAKER, MksSpeaker))
-#define MKS_SPEAKER_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_SPEAKER, MksSpeaker const))
-#define MKS_SPEAKER_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MKS_TYPE_SPEAKER, MksSpeakerClass))
-#define MKS_IS_SPEAKER(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MKS_TYPE_SPEAKER))
-#define MKS_IS_SPEAKER_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MKS_TYPE_SPEAKER))
-#define MKS_SPEAKER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MKS_TYPE_SPEAKER, MksSpeakerClass))
 
-typedef struct _MksSpeaker      MksSpeaker;
-typedef struct _MksSpeakerClass MksSpeakerClass;
+MKS_AVAILABLE_IN_ALL
+MKS_DECLARE_INTERNAL_TYPE (MksSpeaker, mks_speaker, MKS, SPEAKER, MksDevice)
 
 typedef void (*MksSpeakerPcmFunc) (MksSpeaker *speaker,
                                    guint64     stream_id,
                                    GBytes     *bytes,
                                    gpointer    user_data);
 
-MKS_AVAILABLE_IN_ALL
-GType           mks_speaker_get_type            (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
 gboolean        mks_speaker_get_muted           (MksSpeaker        *self);
 MKS_AVAILABLE_IN_ALL
@@ -65,7 +60,5 @@ void            mks_speaker_remove_pcm_observer (MksSpeaker        *self,
 MKS_AVAILABLE_IN_ALL
 GstElement     *mks_speaker_create_gst_source   (MksSpeaker        *self,
                                                  guint64            stream_id);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksSpeaker, g_object_unref)
 
 G_END_DECLS

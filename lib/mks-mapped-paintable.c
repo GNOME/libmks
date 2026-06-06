@@ -1,20 +1,19 @@
-/*
- * mks-mapped-paintable.c
+/* mks-mapped-paintable.c
  *
  * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * This library is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation; either version 2.1 of the
+ * License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * This library is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * Lesser General Public License for more details.
  *
  * You should have received a copy of the GNU Lesser General Public License
- * along with this library; if not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
@@ -36,21 +35,21 @@
 typedef struct
 {
   gpointer data;
-  gsize length;
-  int fd;
+  gsize    length;
+  int      fd;
 } MksMappedBytes;
 
 struct _MksMappedPaintable
 {
-  GObject parent_instance;
-  GBytes *bytes;
-  GdkTexture *texture;
+  GObject         parent_instance;
+  GBytes         *bytes;
+  GdkTexture     *texture;
   cairo_region_t *update_region;
-  guint width;
-  guint height;
-  guint stride;
-  guint pixman_format;
-  guint dirty : 1;
+  guint           width;
+  guint           height;
+  guint           stride;
+  guint           pixman_format;
+  guint           dirty : 1;
 };
 
 static void
@@ -204,10 +203,10 @@ mks_mapped_paintable_new (void)
 }
 
 static gboolean
-map_fd (int fd,
-        gsize length,
-        gpointer *data,
-        GError **error)
+map_fd (int        fd,
+        gsize      length,
+        gpointer  *data,
+        GError   **error)
 {
   gpointer mapped;
 
@@ -247,13 +246,19 @@ mks_mapped_paintable_import (MksMappedPaintable  *self,
 
   if (width == 0 || height == 0 || stride == 0 || fd < 0)
     {
-      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT, "Invalid shared map");
+      g_set_error_literal (error,
+                           G_IO_ERROR,
+                           G_IO_ERROR_INVALID_ARGUMENT,
+                           "Invalid shared map");
       return FALSE;
     }
 
   if (pixman_to_memory_format (pixman_format) == GDK_MEMORY_N_FORMATS)
     {
-      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT, "Unsupported pixman format");
+      g_set_error_literal (error,
+                           G_IO_ERROR,
+                           G_IO_ERROR_INVALID_ARGUMENT,
+                           "Unsupported pixman format");
       return FALSE;
     }
 
