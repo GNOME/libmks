@@ -23,8 +23,10 @@
 #include <gst/gst.h>
 
 #include "mks-audio-format.h"
+#include "mks-transport.h"
 #include "mks-clipboard.h"
 #include "mks-clipboard-redirector.h"
+#include "mks-dbus-transport.h"
 #include "mks-device.h"
 #include "mks-display.h"
 #include "mks-init.h"
@@ -63,9 +65,11 @@ mks_init_gtypes (void)
 
   /* GTypes that are part of our public API */
   g_type_ensure (MKS_TYPE_AUDIO_FORMAT);
+  g_type_ensure (MKS_TYPE_TRANSPORT);
   g_type_ensure (MKS_TYPE_CLIPBOARD);
   g_type_ensure (MKS_TYPE_CLIPBOARD_CONTENT);
   g_type_ensure (MKS_TYPE_CLIPBOARD_REDIRECTOR);
+  g_type_ensure (MKS_TYPE_DBUS_TRANSPORT);
   g_type_ensure (MKS_TYPE_DEVICE);
   g_type_ensure (MKS_TYPE_DISPLAY);
   g_type_ensure (MKS_TYPE_KEYBOARD);

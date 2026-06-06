@@ -1,4 +1,4 @@
-/* mks-device-private.h
+/* mks-dbus-chardev-private.h
  *
  * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
@@ -20,32 +20,12 @@
 
 #pragma once
 
-#include "mks-transport.h"
-#include "mks-device.h"
+#include "mks-chardev-private.h"
 
 G_BEGIN_DECLS
 
-struct _MksDevice
-{
-  GObject       parent_instance;
-  MksTransport *transport;
-  GObject      *object;
-  char         *name;
-};
+#define MKS_TYPE_DBUS_CHARDEV (mks_dbus_chardev_get_type())
 
-struct _MksDeviceClass
-{
-  GObjectClass parent_class;
-
-  gboolean (*setup) (MksDevice *self,
-                     GObject   *object);
-};
-
-gpointer  _mks_device_new        (GType         device_type,
-                                  MksTransport *transport,
-                                  GObject      *object);
-void      _mks_device_set_name   (MksDevice    *self,
-                                  const char   *name);
-GObject  *_mks_device_get_object (MksDevice    *self);
+MKS_DECLARE_INTERNAL_TYPE (MksDBusChardev, mks_dbus_chardev, MKS, DBUS_CHARDEV, MksChardev)
 
 G_END_DECLS

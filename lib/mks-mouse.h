@@ -31,15 +31,10 @@
 
 G_BEGIN_DECLS
 
-#define MKS_TYPE_MOUSE            (mks_mouse_get_type ())
-#define MKS_MOUSE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_MOUSE, MksMouse))
-#define MKS_MOUSE_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_MOUSE, MksMouse const))
-#define MKS_MOUSE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MKS_TYPE_MOUSE, MksMouseClass))
-#define MKS_IS_MOUSE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MKS_TYPE_MOUSE))
-#define MKS_IS_MOUSE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MKS_TYPE_MOUSE))
-#define MKS_MOUSE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MKS_TYPE_MOUSE, MksMouseClass))
+#define MKS_TYPE_MOUSE            (mks_mouse_get_type())
 
-typedef struct _MksMouseClass MksMouseClass;
+MKS_AVAILABLE_IN_ALL
+MKS_DECLARE_INTERNAL_TYPE (MksMouse, mks_mouse, MKS, MOUSE, MksDevice)
 
 /**
  * MksMouseButton:
@@ -64,8 +59,6 @@ typedef enum _MksMouseButton
   MKS_MOUSE_BUTTON_EXTRA      = 6,
 } MksMouseButton;
 
-MKS_AVAILABLE_IN_ALL
-GType      mks_mouse_get_type        (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
 gboolean   mks_mouse_get_is_absolute (MksMouse             *self);
 MKS_AVAILABLE_IN_ALL

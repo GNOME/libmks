@@ -1,4 +1,4 @@
-/* mks-device-private.h
+/* mks-mouse-private.h
  *
  * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
@@ -20,32 +20,31 @@
 
 #pragma once
 
-#include "mks-transport.h"
-#include "mks-device.h"
+#include "mks-device-private.h"
+#include "mks-mouse.h"
 
 G_BEGIN_DECLS
 
-struct _MksDevice
+struct _MksMouse
 {
-  GObject       parent_instance;
-  MksTransport *transport;
-  GObject      *object;
-  char         *name;
+  MksDevice parent_instance;
 };
 
-struct _MksDeviceClass
+struct _MksMouseClass
 {
-  GObjectClass parent_class;
+  MksDeviceClass parent_class;
 
-  gboolean (*setup) (MksDevice *self,
-                     GObject   *object);
+  gboolean   (*get_is_absolute) (MksMouse       *self);
+  DexFuture *(*press)           (MksMouse       *self,
+                                 MksMouseButton  button);
+  DexFuture *(*release)         (MksMouse       *self,
+                                 MksMouseButton  button);
+  DexFuture *(*move_to)         (MksMouse       *self,
+                                 guint           x,
+                                 guint           y);
+  DexFuture *(*move_by)         (MksMouse       *self,
+                                 int             delta_x,
+                                 int             delta_y);
 };
-
-gpointer  _mks_device_new        (GType         device_type,
-                                  MksTransport *transport,
-                                  GObject      *object);
-void      _mks_device_set_name   (MksDevice    *self,
-                                  const char   *name);
-GObject  *_mks_device_get_object (MksDevice    *self);
 
 G_END_DECLS

@@ -26,7 +26,7 @@
 
 #include <gdk/gdk.h>
 
-#include "mks-clipboard.h"
+#include "mks-types.h"
 #include "mks-version-macros.h"
 
 G_BEGIN_DECLS

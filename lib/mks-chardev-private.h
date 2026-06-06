@@ -1,4 +1,4 @@
-/* mks-device-private.h
+/* mks-chardev-private.h
  *
  * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
@@ -20,32 +20,27 @@
 
 #pragma once
 
-#include "mks-transport.h"
-#include "mks-device.h"
+#include "mks-chardev.h"
+#include "mks-device-private.h"
 
 G_BEGIN_DECLS
 
-struct _MksDevice
+struct _MksChardev
 {
-  GObject       parent_instance;
-  MksTransport *transport;
-  GObject      *object;
-  char         *name;
+  MksDevice parent_instance;
 };
 
-struct _MksDeviceClass
+struct _MksChardevClass
 {
-  GObjectClass parent_class;
+  MksDeviceClass parent_class;
 
-  gboolean (*setup) (MksDevice *self,
-                     GObject   *object);
+  const char *(*get_name)      (MksChardev *self);
+  gboolean    (*get_fe_opened) (MksChardev *self);
+  gboolean    (*get_echo)      (MksChardev *self);
+  char       *(*dup_owner)     (MksChardev *self);
+  DexFuture  *(*register_fd)   (MksChardev *self,
+                                int         fd);
+  DexFuture  *(*send_break)    (MksChardev *self);
 };
-
-gpointer  _mks_device_new        (GType         device_type,
-                                  MksTransport *transport,
-                                  GObject      *object);
-void      _mks_device_set_name   (MksDevice    *self,
-                                  const char   *name);
-GObject  *_mks_device_get_object (MksDevice    *self);
 
 G_END_DECLS

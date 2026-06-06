@@ -27,23 +27,16 @@
 #include <libdex.h>
 #include <vte/vte.h>
 
-#include "mks-device.h"
+#include "mks-types.h"
 #include "mks-version-macros.h"
 
 G_BEGIN_DECLS
 
 #define MKS_TYPE_CHARDEV            (mks_chardev_get_type())
-#define MKS_CHARDEV(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_CHARDEV, MksChardev))
-#define MKS_CHARDEV_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_CHARDEV, MksChardev const))
-#define MKS_CHARDEV_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MKS_TYPE_CHARDEV, MksChardevClass))
-#define MKS_IS_CHARDEV(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MKS_TYPE_CHARDEV))
-#define MKS_IS_CHARDEV_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MKS_TYPE_CHARDEV))
-#define MKS_CHARDEV_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MKS_TYPE_CHARDEV, MksChardevClass))
-
-typedef struct _MksChardevClass MksChardevClass;
 
 MKS_AVAILABLE_IN_ALL
-GType       mks_chardev_get_type           (void) G_GNUC_CONST;
+MKS_DECLARE_INTERNAL_TYPE (MksChardev, mks_chardev, MKS, CHARDEV, MksDevice)
+
 MKS_AVAILABLE_IN_ALL
 const char *mks_chardev_get_name           (MksChardev           *self);
 MKS_AVAILABLE_IN_ALL
@@ -87,7 +80,5 @@ MKS_AVAILABLE_IN_ALL
 gboolean    mks_chardev_send_break_finish  (MksChardev           *self,
                                             GAsyncResult         *result,
                                             GError              **error);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksChardev, g_object_unref)
 
 G_END_DECLS

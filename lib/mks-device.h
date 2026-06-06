@@ -31,7 +31,7 @@
 
 G_BEGIN_DECLS
 
-#define MKS_TYPE_DEVICE            (mks_device_get_type ())
+#define MKS_TYPE_DEVICE            (mks_device_get_type())
 #define MKS_DEVICE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_DEVICE, MksDevice))
 #define MKS_DEVICE_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_DEVICE, MksDevice const))
 #define MKS_DEVICE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MKS_TYPE_DEVICE, MksDeviceClass))
@@ -45,7 +45,5 @@ MKS_AVAILABLE_IN_ALL
 GType       mks_device_get_type (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
 const char *mks_device_get_name (MksDevice *self);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksDevice, g_object_unref)
 
 G_END_DECLS

@@ -1,4 +1,4 @@
-/* mks-microphone.h
+/* mks-dbus-transport.h
  *
  * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
@@ -24,32 +24,21 @@
 # error "Only <libmks.h> can be included directly."
 #endif
 
-#include <gst/gst.h>
-
-#include "mks-types.h"
-#include "mks-version-macros.h"
+#include "mks-transport.h"
 
 G_BEGIN_DECLS
 
-#define MKS_TYPE_MICROPHONE            (mks_microphone_get_type())
+#define MKS_TYPE_DBUS_TRANSPORT (mks_dbus_transport_get_type())
 
 MKS_AVAILABLE_IN_ALL
-MKS_DECLARE_INTERNAL_TYPE (MksMicrophone, mks_microphone, MKS, MICROPHONE, MksDevice)
+MKS_DECLARE_INTERNAL_TYPE (MksDBusTransport, mks_dbus_transport, MKS, DBUS_TRANSPORT, MksTransport)
 
 MKS_AVAILABLE_IN_ALL
-gboolean        mks_microphone_get_muted       (MksMicrophone *self);
+MksTransport    *mks_dbus_transport_new            (GDBusConnection  *connection,
+                                                    const char       *bus_name);
 MKS_AVAILABLE_IN_ALL
-void            mks_microphone_set_muted       (MksMicrophone *self,
-                                                gboolean       muted);
+GDBusConnection *mks_dbus_transport_get_connection (MksDBusTransport *self);
 MKS_AVAILABLE_IN_ALL
-MksAudioFormat *mks_microphone_dup_format      (MksMicrophone *self,
-                                                guint64        stream_id);
-MKS_AVAILABLE_IN_ALL
-void            mks_microphone_queue_pcm       (MksMicrophone *self,
-                                                guint64        stream_id,
-                                                GBytes        *bytes);
-MKS_AVAILABLE_IN_ALL
-GstElement     *mks_microphone_create_gst_sink (MksMicrophone *self,
-                                                guint64        stream_id);
+const char      *mks_dbus_transport_get_bus_name   (MksDBusTransport *self);
 
 G_END_DECLS

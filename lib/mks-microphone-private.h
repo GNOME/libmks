@@ -1,4 +1,4 @@
-/* mks-device-private.h
+/* mks-microphone-private.h
  *
  * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
@@ -20,32 +20,30 @@
 
 #pragma once
 
-#include "mks-transport.h"
-#include "mks-device.h"
+#include "mks-device-private.h"
+#include "mks-microphone.h"
 
 G_BEGIN_DECLS
 
-struct _MksDevice
+struct _MksMicrophone
 {
-  GObject       parent_instance;
-  MksTransport *transport;
-  GObject      *object;
-  char         *name;
+  MksDevice parent_instance;
 };
 
-struct _MksDeviceClass
+struct _MksMicrophoneClass
 {
-  GObjectClass parent_class;
+  MksDeviceClass parent_class;
 
-  gboolean (*setup) (MksDevice *self,
-                     GObject   *object);
+  gboolean        (*get_muted)       (MksMicrophone *self);
+  void            (*set_muted)       (MksMicrophone *self,
+                                      gboolean       muted);
+  MksAudioFormat *(*dup_format)      (MksMicrophone *self,
+                                      guint64        stream_id);
+  void            (*queue_pcm)       (MksMicrophone *self,
+                                      guint64        stream_id,
+                                      GBytes        *bytes);
+  GstElement     *(*create_gst_sink) (MksMicrophone *self,
+                                      guint64        stream_id);
 };
-
-gpointer  _mks_device_new        (GType         device_type,
-                                  MksTransport *transport,
-                                  GObject      *object);
-void      _mks_device_set_name   (MksDevice    *self,
-                                  const char   *name);
-GObject  *_mks_device_get_object (MksDevice    *self);
 
 G_END_DECLS

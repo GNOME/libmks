@@ -486,8 +486,7 @@ mks_clipboard_redirector_class_init (MksClipboardRedirectorClass *klass)
 
   properties[PROP_SELECTIONS] =
     g_param_spec_flags ("selections", NULL, NULL,
-                        MKS_TYPE_CLIPBOARD_REDIRECTOR_SELECTIONS,
-                        MKS_CLIPBOARD_REDIRECTOR_SELECTION_CLIPBOARD,
+                        MKS_TYPE_CLIPBOARD_REDIRECTOR_SELECTIONS, MKS_CLIPBOARD_REDIRECTOR_SELECTION_CLIPBOARD,
                         (G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_properties (object_class, N_PROPS, properties);
@@ -552,7 +551,7 @@ mks_remote_content_provider_request_cb (GObject      *object,
     }
 
   stream = g_task_get_task_data (task);
-  bytes = mks_clipboard_content_ref_bytes (content);
+  bytes = mks_clipboard_content_dup_bytes (content);
   data = g_bytes_get_data (bytes, &size);
 
   g_output_stream_write_all_async (stream,

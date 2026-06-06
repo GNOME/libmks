@@ -1,4 +1,4 @@
-/* mks-device-private.h
+/* mks-keyboard-private.h
  *
  * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
@@ -20,32 +20,25 @@
 
 #pragma once
 
-#include "mks-transport.h"
-#include "mks-device.h"
+#include "mks-device-private.h"
+#include "mks-keyboard.h"
 
 G_BEGIN_DECLS
 
-struct _MksDevice
+struct _MksKeyboard
 {
-  GObject       parent_instance;
-  MksTransport *transport;
-  GObject      *object;
-  char         *name;
+  MksDevice parent_instance;
 };
 
-struct _MksDeviceClass
+struct _MksKeyboardClass
 {
-  GObjectClass parent_class;
+  MksDeviceClass parent_class;
 
-  gboolean (*setup) (MksDevice *self,
-                     GObject   *object);
+  MksKeyboardModifier  (*get_modifiers) (MksKeyboard *self);
+  DexFuture           *(*press)         (MksKeyboard *self,
+                                         guint        keycode);
+  DexFuture           *(*release)       (MksKeyboard *self,
+                                         guint        keycode);
 };
-
-gpointer  _mks_device_new        (GType         device_type,
-                                  MksTransport *transport,
-                                  GObject      *object);
-void      _mks_device_set_name   (MksDevice    *self,
-                                  const char   *name);
-GObject  *_mks_device_get_object (MksDevice    *self);
 
 G_END_DECLS

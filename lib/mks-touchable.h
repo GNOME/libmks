@@ -31,15 +31,10 @@
 
 G_BEGIN_DECLS
 
-#define MKS_TYPE_TOUCHABLE            (mks_touchable_get_type ())
-#define MKS_TOUCHABLE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_TOUCHABLE, MksTouchable))
-#define MKS_TOUCHABLE_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MKS_TYPE_TOUCHABLE, MksTouchable const))
-#define MKS_TOUCHABLE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MKS_TYPE_TOUCHABLE, MksTouchableClass))
-#define MKS_IS_TOUCHABLE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MKS_TYPE_TOUCHABLE))
-#define MKS_IS_TOUCHABLE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MKS_TYPE_TOUCHABLE))
-#define MKS_TOUCHABLE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MKS_TYPE_TOUCHABLE, MksTouchableClass))
+#define MKS_TYPE_TOUCHABLE            (mks_touchable_get_type())
 
-typedef struct _MksTouchableClass MksTouchableClass;
+MKS_AVAILABLE_IN_ALL
+MKS_DECLARE_INTERNAL_TYPE (MksTouchable, mks_touchable, MKS, TOUCHABLE, MksDevice)
 
 /**
  * MksTouchEventKind:
@@ -58,8 +53,6 @@ typedef enum _MksTouchEventKind
   MKS_TOUCH_EVENT_CANCEL = 3,
 } MksTouchEventKind;
 
-MKS_AVAILABLE_IN_ALL
-GType      mks_touchable_get_type          (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
 DexFuture *mks_touchable_send_event        (MksTouchable         *self,
                                             MksTouchEventKind     kind,

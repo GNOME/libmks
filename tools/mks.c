@@ -65,6 +65,7 @@ static DexFuture *
 main_fiber (gpointer user_data)
 {
   Main *state = user_data;
+  g_autoptr(MksTransport) transport = NULL;
   g_autoptr(GDBusConnection) connection = NULL;
   g_autoptr(MksSession) session = NULL;
   g_autoptr(MksScreen) screen = NULL;
@@ -90,7 +91,9 @@ main_fiber (gpointer user_data)
                          NULL);
 
   settings = gtk_settings_get_default ();
-  g_object_set (settings, "gtk-application-prefer-dark-theme", TRUE, NULL);
+  g_object_set (settings,
+                "gtk-application-prefer-dark-theme", TRUE,
+                NULL);
 
   display = mks_display_new ();
   gtk_window_set_child (window, display);
@@ -99,13 +102,15 @@ main_fiber (gpointer user_data)
                             G_CALLBACK (g_main_loop_quit),
                             state->main_loop);
 
-  if (!(session = dex_await_object (mks_session_new_for_connection (connection), &error)))
+  transport = mks_dbus_transport_new (connection, "org.qemu");
+
+  if (!(session = dex_await_object (mks_session_new (transport), &error)))
     {
       g_printerr ("Failed to create MksSession: %s\n", error->message);
       return dex_future_new_for_int (EXIT_FAILURE);
     }
 
-  if (!(screen = mks_session_ref_screen (session)))
+  if (!(screen = mks_session_dup_screen (session)))
     {
       g_printerr ("No screen attached to session!\n");
       return dex_future_new_for_int (EXIT_FAILURE);

@@ -147,11 +147,12 @@ main_fiber (gpointer user_data)
 
   for (guint i = 0; i < n_queued_owners; i++)
     {
+      g_autoptr(MksTransport) transport = NULL;
+
       g_clear_object (&session);
 
-      session = dex_await_object (mks_session_new_for_connection_with_name (connection,
-                                                                            queued_owners[i]),
-                                  &error);
+      transport = mks_dbus_transport_new (connection, queued_owners[i]);
+      session = dex_await_object (mks_session_new (transport), &error);
       if (session == NULL)
         {
           g_printerr ("Failed to create MksSession: %s\n",
@@ -162,7 +163,7 @@ main_fiber (gpointer user_data)
       g_print ("Session(uuid=\"%s\", name=\"%s\", bus-name=%s)\n",
               mks_session_get_uuid (session),
               mks_session_get_name (session),
-              mks_session_get_bus_name (session));
+              queued_owners[i]);
 
       devices = mks_session_get_devices (session);
       n_items = g_list_model_get_n_items (devices);

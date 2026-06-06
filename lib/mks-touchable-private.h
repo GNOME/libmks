@@ -1,4 +1,4 @@
-/* mks-device-private.h
+/* mks-touchable-private.h
  *
  * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
@@ -20,32 +20,26 @@
 
 #pragma once
 
-#include "mks-transport.h"
-#include "mks-device.h"
+#include "mks-device-private.h"
+#include "mks-touchable.h"
 
 G_BEGIN_DECLS
 
-struct _MksDevice
+struct _MksTouchable
 {
-  GObject       parent_instance;
-  MksTransport *transport;
-  GObject      *object;
-  char         *name;
+  MksDevice parent_instance;
 };
 
-struct _MksDeviceClass
+struct _MksTouchableClass
 {
-  GObjectClass parent_class;
+  MksDeviceClass parent_class;
 
-  gboolean (*setup) (MksDevice *self,
-                     GObject   *object);
+  DexFuture *(*send_event)    (MksTouchable      *self,
+                               MksTouchEventKind  kind,
+                               guint64            num_slot,
+                               double             x,
+                               double             y);
+  int        (*get_max_slots) (MksTouchable      *self);
 };
-
-gpointer  _mks_device_new        (GType         device_type,
-                                  MksTransport *transport,
-                                  GObject      *object);
-void      _mks_device_set_name   (MksDevice    *self,
-                                  const char   *name);
-GObject  *_mks_device_get_object (MksDevice    *self);
 
 G_END_DECLS

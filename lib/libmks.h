@@ -27,9 +27,11 @@ G_BEGIN_DECLS
 
 #define MKS_INSIDE
 # include "mks-audio-format.h"
+# include "mks-transport.h"
 # include "mks-chardev.h"
 # include "mks-clipboard.h"
 # include "mks-clipboard-redirector.h"
+# include "mks-dbus-transport.h"
 # include "mks-device.h"
 # include "mks-display.h"
 # include "mks-enums.h"

@@ -328,8 +328,7 @@ mks_cairo_framebuffer_class_init (MksCairoFramebufferClass *klass)
 
   properties[PROP_FORMAT] =
     g_param_spec_enum ("format", NULL, NULL,
-                       CAIRO_GOBJECT_TYPE_FORMAT,
-                       CAIRO_FORMAT_RGB24,
+                       CAIRO_GOBJECT_TYPE_FORMAT, CAIRO_FORMAT_RGB24,
                        (G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS));
 
   properties[PROP_HEIGHT] =

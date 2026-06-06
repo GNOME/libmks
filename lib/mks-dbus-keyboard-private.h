@@ -1,4 +1,4 @@
-/* mks-device-private.h
+/* mks-dbus-keyboard-private.h
  *
  * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
@@ -20,32 +20,12 @@
 
 #pragma once
 
-#include "mks-transport.h"
-#include "mks-device.h"
+#include "mks-keyboard-private.h"
 
 G_BEGIN_DECLS
 
-struct _MksDevice
-{
-  GObject       parent_instance;
-  MksTransport *transport;
-  GObject      *object;
-  char         *name;
-};
+#define MKS_TYPE_DBUS_KEYBOARD (mks_dbus_keyboard_get_type())
 
-struct _MksDeviceClass
-{
-  GObjectClass parent_class;
-
-  gboolean (*setup) (MksDevice *self,
-                     GObject   *object);
-};
-
-gpointer  _mks_device_new        (GType         device_type,
-                                  MksTransport *transport,
-                                  GObject      *object);
-void      _mks_device_set_name   (MksDevice    *self,
-                                  const char   *name);
-GObject  *_mks_device_get_object (MksDevice    *self);
+MKS_DECLARE_INTERNAL_TYPE (MksDBusKeyboard, mks_dbus_keyboard, MKS, DBUS_KEYBOARD, MksKeyboard)
 
 G_END_DECLS

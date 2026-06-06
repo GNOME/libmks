@@ -1,4 +1,4 @@
-/* mks-device-private.h
+/* mks-dbus-clipboard-private.h
  *
  * Copyright 2026 Christian Hergert <christian@sourceandstack.com>
  *
@@ -20,32 +20,15 @@
 
 #pragma once
 
-#include "mks-transport.h"
-#include "mks-device.h"
+#include "mks-clipboard-private-base.h"
 
 G_BEGIN_DECLS
 
-struct _MksDevice
-{
-  GObject       parent_instance;
-  MksTransport *transport;
-  GObject      *object;
-  char         *name;
-};
+#define MKS_TYPE_DBUS_CLIPBOARD (mks_dbus_clipboard_get_type())
 
-struct _MksDeviceClass
-{
-  GObjectClass parent_class;
+MKS_DECLARE_INTERNAL_TYPE (MksDBusClipboard, mks_dbus_clipboard, MKS, DBUS_CLIPBOARD, MksClipboard)
 
-  gboolean (*setup) (MksDevice *self,
-                     GObject   *object);
-};
-
-gpointer  _mks_device_new        (GType         device_type,
-                                  MksTransport *transport,
-                                  GObject      *object);
-void      _mks_device_set_name   (MksDevice    *self,
-                                  const char   *name);
-GObject  *_mks_device_get_object (MksDevice    *self);
+MksClipboard *_mks_dbus_clipboard_new (MksTransport  *transport,
+                                       MksQemuObject *object);
 
 G_END_DECLS

@@ -49,7 +49,7 @@ typedef enum _MksClipboardOwner
 } MksClipboardOwner;
 
 MKS_AVAILABLE_IN_ALL
-G_DECLARE_FINAL_TYPE (MksClipboard, mks_clipboard, MKS, CLIPBOARD, GObject)
+MKS_DECLARE_INTERNAL_TYPE (MksClipboard, mks_clipboard, MKS, CLIPBOARD, GObject)
 
 MKS_AVAILABLE_IN_ALL
 GType                 mks_clipboard_content_get_type      (void) G_GNUC_CONST;
@@ -63,7 +63,7 @@ void                  mks_clipboard_content_unref         (MksClipboardContent  
 MKS_AVAILABLE_IN_ALL
 const char           *mks_clipboard_content_get_mime_type (MksClipboardContent    *self);
 MKS_AVAILABLE_IN_ALL
-GBytes               *mks_clipboard_content_ref_bytes     (MksClipboardContent    *self);
+GBytes               *mks_clipboard_content_dup_bytes     (MksClipboardContent    *self);
 MKS_AVAILABLE_IN_ALL
 gboolean              mks_clipboard_get_registered        (MksClipboard           *self);
 MKS_AVAILABLE_IN_ALL

@@ -25,7 +25,7 @@
 /**
  * MksDevice:
  * 
- * An abstraction of a virtualized QEMU device.
+ * An abstraction of a virtualized device.
  */
 
 G_DEFINE_TYPE (MksDevice, mks_device, G_TYPE_OBJECT)
@@ -39,11 +39,11 @@ enum {
 static GParamSpec *properties [N_PROPS];
 
 static gboolean
-mks_device_real_setup (MksDevice     *device,
-                       MksQemuObject *object)
+mks_device_real_setup (MksDevice *device,
+                       GObject   *object)
 {
   g_assert (MKS_IS_DEVICE (device));
-  g_assert (MKS_QEMU_IS_OBJECT (object));
+  g_assert (G_IS_OBJECT (object));
 
   return TRUE;
 }
@@ -53,7 +53,7 @@ mks_device_dispose (GObject *object)
 {
   MksDevice *self = (MksDevice *)object;
 
-  g_clear_weak_pointer (&self->session);
+  g_clear_weak_pointer (&self->transport);
   g_clear_pointer (&self->name, g_free);
   g_clear_object (&self->object);
 
@@ -132,25 +132,33 @@ _mks_device_set_name (MksDevice  *self,
 }
 
 gpointer
-_mks_device_new (GType          device_type,
-                 MksSession    *session,
-                 MksQemuObject *object)
+_mks_device_new (GType         device_type,
+                 MksTransport *transport,
+                 GObject      *object)
 {
   g_autoptr(MksDevice) self = NULL;
 
   g_return_val_if_fail (g_type_is_a (device_type, MKS_TYPE_DEVICE), NULL);
   g_return_val_if_fail (device_type != MKS_TYPE_DEVICE, NULL);
-  g_return_val_if_fail (MKS_IS_SESSION (session), NULL);
-  g_return_val_if_fail (MKS_QEMU_IS_OBJECT (object), NULL);
+  g_return_val_if_fail (MKS_IS_TRANSPORT (transport), NULL);
+  g_return_val_if_fail (G_IS_OBJECT (object), NULL);
 
   if (!(self = g_object_new (device_type, NULL)))
     return NULL;
 
-  g_set_weak_pointer (&self->session, session);
+  g_set_weak_pointer (&self->transport, transport);
   self->object = g_object_ref (object);
 
   if (!MKS_DEVICE_GET_CLASS (self)->setup (self, object))
     return NULL;
 
   return g_steal_pointer (&self);
+}
+
+GObject *
+_mks_device_get_object (MksDevice *self)
+{
+  g_return_val_if_fail (MKS_IS_DEVICE (self), NULL);
+
+  return self->object;
 }

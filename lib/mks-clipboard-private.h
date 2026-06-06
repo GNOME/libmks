@@ -20,9 +20,9 @@
 
 #pragma once
 
+#include "mks-transport.h"
 #include "mks-clipboard.h"
 #include "mks-qemu.h"
-#include "mks-session.h"
 
 G_BEGIN_DECLS
 
@@ -31,11 +31,11 @@ typedef DexFuture *(*MksClipboardReadFunc) (MksClipboard          *self,
                                             const char * const    *mime_types,
                                             gpointer               user_data);
 
-MksClipboard *_mks_clipboard_new           (MksSession            *session,
-                                            MksQemuObject         *object);
-void          _mks_clipboard_set_read_func (MksClipboard          *self,
-                                            MksClipboardReadFunc   read_func,
-                                            gpointer               user_data,
-                                            GDestroyNotify         destroy);
+MksClipboard *_mks_clipboard_new           (MksTransport         *transport,
+                                            MksQemuObject        *object);
+void          _mks_clipboard_set_read_func (MksClipboard         *self,
+                                            MksClipboardReadFunc  read_func,
+                                            gpointer              user_data,
+                                            GDestroyNotify        destroy);
 
 G_END_DECLS

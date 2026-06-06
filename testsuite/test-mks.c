@@ -66,7 +66,7 @@ test_mks_clipboard_content (void)
 
   g_assert_cmpstr (mks_clipboard_content_get_mime_type (content), ==, "text/plain");
 
-  copy = mks_clipboard_content_ref_bytes (content);
+  copy = mks_clipboard_content_dup_bytes (content);
   copy_data = g_bytes_get_data (copy, &copy_size);
 
   g_assert_cmpmem (copy_data, copy_size, data, sizeof data - 1);
