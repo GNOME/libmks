@@ -51,7 +51,7 @@ typedef struct _MksScreenClass MksScreenClass;
  */
 typedef enum _MksScreenKind
 {
-  MKS_SCREEN_KIND_TEXT = 0,
+  MKS_SCREEN_KIND_TEXT    = 0,
   MKS_SCREEN_KIND_GRAPHIC = 1,
 } MksScreenKind;
 

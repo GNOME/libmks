@@ -56,9 +56,9 @@ update_title_binding (GBinding     *binding,
 
 typedef struct
 {
-  int        argc;
-  char     **argv;
-  GMainLoop *main_loop;
+  int         argc;
+  char      **argv;
+  GMainLoop  *main_loop;
 } Main;
 
 static DexFuture *

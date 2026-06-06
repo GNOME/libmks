@@ -24,9 +24,9 @@
 
 struct _MksInhibitor
 {
-  GObject parent_instance;
+  GObject      parent_instance;
   GdkToplevel *toplevel;
-  guint shortcuts_inhibited : 1;
+  guint        shortcuts_inhibited : 1;
 };
 
 G_DEFINE_FINAL_TYPE (MksInhibitor, mks_inhibitor, G_TYPE_OBJECT)

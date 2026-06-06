@@ -31,7 +31,7 @@
 
 G_BEGIN_DECLS
 
-#define MKS_TYPE_SCREEN_ATTRIBUTES (mks_screen_attributes_get_type ())
+#define MKS_TYPE_SCREEN_ATTRIBUTES (mks_screen_attributes_get_type())
 
 MKS_AVAILABLE_IN_ALL
 GType                mks_screen_attributes_get_type      (void) G_GNUC_CONST;

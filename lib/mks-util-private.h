@@ -35,9 +35,9 @@ typedef struct _MksSocketpairConnection MksSocketpairConnection;
 
 struct _MksSocketpairConnection
 {
-  int ref_count;
+  int              ref_count;
   GDBusConnection *connection;
-  int peer_fd;
+  int              peer_fd;
 };
 
 #define _CAIRO_CHECK_VERSION(major, minor, micro) \

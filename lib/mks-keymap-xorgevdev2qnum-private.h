@@ -242,4 +242,4 @@ const unsigned short xorgevdev_to_qnum[533] = {
   [0xf6] = 0xf3, /* xorgevdev:246 -> linux:238 (KEY_WLAN) -> qnum:243 */
   [0xf7] = 0xf4, /* xorgevdev:247 -> linux:239 (KEY_UWB) -> qnum:244 */
 };
-const unsigned int xorgevdev_to_qnum_len = sizeof(xorgevdev_to_qnum)/sizeof(xorgevdev_to_qnum[0]);
+const unsigned int xorgevdev_to_qnum_len = sizeof (xorgevdev_to_qnum ) /sizeof(xorgevdev_to_qnum[0]);

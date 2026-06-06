@@ -40,17 +40,17 @@
 
 struct _MksDmabufPaintable
 {
-  GObject parent_instance;
-  GdkTexture *texture;
+  GObject                  parent_instance;
+  GdkTexture              *texture;
   GdkDmabufTextureBuilder *builder;
-  MksDmabufScanoutData *builder_data;
-  guint x;
-  guint y;
-  guint width;
-  guint height;
-  guint backing_width;
-  guint backing_height;
-  guint dmabuf_updated : 1;
+  MksDmabufScanoutData    *builder_data;
+  guint                    x;
+  guint                    y;
+  guint                    width;
+  guint                    height;
+  guint                    backing_width;
+  guint                    backing_height;
+  guint                    dmabuf_updated : 1;
 };
 
 static int
@@ -241,22 +241,25 @@ mks_dmabuf_paintable_import (MksDmabufPaintable    *self,
 
   if (data->n_planes == 0 || data->n_planes > MKS_DMABUF_MAX_PLANES)
     {
-      g_set_error  (error,
-                    G_IO_ERROR,
-                    G_IO_ERROR_INVALID_ARGUMENT,
-                    "invalid number of DMA-BUF planes (%u)",
-                    data->n_planes);
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_INVALID_ARGUMENT,
+                   "invalid number of DMA-BUF planes (%u)",
+                   data->n_planes);
       return FALSE;
     }
 
   if (data->width == 0 || data->height == 0 ||
       data->backing_width == 0 || data->backing_height == 0)
     {
-      g_set_error  (error,
-                    G_IO_ERROR,
-                    G_IO_ERROR_INVALID_ARGUMENT,
-                    "invalid width/height/backing-width/backing-height (%u/%u/%u/%u)",
-                    data->width, data->height, data->backing_width, data->backing_height);
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_INVALID_ARGUMENT,
+                   "invalid width/height/backing-width/backing-height (%u/%u/%u/%u)",
+                   data->width,
+                   data->height,
+                   data->backing_width,
+                   data->backing_height);
       return FALSE;
     }
 
@@ -264,11 +267,13 @@ mks_dmabuf_paintable_import (MksDmabufPaintable    *self,
     {
       if (data->dmabuf_fd[i] < 0 || data->stride[i] == 0)
         {
-          g_set_error  (error,
-                        G_IO_ERROR,
-                        G_IO_ERROR_INVALID_ARGUMENT,
-                        "invalid DMA-BUF plane %u fd/stride (%d/%u)",
-                        i, data->dmabuf_fd[i], data->stride[i]);
+          g_set_error (error,
+                       G_IO_ERROR,
+                       G_IO_ERROR_INVALID_ARGUMENT,
+                       "invalid DMA-BUF plane %u fd/stride (%d/%u)",
+                       i,
+                       data->dmabuf_fd[i],
+                       data->stride[i]);
           return FALSE;
         }
     }

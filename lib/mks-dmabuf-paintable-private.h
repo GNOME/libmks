@@ -42,7 +42,7 @@ typedef struct _MksDmabufScanoutData
   int     dmabuf_fd[MKS_DMABUF_MAX_PLANES];
 } MksDmabufScanoutData;
 
-void                mks_dmabuf_scanout_data_free (MksDmabufScanoutData *data);
+void mks_dmabuf_scanout_data_free (MksDmabufScanoutData *data);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksDmabufScanoutData, mks_dmabuf_scanout_data_free)
 

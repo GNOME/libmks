@@ -29,15 +29,15 @@ static void mks_screen_resizer_reconfigure (MksScreenResizer    *self,
 
 struct _MksScreenResizer
 {
-  GObject              parent_instance;
+  GObject parent_instance;
 
-  MksScreen           *screen;
+  MksScreen *screen;
 
   /* Remember our last operation */
   MksScreenAttributes *next_op;
   MksScreenAttributes *previous_op;
 
-  guint                in_progress : 1;
+  guint in_progress : 1;
 };
 
 enum {

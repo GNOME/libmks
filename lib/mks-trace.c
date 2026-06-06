@@ -34,9 +34,9 @@
 
 struct _MksTraceScope
 {
-  gint64 start_time;
-  char *name;
-  char *message;
+  gint64  start_time;
+  char   *name;
+  char   *message;
 };
 
 #if defined(HAVE_SYSPROF) && HAVE_SYSPROF

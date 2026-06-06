@@ -24,9 +24,9 @@
 
 struct _MksReadOnlyListModel
 {
-  GObject parent_instance;
+  GObject     parent_instance;
   GListModel *model;
-  gulong items_changed_handler;
+  gulong      items_changed_handler;
 };
 
 static GType

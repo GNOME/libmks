@@ -187,7 +187,7 @@ main_loop_quit_cb (DexFuture *future,
 }
 
 int
-main (int argc,
+main (int   argc,
       char *argv[])
 {
   g_autoptr(GMainLoop) main_loop = NULL;

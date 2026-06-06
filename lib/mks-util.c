@@ -31,15 +31,15 @@ static gsize initialized;
 
 typedef struct
 {
-  gint64 begin_time;
+  gint64      begin_time;
   const char *message;
 } MksMarkedFuture;
 
 typedef struct
 {
-  const char *log_domain;
-  GLogLevelFlags level;
-  char *message_prefix;
+  const char     *log_domain;
+  GLogLevelFlags  level;
+  char           *message_prefix;
 } MksLoggedFuture;
 
 static void

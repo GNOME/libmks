@@ -28,10 +28,10 @@ struct _MksScreenAttributes
 {
   guint16 width_mm;
   guint16 height_mm;
-  int x_offset;
-  int y_offset;
-  guint width;
-  guint height;
+  int     x_offset;
+  int     y_offset;
+  guint   width;
+  guint   height;
 };
 
 G_END_DECLS

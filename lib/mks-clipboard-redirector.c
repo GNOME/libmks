@@ -27,10 +27,10 @@
 typedef struct
 {
   MksClipboardRedirector *redirector;
-  MksClipboardSelection selection;
-  DexPromise *promise;
-  GOutputStream *stream;
-  char *mime_type;
+  MksClipboardSelection   selection;
+  DexPromise             *promise;
+  GOutputStream          *stream;
+  char                   *mime_type;
 } ReadState;
 
 static void mks_remote_content_provider_set_property (GObject      *object,
@@ -40,41 +40,35 @@ static void mks_remote_content_provider_set_property (GObject      *object,
 
 #define MKS_TYPE_REMOTE_CONTENT_PROVIDER (mks_remote_content_provider_get_type())
 
-G_DECLARE_FINAL_TYPE (MksRemoteContentProvider,
-                      mks_remote_content_provider,
-                      MKS,
-                      REMOTE_CONTENT_PROVIDER,
-                      GdkContentProvider)
+G_DECLARE_FINAL_TYPE (MksRemoteContentProvider, mks_remote_content_provider, MKS, REMOTE_CONTENT_PROVIDER, GdkContentProvider)
 
 struct _MksRemoteContentProvider
 {
   GdkContentProvider parent_instance;
 
-  MksClipboard *clipboard;
-  MksClipboardSelection selection;
-  char **mime_types;
+  MksClipboard           *clipboard;
+  MksClipboardSelection   selection;
+  char                  **mime_types;
 };
 
 struct _MksClipboardRedirector
 {
   GObject parent_instance;
 
-  MksClipboard *clipboard;
-  GdkDisplay *display;
-  GdkClipboard *gdk_clipboard;
-  GdkClipboard *gdk_primary;
-  MksClipboardRedirectorSelections selections;
-  gboolean enabled;
-  gboolean applying_remote;
+  MksClipboard                     *clipboard;
+  GdkDisplay                       *display;
+  GdkClipboard                     *gdk_clipboard;
+  GdkClipboard                     *gdk_primary;
+  MksClipboardRedirectorSelections  selections;
+  gboolean                          enabled;
+  gboolean                          applying_remote;
 
   gulong clipboard_changed_handler;
   gulong primary_changed_handler;
   gulong mks_changed_handler;
 };
 
-G_DEFINE_FINAL_TYPE (MksRemoteContentProvider,
-                     mks_remote_content_provider,
-                     GDK_TYPE_CONTENT_PROVIDER)
+G_DEFINE_FINAL_TYPE (MksRemoteContentProvider, mks_remote_content_provider, GDK_TYPE_CONTENT_PROVIDER)
 G_DEFINE_FINAL_TYPE (MksClipboardRedirector, mks_clipboard_redirector, G_TYPE_OBJECT)
 
 enum {

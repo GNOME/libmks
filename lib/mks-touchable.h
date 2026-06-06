@@ -52,10 +52,10 @@ typedef struct _MksTouchableClass MksTouchableClass;
  */
 typedef enum _MksTouchEventKind
 {
-  MKS_TOUCH_EVENT_BEGIN     = 0,
-  MKS_TOUCH_EVENT_UPDATE    = 1,
-  MKS_TOUCH_EVENT_END       = 2,
-  MKS_TOUCH_EVENT_CANCEL    = 3,
+  MKS_TOUCH_EVENT_BEGIN  = 0,
+  MKS_TOUCH_EVENT_UPDATE = 1,
+  MKS_TOUCH_EVENT_END    = 2,
+  MKS_TOUCH_EVENT_CANCEL = 3,
 } MksTouchEventKind;
 
 MKS_AVAILABLE_IN_ALL

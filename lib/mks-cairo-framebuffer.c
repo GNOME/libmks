@@ -51,7 +51,7 @@ struct _MksCairoFramebuffer
   /* The format our framebuffer uses and corresponding format
    * the uploaded textures will use.
    */
-  cairo_format_t format;
+  cairo_format_t  format;
   GdkMemoryFormat memory_format;
 
   /* The stride for the framebuffer so that the memory texture

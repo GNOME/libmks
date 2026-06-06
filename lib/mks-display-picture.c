@@ -30,7 +30,7 @@
 
 struct _MksDisplayPicture
 {
-  GtkWidget     parent_instance;
+  GtkWidget parent_instance;
 
   GSignalGroup *paintable_signals;
   MksPaintable *paintable;
@@ -38,8 +38,8 @@ struct _MksDisplayPicture
   MksMouse     *mouse;
   MksTouchable *touchable;
 
-  double        last_mouse_x;
-  double        last_mouse_y;
+  double last_mouse_x;
+  double last_mouse_y;
 };
 
 enum {
