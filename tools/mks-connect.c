@@ -89,8 +89,6 @@ main_fiber (gpointer user_data)
   g_autoptr(GDBusProxy) proxy = NULL;
   g_autofree const char **queued_owners = NULL;
   gsize n_queued_owners;
-  GListModel *devices = NULL;
-  guint n_items;
   int argc;
   char **argv;
 
@@ -147,7 +145,9 @@ main_fiber (gpointer user_data)
 
   for (guint i = 0; i < n_queued_owners; i++)
     {
+      g_autoptr(GListModel) devices = NULL;
       g_autoptr(MksTransport) transport = NULL;
+      guint n_items;
 
       g_clear_object (&session);
 
@@ -165,7 +165,7 @@ main_fiber (gpointer user_data)
               mks_session_get_name (session),
               queued_owners[i]);
 
-      devices = mks_session_get_devices (session);
+      devices = mks_session_list_devices (session);
       n_items = g_list_model_get_n_items (devices);
 
       for (guint j = 0; j < n_items; j++)

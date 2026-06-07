@@ -28,6 +28,8 @@ G_BEGIN_DECLS
 struct _MksScreen
 {
   MksDevice parent_instance;
+
+  gint64 last_active_time;
 };
 
 struct _MksScreenClass
@@ -47,5 +49,7 @@ struct _MksScreenClass
   DexFuture     *(*attach)             (MksScreen           *self,
                                         GdkDisplay          *display);
 };
+
+void _mks_screen_mark_active (MksScreen *self);
 
 G_END_DECLS

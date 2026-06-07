@@ -44,37 +44,23 @@ struct _MksDBusScreenClass
 
 struct _MksDBusScreen
 {
-  MksDevice parent_instance;
-
-  MksQemuConsole *console;
-  gulong          console_notify_handler;
-
-  MksKeyboard  *keyboard;
-  MksMouse     *mouse;
-  MksTouchable *touchable;
-
-  guint number;
-  guint width;
-  guint height;
-
-  MksScreenKind kind : 2;
+  MksScreen                          parent_instance;
+  MksQemuConsole                    *console;
+  gulong                             console_notify_handler;
+  GDBusConnection                   *activity_connection;
+  MksQemuListener                   *activity_listener;
+  MksQemuListenerUnixScanoutDMABUF2 *activity_listener_dmabuf2;
+  MksQemuListenerUnixMap            *activity_listener_map;
+  MksKeyboard                       *keyboard;
+  MksMouse                          *mouse;
+  MksTouchable                      *touchable;
+  guint                              number;
+  guint                              width;
+  guint                              height;
+  MksScreenKind                      kind : 2;
 };
 
 G_DEFINE_FINAL_TYPE (MksDBusScreen, mks_dbus_screen, MKS_TYPE_SCREEN)
-
-enum {
-  PROP_0,
-  PROP_DEVICE_ADDRESS,
-  PROP_HEIGHT,
-  PROP_KIND,
-  PROP_KEYBOARD,
-  PROP_MOUSE,
-  PROP_NUMBER,
-  PROP_WIDTH,
-  N_PROPS
-};
-
-static GParamSpec *properties [N_PROPS];
 
 static MksKeyboard   *mks_dbus_screen_get_keyboard       (MksScreen           *screen);
 static MksMouse      *mks_dbus_screen_get_mouse          (MksScreen           *screen);
@@ -91,6 +77,401 @@ static DexFuture     *mks_dbus_screen_attach             (MksScreen           *s
 
 
 static void
+mks_dbus_screen_mark_active (MksDBusScreen *self)
+{
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+
+  _mks_screen_mark_active (MKS_SCREEN (self));
+}
+
+static gboolean
+mks_dbus_screen_activity_listener_scanout (MksDBusScreen         *self,
+                                           GDBusMethodInvocation *invocation,
+                                           guint                  width,
+                                           guint                  height,
+                                           guint                  stride,
+                                           guint                  pixman_format,
+                                           GVariant              *data,
+                                           MksQemuListener       *listener)
+{
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER (listener));
+
+  mks_dbus_screen_mark_active (self);
+  mks_qemu_listener_complete_scanout (listener, invocation);
+
+  return TRUE;
+}
+
+static gboolean
+mks_dbus_screen_activity_listener_update (MksDBusScreen         *self,
+                                          GDBusMethodInvocation *invocation,
+                                          int                    x,
+                                          int                    y,
+                                          int                    width,
+                                          int                    height,
+                                          guint                  stride,
+                                          guint                  pixman_format,
+                                          GVariant              *data,
+                                          MksQemuListener       *listener)
+{
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER (listener));
+
+  mks_dbus_screen_mark_active (self);
+  mks_qemu_listener_complete_update (listener, invocation);
+
+  return TRUE;
+}
+
+static gboolean
+mks_dbus_screen_activity_listener_scanout_dmabuf (MksDBusScreen         *self,
+                                                  GDBusMethodInvocation *invocation,
+                                                  GUnixFDList           *unix_fd_list,
+                                                  GVariant              *dmabuf,
+                                                  guint                  width,
+                                                  guint                  height,
+                                                  guint                  stride,
+                                                  guint                  fourcc,
+                                                  guint64                modifier,
+                                                  gboolean               y0_top,
+                                                  MksQemuListener       *listener)
+{
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER (listener));
+
+  mks_dbus_screen_mark_active (self);
+  mks_qemu_listener_complete_scanout_dmabuf (listener, invocation, NULL);
+
+  return TRUE;
+}
+
+static gboolean
+mks_dbus_screen_activity_listener_update_dmabuf (MksDBusScreen         *self,
+                                                 GDBusMethodInvocation *invocation,
+                                                 int                    x,
+                                                 int                    y,
+                                                 int                    width,
+                                                 int                    height,
+                                                 MksQemuListener       *listener)
+{
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER (listener));
+
+  mks_dbus_screen_mark_active (self);
+  mks_qemu_listener_complete_update_dmabuf (listener, invocation);
+
+  return TRUE;
+}
+
+static gboolean
+mks_dbus_screen_activity_listener_scanout_dmabuf2 (MksDBusScreen                     *self,
+                                                   GDBusMethodInvocation             *invocation,
+                                                   GUnixFDList                       *unix_fd_list,
+                                                   GVariant                          *dmabuf,
+                                                   guint                              x,
+                                                   guint                              y,
+                                                   guint                              width,
+                                                   guint                              height,
+                                                   GVariant                          *offset,
+                                                   GVariant                          *stride,
+                                                   guint                              num_planes,
+                                                   guint                              fourcc,
+                                                   guint                              backing_w,
+                                                   guint                              backing_h,
+                                                   guint64                            modifier,
+                                                   gboolean                           y0_top,
+                                                   MksQemuListenerUnixScanoutDMABUF2 *listener)
+{
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER_UNIX_SCANOUT_DMABUF2 (listener));
+
+  mks_dbus_screen_mark_active (self);
+  mks_qemu_listener_unix_scanout_dmabuf2_complete_scanout_dmabuf2 (listener,
+                                                                   invocation,
+                                                                   NULL);
+
+  return TRUE;
+}
+
+static gboolean
+mks_dbus_screen_activity_listener_scanout_map (MksDBusScreen          *self,
+                                               GDBusMethodInvocation  *invocation,
+                                               GUnixFDList            *unix_fd_list,
+                                               GVariant               *handle,
+                                               guint                   offset,
+                                               guint                   width,
+                                               guint                   height,
+                                               guint                   stride,
+                                               guint                   pixman_format,
+                                               MksQemuListenerUnixMap *listener)
+{
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER_UNIX_MAP (listener));
+
+  mks_dbus_screen_mark_active (self);
+  mks_qemu_listener_unix_map_complete_scanout_map (listener, invocation, NULL);
+
+  return TRUE;
+}
+
+static gboolean
+mks_dbus_screen_activity_listener_update_map (MksDBusScreen          *self,
+                                              GDBusMethodInvocation  *invocation,
+                                              int                     x,
+                                              int                     y,
+                                              int                     width,
+                                              int                     height,
+                                              MksQemuListenerUnixMap *listener)
+{
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER_UNIX_MAP (listener));
+
+  mks_dbus_screen_mark_active (self);
+  mks_qemu_listener_unix_map_complete_update_map (listener, invocation);
+
+  return TRUE;
+}
+
+static gboolean
+mks_dbus_screen_activity_listener_disable (MksDBusScreen         *self,
+                                           GDBusMethodInvocation *invocation,
+                                           MksQemuListener       *listener)
+{
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER (listener));
+
+  mks_qemu_listener_complete_disable (listener, invocation);
+
+  return TRUE;
+}
+
+static gboolean
+mks_dbus_screen_activity_listener_mouse_set (MksDBusScreen         *self,
+                                             GDBusMethodInvocation *invocation,
+                                             int                    x,
+                                             int                    y,
+                                             int                    on,
+                                             MksQemuListener       *listener)
+{
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER (listener));
+
+  mks_qemu_listener_complete_mouse_set (listener, invocation);
+
+  return TRUE;
+}
+
+static gboolean
+mks_dbus_screen_activity_listener_cursor_define (MksDBusScreen         *self,
+                                                 GDBusMethodInvocation *invocation,
+                                                 int                    width,
+                                                 int                    height,
+                                                 int                    hot_x,
+                                                 int                    hot_y,
+                                                 GVariant              *data,
+                                                 MksQemuListener       *listener)
+{
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER (listener));
+
+  mks_qemu_listener_complete_cursor_define (listener, invocation);
+
+  return TRUE;
+}
+
+static DexFuture *
+mks_dbus_screen_activity_connection_cb (DexFuture *future,
+                                        gpointer   user_data)
+{
+  MksDBusScreen *self = user_data;
+  GDBusInterfaceSkeleton *skeleton;
+  g_autoptr(GError) error = NULL;
+  const GValue *value;
+
+  g_assert (DEX_IS_FUTURE (future));
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+
+  if (!(value = dex_future_get_value (future, &error)))
+    {
+      g_warning ("Failed to create activity D-Bus connection: %s", error->message);
+      return dex_future_new_true ();
+    }
+
+  g_set_object (&self->activity_connection, g_value_get_object (value));
+
+  skeleton = G_DBUS_INTERFACE_SKELETON (self->activity_listener);
+  if (!g_dbus_interface_skeleton_export (skeleton,
+                                         self->activity_connection,
+                                         "/org/qemu/Display1/Listener",
+                                         &error))
+    {
+      g_warning ("Failed to export activity listener on D-Bus connection: %s",
+                 error->message);
+      return dex_future_new_true ();
+    }
+
+  skeleton = G_DBUS_INTERFACE_SKELETON (self->activity_listener_dmabuf2);
+  if (!g_dbus_interface_skeleton_export (skeleton,
+                                         self->activity_connection,
+                                         "/org/qemu/Display1/Listener",
+                                         &error))
+    {
+      g_warning ("Failed to export activity DMA-BUF2 listener on D-Bus connection: %s",
+                 error->message);
+      return dex_future_new_true ();
+    }
+
+  skeleton = G_DBUS_INTERFACE_SKELETON (self->activity_listener_map);
+  if (!g_dbus_interface_skeleton_export (skeleton,
+                                         self->activity_connection,
+                                         "/org/qemu/Display1/Listener",
+                                         &error))
+    {
+      g_warning ("Failed to export activity map listener on D-Bus connection: %s",
+                 error->message);
+      return dex_future_new_true ();
+    }
+
+  g_dbus_connection_start_message_processing (self->activity_connection);
+
+  return dex_future_new_true ();
+}
+
+static void
+mks_dbus_screen_start_activity_listener (MksDBusScreen *self)
+{
+  g_autoptr(GSocketConnection) io_stream = NULL;
+  g_autoptr(GUnixFDList) unix_fd_list = NULL;
+  g_autoptr(GSocket) socket = NULL;
+  g_autoptr(GError) error = NULL;
+  g_autofd int us = -1;
+  g_autofd int them = -1;
+  gint64 begin_time;
+
+  g_assert (MKS_IS_DBUS_SCREEN (self));
+
+  if (self->console == NULL || self->activity_listener != NULL)
+    return;
+
+  if (!mks_socketpair_create (&us, &them, &error) ||
+      !(socket = g_socket_new_from_fd (us, &error)))
+    {
+      g_warning ("Failed to create activity listener socket: %s", error->message);
+      return;
+    }
+
+  us = -1;
+  io_stream = g_socket_connection_factory_create_connection (socket);
+
+  self->activity_listener = mks_qemu_listener_skeleton_new ();
+  self->activity_listener_dmabuf2 = mks_qemu_listener_unix_scanout_dmabuf2_skeleton_new ();
+  self->activity_listener_map = mks_qemu_listener_unix_map_skeleton_new ();
+  mks_qemu_listener_set_interfaces (self->activity_listener,
+                                    (const char * const[]) {
+                                      "org.qemu.Display1.Listener.Unix.Map",
+                                      "org.qemu.Display1.Listener.Unix.ScanoutDMABUF2",
+                                      NULL
+                                    });
+  g_signal_connect_object (self->activity_listener,
+                           "handle-scanout",
+                           G_CALLBACK (mks_dbus_screen_activity_listener_scanout),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->activity_listener,
+                           "handle-update",
+                           G_CALLBACK (mks_dbus_screen_activity_listener_update),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->activity_listener,
+                           "handle-scanout-dmabuf",
+                           G_CALLBACK (mks_dbus_screen_activity_listener_scanout_dmabuf),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->activity_listener,
+                           "handle-update-dmabuf",
+                           G_CALLBACK (mks_dbus_screen_activity_listener_update_dmabuf),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->activity_listener_dmabuf2,
+                           "handle-scanout-dmabuf2",
+                           G_CALLBACK (mks_dbus_screen_activity_listener_scanout_dmabuf2),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->activity_listener_map,
+                           "handle-scanout-map",
+                           G_CALLBACK (mks_dbus_screen_activity_listener_scanout_map),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->activity_listener_map,
+                           "handle-update-map",
+                           G_CALLBACK (mks_dbus_screen_activity_listener_update_map),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->activity_listener,
+                           "handle-disable",
+                           G_CALLBACK (mks_dbus_screen_activity_listener_disable),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->activity_listener,
+                           "handle-mouse-set",
+                           G_CALLBACK (mks_dbus_screen_activity_listener_mouse_set),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->activity_listener,
+                           "handle-cursor-define",
+                           G_CALLBACK (mks_dbus_screen_activity_listener_cursor_define),
+                           self,
+                           G_CONNECT_SWAPPED);
+
+  begin_time = MKS_TRACE_BEGIN_MARK ();
+  dex_future_disown
+    (dex_future_finally
+       (mks_marked_future
+          (mks_dbus_connection_new (G_IO_STREAM (io_stream),
+                                    (G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING |
+                                     G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT),
+                                    NULL),
+           begin_time,
+           "screen.activity.dbus-connection"),
+        mks_dbus_screen_activity_connection_cb,
+        g_object_ref (self),
+        g_object_unref));
+
+  unix_fd_list = g_unix_fd_list_new_from_array (&them, 1), them = -1;
+  begin_time = MKS_TRACE_BEGIN_MARK ();
+  dex_future_disown
+    (mks_logged_future
+       (mks_marked_future
+          (dex_dbus_connection_call_with_unix_fd_list
+             (g_dbus_proxy_get_connection (G_DBUS_PROXY (self->console)),
+              g_dbus_proxy_get_name (G_DBUS_PROXY (self->console)),
+              g_dbus_proxy_get_object_path (G_DBUS_PROXY (self->console)),
+              "org.qemu.Display1.Console",
+              "RegisterListener",
+              g_variant_new ("(h)", 0),
+              G_VARIANT_TYPE ("()"),
+              G_DBUS_CALL_FLAGS_NONE,
+              -1,
+              unix_fd_list),
+           begin_time,
+           "screen.activity.register"),
+        G_LOG_DOMAIN,
+        G_LOG_LEVEL_WARNING,
+        "Failed to register screen activity listener"));
+}
+
+static void
 mks_dbus_screen_set_width (MksDBusScreen *self,
                            guint          width)
 {
@@ -99,7 +480,7 @@ mks_dbus_screen_set_width (MksDBusScreen *self,
   if (self->width != width)
     {
       self->width = width;
-      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_WIDTH]);
+      g_object_notify (G_OBJECT (self), "width");
     }
 }
 
@@ -112,7 +493,7 @@ mks_dbus_screen_set_height (MksDBusScreen *self,
   if (self->height != height)
     {
       self->height = height;
-      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_HEIGHT]);
+      g_object_notify (G_OBJECT (self), "height");
     }
 }
 
@@ -125,7 +506,7 @@ mks_dbus_screen_set_number (MksDBusScreen *self,
   if (self->number != number)
     {
       self->number = number;
-      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_NUMBER]);
+      g_object_notify (G_OBJECT (self), "number");
     }
 }
 
@@ -145,7 +526,7 @@ mks_dbus_screen_set_type (MksDBusScreen *self,
   if (kind != self->kind)
     {
       self->kind = kind;
-      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_KIND]);
+      g_object_notify (G_OBJECT (self), "kind");
     }
 }
 
@@ -160,6 +541,8 @@ mks_dbus_screen_console_notify_cb (MksDBusScreen  *self,
 
   if (strcmp (pspec->name, "label") == 0)
     _mks_device_set_name (MKS_DEVICE (self), mks_qemu_console_get_label (console));
+  else if (strcmp (pspec->name, "device-address") == 0)
+    g_object_notify (G_OBJECT (self), "device-address");
   else if (strcmp (pspec->name, "width") == 0)
     mks_dbus_screen_set_width (self, mks_qemu_console_get_width (console));
   else if (strcmp (pspec->name, "height") == 0)
@@ -183,6 +566,7 @@ mks_dbus_screen_set_console (MksDBusScreen  *self,
   if (g_set_object (&self->console, console))
     {
       _mks_device_set_name (MKS_DEVICE (self), mks_qemu_console_get_label (console));
+      g_object_notify (G_OBJECT (self), "device-address");
 
       self->console_notify_handler =
         g_signal_connect_object (console,
@@ -195,6 +579,7 @@ mks_dbus_screen_set_console (MksDBusScreen  *self,
       mks_dbus_screen_set_width (self, mks_qemu_console_get_width (console));
       mks_dbus_screen_set_height (self, mks_qemu_console_get_height (console));
       mks_dbus_screen_set_number (self, mks_qemu_console_get_head (console));
+      mks_dbus_screen_start_activity_listener (self);
     }
 }
 
@@ -217,11 +602,29 @@ mks_dbus_screen_setup (MksDevice *device,
       if (MKS_QEMU_IS_CONSOLE (iface))
         mks_dbus_screen_set_console (self, MKS_QEMU_CONSOLE (iface));
       else if (MKS_QEMU_IS_KEYBOARD (iface))
-        self->keyboard = _mks_device_new (MKS_TYPE_DBUS_KEYBOARD, device->transport, object);
+        {
+          g_autoptr(MksKeyboard) keyboard = NULL;
+
+          keyboard = _mks_device_new (MKS_TYPE_DBUS_KEYBOARD, device->transport, object);
+          if (g_set_object (&self->keyboard, keyboard))
+            g_object_notify (G_OBJECT (self), "keyboard");
+        }
       else if (MKS_QEMU_IS_MOUSE (iface))
-        self->mouse = _mks_device_new (MKS_TYPE_DBUS_MOUSE, device->transport, object);
+        {
+          g_autoptr(MksMouse) mouse = NULL;
+
+          mouse = _mks_device_new (MKS_TYPE_DBUS_MOUSE, device->transport, object);
+          if (g_set_object (&self->mouse, mouse))
+            g_object_notify (G_OBJECT (self), "mouse");
+        }
       else if (MKS_QEMU_IS_MULTI_TOUCH (iface))
-        self->touchable = _mks_device_new (MKS_TYPE_DBUS_TOUCHABLE, device->transport, object);
+        {
+          g_autoptr(MksTouchable) touchable = NULL;
+
+          touchable = _mks_device_new (MKS_TYPE_DBUS_TOUCHABLE, device->transport, object);
+          if (g_set_object (&self->touchable, touchable))
+            g_object_notify (G_OBJECT (self), "touchable");
+        }
     }
 
   return self->console != NULL &&
@@ -243,51 +646,12 @@ mks_dbus_screen_dispose (GObject *object)
   g_clear_object (&self->keyboard);
   g_clear_object (&self->mouse);
   g_clear_object (&self->touchable);
+  g_clear_object (&self->activity_listener);
+  g_clear_object (&self->activity_listener_dmabuf2);
+  g_clear_object (&self->activity_listener_map);
+  g_clear_object (&self->activity_connection);
 
   G_OBJECT_CLASS (mks_dbus_screen_parent_class)->dispose (object);
-}
-
-static void
-mks_dbus_screen_get_property (GObject    *object,
-                              guint       prop_id,
-                              GValue     *value,
-                              GParamSpec *pspec)
-{
-  MksDBusScreen *self = MKS_DBUS_SCREEN (object);
-
-  switch (prop_id)
-    {
-    case PROP_DEVICE_ADDRESS:
-      g_value_set_string (value, mks_dbus_screen_get_device_address (MKS_SCREEN (self)));
-      break;
-
-    case PROP_KEYBOARD:
-      g_value_set_object (value, mks_dbus_screen_get_keyboard (MKS_SCREEN (self)));
-      break;
-
-    case PROP_KIND:
-      g_value_set_enum (value, mks_dbus_screen_get_kind (MKS_SCREEN (self)));
-      break;
-
-    case PROP_MOUSE:
-      g_value_set_object (value, mks_dbus_screen_get_mouse (MKS_SCREEN (self)));
-      break;
-
-    case PROP_NUMBER:
-      g_value_set_uint (value, mks_dbus_screen_get_number (MKS_SCREEN (self)));
-      break;
-
-    case PROP_WIDTH:
-      g_value_set_uint (value, mks_dbus_screen_get_width (MKS_SCREEN (self)));
-      break;
-
-    case PROP_HEIGHT:
-      g_value_set_uint (value, mks_dbus_screen_get_height (MKS_SCREEN (self)));
-      break;
-
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-    }
 }
 
 static void
@@ -308,48 +672,9 @@ mks_dbus_screen_class_init (MksDBusScreenClass *klass)
   screen_class->configure = mks_dbus_screen_configure;
   screen_class->attach = mks_dbus_screen_attach;
 
-
   object_class->dispose = mks_dbus_screen_dispose;
-  object_class->get_property = mks_dbus_screen_get_property;
 
   device_class->setup = mks_dbus_screen_setup;
-
-  properties [PROP_DEVICE_ADDRESS] =
-    g_param_spec_string ("device-address", NULL, NULL,
-                         NULL,
-                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-
-  properties [PROP_KEYBOARD] =
-    g_param_spec_object ("keyboard", NULL, NULL,
-                         MKS_TYPE_KEYBOARD,
-                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-
-  properties [PROP_KIND] =
-    g_param_spec_enum ("kind", NULL, NULL,
-                       MKS_TYPE_SCREEN_KIND, MKS_SCREEN_KIND_TEXT,
-                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-
-  properties [PROP_MOUSE] =
-    g_param_spec_object ("mouse", NULL, NULL,
-                         MKS_TYPE_MOUSE,
-                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-
-  properties [PROP_NUMBER] =
-    g_param_spec_uint ("number", NULL, NULL,
-                       0, G_MAXUINT, 0,
-                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-
-  properties [PROP_WIDTH] =
-    g_param_spec_uint ("width", NULL, NULL,
-                       0, G_MAXUINT, 0,
-                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-
-  properties [PROP_HEIGHT] =
-    g_param_spec_uint ("height", NULL, NULL,
-                       0, G_MAXUINT, 0,
-                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_properties (object_class, N_PROPS, properties);
 }
 
 static void
@@ -357,14 +682,6 @@ mks_dbus_screen_init (MksDBusScreen *self)
 {
 }
 
-/**
- * mks_dbus_screen_get_keyboard:
- * @self: a #MksDBusScreen
- *
- * Gets the #MksDBusScreen:keyboard property.
- *
- * Returns: (transfer none): a #MksKeyboard
- */
 static MksKeyboard *
 mks_dbus_screen_get_keyboard (MksScreen *screen)
 {
@@ -375,14 +692,6 @@ mks_dbus_screen_get_keyboard (MksScreen *screen)
   return self->keyboard;
 }
 
-/**
- * mks_dbus_screen_get_mouse:
- * @self: a #MksDBusScreen
- *
- * Gets the #MksDBusScreen:mouse property.
- *
- * Returns: (transfer none): a #MksMouse
- */
 static MksMouse *
 mks_dbus_screen_get_mouse (MksScreen *screen)
 {
@@ -393,14 +702,6 @@ mks_dbus_screen_get_mouse (MksScreen *screen)
   return self->mouse;
 }
 
-/**
- * mks_dbus_screen_get_touchable:
- * @self: a #MksDBusScreen
- *
- * Gets the #MksDBusScreen:touchable property.
- *
- * Returns: (transfer none): a #MksTouchable
- */
 static MksTouchable *
 mks_dbus_screen_get_touchable (MksScreen *screen)
 {
@@ -411,14 +712,6 @@ mks_dbus_screen_get_touchable (MksScreen *screen)
   return self->touchable;
 }
 
-/**
- * mks_dbus_screen_get_kind:
- * @self: a #MksDBusScreen
- *
- * Gets the "kind" property.
- *
- * Returns: a #MksScreenKind
- */
 static MksScreenKind
 mks_dbus_screen_get_kind (MksScreen *screen)
 {
@@ -429,14 +722,6 @@ mks_dbus_screen_get_kind (MksScreen *screen)
   return self->kind;
 }
 
-/**
- * mks_dbus_screen_get_width:
- * @self: a #MksDBusScreen
- *
- * Gets the "width" property.
- *
- * Returns: The width of the screen in pixels.
- */
 static guint
 mks_dbus_screen_get_width (MksScreen *screen)
 {
@@ -447,14 +732,6 @@ mks_dbus_screen_get_width (MksScreen *screen)
   return self->width;
 }
 
-/**
- * mks_dbus_screen_get_height:
- * @self: a #MksDBusScreen
- *
- * Gets the "height" property.
- *
- * Returns: The height of the screen in pixels.
- */
 static guint
 mks_dbus_screen_get_height (MksScreen *screen)
 {
@@ -465,14 +742,6 @@ mks_dbus_screen_get_height (MksScreen *screen)
   return self->height;
 }
 
-/**
- * mks_dbus_screen_get_number:
- * @self: a #MksDBusScreen
- *
- * Gets the "number" property.
- *
- * Returns: the screen number
- */
 static guint
 mks_dbus_screen_get_number (MksScreen *screen)
 {
@@ -512,17 +781,6 @@ check_console (MksDBusScreen  *self,
   return TRUE;
 }
 
-/**
- * mks_dbus_screen_configure:
- * @self: an #MksDBusScreen
- * @attributes: (transfer full): a #MksScreenAttributes
- *
- * Requests the QEMU instance reconfigure the screen with @attributes.
- *
- * This function takes ownership of @attributes.
- *
- * Returns: (transfer full): a [class@Dex.Future] that resolves to %TRUE.
- */
 static DexFuture *
 mks_dbus_screen_configure (MksScreen           *screen,
                            MksScreenAttributes *attributes)
@@ -584,20 +842,6 @@ mks_dbus_screen_attach_complete (DexFuture *future,
   return dex_future_new_for_object (state->paintable);
 }
 
-/**
- * mks_dbus_screen_attach:
- * @self: an #MksDBusScreen
- * @display: a #GdkDisplay
- *
- * Creates a #GdkPaintable that is updated with the contents of the screen.
- *
- * This function registers a new `socketpair()` which is shared with
- * the QEMU instance to receive rendering updates. Those updates are
- * propagated to the resulting #GdkPaintable.
- *
- * Returns: (transfer full): a [class@Dex.Future] that resolves to a
- *   #GdkPaintable.
- */
 static DexFuture *
 mks_dbus_screen_attach (MksScreen  *screen,
                         GdkDisplay *display)

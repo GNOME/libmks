@@ -110,13 +110,15 @@ main_fiber (gpointer user_data)
       return dex_future_new_for_int (EXIT_FAILURE);
     }
 
-  if (!(screen = mks_session_dup_screen (session)))
+  if (!(screen = mks_session_dup_primary_screen (session)))
     {
       g_printerr ("No screen attached to session!\n");
       return dex_future_new_for_int (EXIT_FAILURE);
     }
 
-  mks_display_set_screen (MKS_DISPLAY (display), screen);
+  g_object_bind_property (session, "primary-screen",
+                          display, "screen",
+                          (G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE));
 
   gtk_window_present (window);
 

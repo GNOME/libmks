@@ -51,46 +51,48 @@ typedef enum _MksScreenKind
 } MksScreenKind;
 
 MKS_AVAILABLE_IN_ALL
-MksScreenKind  mks_screen_get_kind           (MksScreen            *self);
+MksScreenKind  mks_screen_get_kind             (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-MksKeyboard   *mks_screen_get_keyboard       (MksScreen            *self);
+MksKeyboard   *mks_screen_get_keyboard         (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-MksMouse      *mks_screen_get_mouse          (MksScreen            *self);
+MksMouse      *mks_screen_get_mouse            (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-MksTouchable  *mks_screen_get_touchable      (MksScreen            *self);
+MksTouchable  *mks_screen_get_touchable        (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-guint          mks_screen_get_width          (MksScreen            *self);
+guint          mks_screen_get_width            (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-guint          mks_screen_get_height         (MksScreen            *self);
+guint          mks_screen_get_height           (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-guint          mks_screen_get_number         (MksScreen            *self);
+guint          mks_screen_get_number           (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-const char    *mks_screen_get_device_address (MksScreen            *self);
+gint64         mks_screen_get_last_active_time (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-DexFuture     *mks_screen_configure          (MksScreen            *self,
-                                              MksScreenAttributes  *attributes);
+const char    *mks_screen_get_device_address   (MksScreen            *self);
 MKS_AVAILABLE_IN_ALL
-void           mks_screen_configure_async    (MksScreen            *self,
-                                              MksScreenAttributes  *attributes,
-                                              GCancellable         *cancellable,
-                                              GAsyncReadyCallback   callback,
-                                              gpointer              user_data);
+DexFuture     *mks_screen_configure            (MksScreen            *self,
+                                                MksScreenAttributes  *attributes);
 MKS_AVAILABLE_IN_ALL
-gboolean       mks_screen_configure_finish   (MksScreen            *self,
-                                              GAsyncResult         *result,
-                                              GError              **error);
+void           mks_screen_configure_async      (MksScreen            *self,
+                                                MksScreenAttributes  *attributes,
+                                                GCancellable         *cancellable,
+                                                GAsyncReadyCallback   callback,
+                                                gpointer              user_data);
 MKS_AVAILABLE_IN_ALL
-DexFuture     *mks_screen_attach             (MksScreen            *self,
-                                              GdkDisplay           *display);
+gboolean       mks_screen_configure_finish     (MksScreen            *self,
+                                                GAsyncResult         *result,
+                                                GError              **error);
 MKS_AVAILABLE_IN_ALL
-void           mks_screen_attach_async       (MksScreen            *self,
-                                              GdkDisplay           *display,
-                                              GCancellable         *cancellable,
-                                              GAsyncReadyCallback   callback,
-                                              gpointer              user_data);
+DexFuture     *mks_screen_attach               (MksScreen            *self,
+                                                GdkDisplay           *display);
 MKS_AVAILABLE_IN_ALL
-GdkPaintable  *mks_screen_attach_finish      (MksScreen            *self,
-                                              GAsyncResult         *result,
-                                              GError              **error);
+void           mks_screen_attach_async         (MksScreen            *self,
+                                                GdkDisplay           *display,
+                                                GCancellable         *cancellable,
+                                                GAsyncReadyCallback   callback,
+                                                gpointer              user_data);
+MKS_AVAILABLE_IN_ALL
+GdkPaintable  *mks_screen_attach_finish        (MksScreen            *self,
+                                                GAsyncResult         *result,
+                                                GError              **error);
 
 G_END_DECLS

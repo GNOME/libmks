@@ -26,7 +26,7 @@
 #include "mks-device-private.h"
 #include "mks-microphone.h"
 #include "mks-read-only-list-model-private.h"
-#include "mks-screen.h"
+#include "mks-screen-private.h"
 #include "mks-session.h"
 #include "mks-speaker.h"
 #include "mks-util-private.h"
@@ -37,23 +37,24 @@
  *
  * Session connected to a transport
  *
- * The `MksSession` represents a connection to a transport. It contains
- * devices such as the mouse, keyboard, and screen which can be used with GTK.
+ * The `MksSession` represents a connection to a transport. It contains devices
+ * such as the mouse, keyboard, and screen which can be used with GTK.
  *
  * You may monitor [property@Mks.Session:devices] using [signal@Gio.ListModel::items-changed] to be
  * notified of changes to available devices in the session.
+ * [property@Mks.Session:screens] contains only screen devices.
  *
  * # Connecting
  *
  * Create a [class@Mks.Transport] and then a `MksSession` with
  * [ctor@Mks.Session.new]. The `MksSession` instance exposes devices via the
- * [property@Mks.Session:devices] [iface@Gio.ListModel].
+ * [property@Mks.Session:devices] [iface@Gio.ListModel] and screens via the
+ * [property@Mks.Session:screens] [iface@Gio.ListModel].
  *
  * # Creating Widgets
  *
- * You can create a new widget to embed in your application by calling
- * [method@Mks.Session.dup_screen] and set the screen for the [class@Mks.Display]
- * with [method@Mks.Display.set_screen].
+ * You can bind [property@Mks.Session:primary-screen] to
+ * [property@Mks.Display:screen] for the common single-screen case.
  */
 
 static void     mks_session_async_initable_init_async  (GAsyncInitable       *async_initable,
@@ -83,6 +84,13 @@ struct _MksSession
    */
   GListModel *devices_read_only;
 
+  /* Screens are also stored separately so applications can ignore unrelated
+   * devices when choosing which displays to present.
+   */
+  GListStore *screens;
+  GListModel *screens_read_only;
+
+  MksScreen *primary_screen;
   MksClipboard *clipboard;
 
   char *name;
@@ -103,6 +111,8 @@ enum {
   PROP_0,
   PROP_TRANSPORT,
   PROP_DEVICES,
+  PROP_SCREENS,
+  PROP_PRIMARY_SCREEN,
   PROP_CLIPBOARD,
   PROP_NAME,
   PROP_UUID,
@@ -110,6 +120,291 @@ enum {
 };
 
 static GParamSpec *properties [N_PROPS];
+
+static int
+mks_session_compare_screens (gconstpointer a,
+                             gconstpointer b,
+                             gpointer      user_data)
+{
+  MksScreen *screen_a = (MksScreen *)a;
+  MksScreen *screen_b = (MksScreen *)b;
+  const char *device_address_a;
+  const char *device_address_b;
+  const char *name_a;
+  const char *name_b;
+  guint number_a;
+  guint number_b;
+  int ret;
+
+  g_assert (MKS_IS_SCREEN (screen_a));
+  g_assert (MKS_IS_SCREEN (screen_b));
+
+  if (screen_a == screen_b)
+    return 0;
+
+  device_address_a = mks_screen_get_device_address (screen_a);
+  device_address_b = mks_screen_get_device_address (screen_b);
+
+  if ((ret = g_strcmp0 (device_address_a, device_address_b)))
+    return ret;
+
+  number_a = mks_screen_get_number (screen_a);
+  number_b = mks_screen_get_number (screen_b);
+
+  if (number_a < number_b)
+    return -1;
+
+  if (number_a > number_b)
+    return 1;
+
+  name_a = mks_device_get_name (MKS_DEVICE (screen_a));
+  name_b = mks_device_get_name (MKS_DEVICE (screen_b));
+
+  return g_strcmp0 (name_a, name_b);
+}
+
+static gboolean
+mks_session_find_screen (MksSession *self,
+                         MksScreen  *screen,
+                         guint      *position)
+{
+  GListModel *model;
+  guint n_items;
+
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_IS_SCREEN (screen));
+
+  model = G_LIST_MODEL (self->screens);
+  n_items = g_list_model_get_n_items (model);
+
+  for (guint i = 0; i < n_items; i++)
+    {
+      g_autoptr(MksScreen) item = g_list_model_get_item (model, i);
+
+      if (item == screen)
+        {
+          if (position != NULL)
+            *position = i;
+
+          return TRUE;
+        }
+    }
+
+  return FALSE;
+}
+
+static guint
+mks_session_get_screen_insert_position (MksSession *self,
+                                        MksScreen  *screen)
+{
+  GListModel *model;
+  guint n_items;
+
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_IS_SCREEN (screen));
+
+  model = G_LIST_MODEL (self->screens);
+  n_items = g_list_model_get_n_items (model);
+
+  for (guint i = 0; i < n_items; i++)
+    {
+      g_autoptr(MksScreen) item = g_list_model_get_item (model, i);
+
+      if (mks_session_compare_screens (screen, item, NULL) < 0)
+        return i;
+    }
+
+  return n_items;
+}
+
+static int
+mks_session_score_primary_screen (MksSession *self,
+                                  MksScreen  *screen)
+{
+  int score = 0;
+
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_IS_SCREEN (screen));
+
+  if (mks_screen_get_kind (screen) != MKS_SCREEN_KIND_GRAPHIC)
+    return -1;
+
+  if (mks_screen_get_width (screen) > 0 && mks_screen_get_height (screen) > 0)
+    score += 100;
+
+  if (mks_screen_get_number (screen) == 0)
+    score += 10;
+
+  return score;
+}
+
+static gboolean
+mks_session_screen_is_primary_candidate (MksSession *self,
+                                         MksScreen  *screen)
+{
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_IS_SCREEN (screen));
+
+  return mks_session_find_screen (self, screen, NULL) &&
+         mks_session_score_primary_screen (self, screen) >= 0;
+}
+
+static void
+mks_session_set_primary_screen (MksSession *self,
+                                MksScreen  *primary_screen)
+{
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (!primary_screen || MKS_IS_SCREEN (primary_screen));
+
+  if (g_set_object (&self->primary_screen, primary_screen))
+    g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_PRIMARY_SCREEN]);
+}
+
+static void
+mks_session_update_primary_screen (MksSession *self)
+{
+  g_autoptr(MksScreen) best = NULL;
+  GListModel *model;
+  guint n_items;
+  gint64 current_active_time = 0;
+  gboolean current_is_candidate;
+  int best_score = -1;
+  gint64 best_active_time = 0;
+
+  g_assert (MKS_IS_SESSION (self));
+
+  current_is_candidate = self->primary_screen != NULL &&
+                         mks_session_screen_is_primary_candidate (self, self->primary_screen);
+
+  if (current_is_candidate)
+    current_active_time = mks_screen_get_last_active_time (self->primary_screen);
+
+  model = G_LIST_MODEL (self->screens);
+  n_items = g_list_model_get_n_items (model);
+
+  for (guint i = 0; i < n_items; i++)
+    {
+      g_autoptr(MksScreen) screen = g_list_model_get_item (model, i);
+      gint64 active_time;
+      int score;
+
+      if ((score = mks_session_score_primary_screen (self, screen)) < 0)
+        continue;
+
+      active_time = mks_screen_get_last_active_time (screen);
+
+      /* Once a primary screen exists, metadata alone should not steal focus
+       * from it. A different screen needs newer display activity to replace it.
+       */
+      if (current_is_candidate &&
+          screen != self->primary_screen &&
+          active_time <= current_active_time)
+        continue;
+
+      if (active_time > best_active_time ||
+          (active_time == best_active_time && score > best_score))
+        {
+          best_active_time = active_time;
+          best_score = score;
+          g_set_object (&best, screen);
+        }
+    }
+
+  if (best == NULL && current_is_candidate)
+    g_set_object (&best, self->primary_screen);
+
+  mks_session_set_primary_screen (self, best);
+}
+
+static void
+mks_session_resort_screen (MksSession *self,
+                           MksScreen  *screen)
+{
+  g_autoptr(MksScreen) hold = NULL;
+  guint old_position;
+  guint new_position;
+
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_IS_SCREEN (screen));
+
+  if (!mks_session_find_screen (self, screen, &old_position))
+    return;
+
+  hold = g_object_ref (screen);
+  g_list_store_remove (self->screens, old_position);
+
+  new_position = mks_session_get_screen_insert_position (self, hold);
+  g_list_store_insert (self->screens, new_position, hold);
+}
+
+static void
+mks_session_screen_notify_cb (MksSession *self,
+                              GParamSpec *pspec,
+                              MksScreen  *screen)
+{
+  const char *name;
+
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (pspec != NULL);
+  g_assert (MKS_IS_SCREEN (screen));
+
+  name = pspec->name;
+
+  if (g_str_equal (name, "device-address") ||
+      g_str_equal (name, "number"))
+    mks_session_resort_screen (self, screen);
+
+  if (g_str_equal (name, "device-address") ||
+      g_str_equal (name, "height") ||
+      g_str_equal (name, "kind") ||
+      g_str_equal (name, "last-active-time") ||
+      g_str_equal (name, "number") ||
+      g_str_equal (name, "width"))
+    mks_session_update_primary_screen (self);
+}
+
+static void
+mks_session_add_screen (MksSession *self,
+                        MksScreen  *screen)
+{
+  guint position;
+
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_IS_SCREEN (screen));
+
+  if (mks_session_find_screen (self, screen, NULL))
+    return;
+
+  g_signal_connect_object (screen,
+                           "notify",
+                           G_CALLBACK (mks_session_screen_notify_cb),
+                           self,
+                           G_CONNECT_SWAPPED);
+
+  position = mks_session_get_screen_insert_position (self, screen);
+  g_list_store_insert (self->screens, position, screen);
+  mks_session_update_primary_screen (self);
+}
+
+static void
+mks_session_remove_screen (MksSession *self,
+                           MksScreen  *screen)
+{
+  guint position;
+
+  g_assert (MKS_IS_SESSION (self));
+  g_assert (MKS_IS_SCREEN (screen));
+
+  if (!mks_session_find_screen (self, screen, &position))
+    return;
+
+  g_signal_handlers_disconnect_by_func (screen,
+                                        G_CALLBACK (mks_session_screen_notify_cb),
+                                        self);
+
+  g_list_store_remove (self->screens, position);
+  mks_session_update_primary_screen (self);
+}
 
 static void
 mks_session_add_device (MksSession *self,
@@ -122,6 +417,9 @@ mks_session_add_device (MksSession *self,
     return;
 
   g_list_store_append (self->devices, device);
+
+  if (MKS_IS_SCREEN (device))
+    mks_session_add_screen (self, MKS_SCREEN (device));
 }
 
 static void
@@ -132,6 +430,9 @@ mks_session_remove_device (MksSession *self,
 
   g_assert (MKS_IS_SESSION (self));
   g_assert (MKS_IS_DEVICE (device));
+
+  if (MKS_IS_SCREEN (device))
+    mks_session_remove_screen (self, MKS_SCREEN (device));
 
   n_items = g_list_model_get_n_items (G_LIST_MODEL (self->devices));
 
@@ -262,6 +563,24 @@ mks_session_dispose (GObject *object)
   if (self->devices != NULL)
     g_list_store_remove_all (self->devices);
 
+  if (self->screens != NULL)
+    {
+      GListModel *model = G_LIST_MODEL (self->screens);
+      guint n_items = g_list_model_get_n_items (model);
+
+      for (guint i = 0; i < n_items; i++)
+        {
+          g_autoptr(MksScreen) screen = g_list_model_get_item (model, i);
+
+          g_signal_handlers_disconnect_by_func (screen,
+                                                G_CALLBACK (mks_session_screen_notify_cb),
+                                                self);
+        }
+
+      g_list_store_remove_all (self->screens);
+    }
+
+  g_clear_object (&self->primary_screen);
   g_clear_object (&self->clipboard);
   g_clear_pointer (&self->name, g_free);
   g_clear_pointer (&self->uuid, g_free);
@@ -276,6 +595,8 @@ mks_session_finalize (GObject *object)
 
   g_clear_object (&self->devices);
   g_clear_object (&self->devices_read_only);
+  g_clear_object (&self->screens);
+  g_clear_object (&self->screens_read_only);
   g_clear_object (&self->transport);
 
   G_OBJECT_CLASS (mks_session_parent_class)->finalize (object);
@@ -297,7 +618,15 @@ mks_session_get_property (GObject    *object,
 
 
     case PROP_DEVICES:
-      g_value_set_object (value, mks_session_get_devices (self));
+      g_value_take_object (value, mks_session_list_devices (self));
+      break;
+
+    case PROP_SCREENS:
+      g_value_take_object (value, mks_session_list_screens (self));
+      break;
+
+    case PROP_PRIMARY_SCREEN:
+      g_value_set_object (value, self->primary_screen);
       break;
 
     case PROP_CLIPBOARD:
@@ -368,6 +697,28 @@ mks_session_class_init (MksSessionClass *klass)
                          (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   /**
+   * MksSession:screens:
+   *
+   * A [iface@Gio.ListModel] of screens discovered by the transport.
+   */
+  properties [PROP_SCREENS] =
+    g_param_spec_object ("screens", NULL, NULL,
+                         G_TYPE_LIST_MODEL,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  /**
+   * MksSession:primary-screen:
+   *
+   * The best screen to present by default.
+   */
+  properties [PROP_PRIMARY_SCREEN] =
+    g_param_spec_object ("primary-screen", NULL, NULL,
+                         MKS_TYPE_SCREEN,
+                         (G_PARAM_READABLE |
+                          G_PARAM_EXPLICIT_NOTIFY |
+                          G_PARAM_STATIC_STRINGS));
+
+  /**
    * MksSession:clipboard:
    *
    * The [class@Mks.Clipboard] for the session, if clipboard redirection is
@@ -406,6 +757,8 @@ mks_session_init (MksSession *self)
 {
   self->devices = g_list_store_new (MKS_TYPE_DEVICE);
   self->devices_read_only = mks_read_only_list_model_new (G_LIST_MODEL (self->devices));
+  self->screens = g_list_store_new (MKS_TYPE_SCREEN);
+  self->screens_read_only = mks_read_only_list_model_new (G_LIST_MODEL (self->screens));
 }
 
 static DexFuture *
@@ -454,19 +807,35 @@ mks_session_async_initable_init_finish (GAsyncInitable  *async_initable,
 }
 
 /**
- * mks_session_get_devices:
+ * mks_session_list_devices:
  * @self: a #MksSession
  *
- * Gets a #GListModel of devices connected to the session.
+ * Lists devices connected to the session.
  *
- * Returns: (transfer none): a #GListModel of #MksDevice
+ * Returns: (transfer full): a #GListModel of #MksDevice
  */
 GListModel *
-mks_session_get_devices (MksSession *self)
+mks_session_list_devices (MksSession *self)
 {
   g_return_val_if_fail (MKS_IS_SESSION (self), NULL);
 
-  return self->devices_read_only;
+  return g_object_ref (self->devices_read_only);
+}
+
+/**
+ * mks_session_list_screens:
+ * @self: a #MksSession
+ *
+ * Lists screens connected to the session.
+ *
+ * Returns: (transfer full): a #GListModel of #MksScreen
+ */
+GListModel *
+mks_session_list_screens (MksSession *self)
+{
+  g_return_val_if_fail (MKS_IS_SESSION (self), NULL);
+
+  return g_object_ref (self->screens_read_only);
 }
 
 typedef struct _MksSessionNew
@@ -582,33 +951,19 @@ mks_session_get_name (MksSession *self)
 }
 
 /**
- * mks_session_dup_screen:
+ * mks_session_dup_primary_screen:
  * @self: a #MksSession
  *
- * Gets the main screen for the session.
+ * Gets the primary screen for the session.
  *
  * Returns: (transfer full) (nullable): a #MksScreen or %NULL
  */
 MksScreen *
-mks_session_dup_screen (MksSession *self)
+mks_session_dup_primary_screen (MksSession *self)
 {
-  GListModel *model;
-  guint n_items;
-
   g_return_val_if_fail (MKS_IS_SESSION (self), NULL);
 
-  model = G_LIST_MODEL (self->devices);
-  n_items = g_list_model_get_n_items (model);
-
-  for (guint i = 0; i < n_items; i++)
-    {
-      g_autoptr(MksDevice) device = g_list_model_get_item (model, i);
-
-      if (MKS_IS_SCREEN (device))
-        return MKS_SCREEN (g_steal_pointer (&device));
-    }
-
-  return NULL;
+  return self->primary_screen ? g_object_ref (self->primary_screen) : NULL;
 }
 
 /**

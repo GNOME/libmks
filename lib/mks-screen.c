@@ -20,15 +20,185 @@
 
 #include "config.h"
 
+#include "mks-enums.h"
+#include "mks-keyboard.h"
+#include "mks-mouse.h"
 #include "mks-screen-private.h"
 #include "mks-screen-attributes.h"
+#include "mks-touchable.h"
 #include "mks-util-private.h"
 
 G_DEFINE_ABSTRACT_TYPE (MksScreen, mks_screen, MKS_TYPE_DEVICE)
 
+enum {
+  PROP_0,
+  PROP_DEVICE_ADDRESS,
+  PROP_HEIGHT,
+  PROP_KIND,
+  PROP_KEYBOARD,
+  PROP_LAST_ACTIVE_TIME,
+  PROP_MOUSE,
+  PROP_NUMBER,
+  PROP_TOUCHABLE,
+  PROP_WIDTH,
+  N_PROPS
+};
+
+static GParamSpec *properties [N_PROPS];
+
+static void
+mks_screen_get_property (GObject    *object,
+                         guint       prop_id,
+                         GValue     *value,
+                         GParamSpec *pspec)
+{
+  MksScreen *self = MKS_SCREEN (object);
+
+  switch (prop_id)
+    {
+    case PROP_DEVICE_ADDRESS:
+      g_value_set_string (value, mks_screen_get_device_address (self));
+      break;
+
+    case PROP_HEIGHT:
+      g_value_set_uint (value, mks_screen_get_height (self));
+      break;
+
+    case PROP_KIND:
+      g_value_set_enum (value, mks_screen_get_kind (self));
+      break;
+
+    case PROP_KEYBOARD:
+      g_value_set_object (value, mks_screen_get_keyboard (self));
+      break;
+
+    case PROP_LAST_ACTIVE_TIME:
+      g_value_set_int64 (value, mks_screen_get_last_active_time (self));
+      break;
+
+    case PROP_MOUSE:
+      g_value_set_object (value, mks_screen_get_mouse (self));
+      break;
+
+    case PROP_NUMBER:
+      g_value_set_uint (value, mks_screen_get_number (self));
+      break;
+
+    case PROP_TOUCHABLE:
+      g_value_set_object (value, mks_screen_get_touchable (self));
+      break;
+
+    case PROP_WIDTH:
+      g_value_set_uint (value, mks_screen_get_width (self));
+      break;
+
+    default:
+      G_OBJECT_CLASS (mks_screen_parent_class)->get_property (object, prop_id, value, pspec);
+    }
+}
+
 static void
 mks_screen_class_init (MksScreenClass *klass)
 {
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->get_property = mks_screen_get_property;
+
+  /**
+   * MksScreen:device-address:
+   *
+   * The display device address.
+   */
+  properties [PROP_DEVICE_ADDRESS] =
+    g_param_spec_string ("device-address", NULL, NULL,
+                         NULL,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  /**
+   * MksScreen:height:
+   *
+   * The screen height in pixels.
+   */
+  properties [PROP_HEIGHT] =
+    g_param_spec_uint ("height", NULL, NULL,
+                       0, G_MAXUINT, 0,
+                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  /**
+   * MksScreen:kind:
+   *
+   * The screen kind.
+   */
+  properties [PROP_KIND] =
+    g_param_spec_enum ("kind", NULL, NULL,
+                       MKS_TYPE_SCREEN_KIND, MKS_SCREEN_KIND_TEXT,
+                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  /**
+   * MksScreen:keyboard:
+   *
+   * The keyboard associated with the screen.
+   */
+  properties [PROP_KEYBOARD] =
+    g_param_spec_object ("keyboard", NULL, NULL,
+                         MKS_TYPE_KEYBOARD,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  /**
+   * MksScreen:last-active-time:
+   *
+   * The last time that display contents were observed for the screen.
+   *
+   * The value is in monotonic time, comparable to
+   * [func@GLib.get_monotonic_time]. A value of 0 means no display content has
+   * been observed yet.
+   */
+  properties [PROP_LAST_ACTIVE_TIME] =
+    g_param_spec_int64 ("last-active-time", NULL, NULL,
+                        0, G_MAXINT64, 0,
+                        (G_PARAM_READABLE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS));
+
+  /**
+   * MksScreen:mouse:
+   *
+   * The mouse associated with the screen.
+   */
+  properties [PROP_MOUSE] =
+    g_param_spec_object ("mouse", NULL, NULL,
+                         MKS_TYPE_MOUSE,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  /**
+   * MksScreen:number:
+   *
+   * The screen number.
+   */
+  properties [PROP_NUMBER] =
+    g_param_spec_uint ("number", NULL, NULL,
+                       0, G_MAXUINT, 0,
+                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  /**
+   * MksScreen:touchable:
+   *
+   * The touch device associated with the screen.
+   */
+  properties [PROP_TOUCHABLE] =
+    g_param_spec_object ("touchable", NULL, NULL,
+                         MKS_TYPE_TOUCHABLE,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  /**
+   * MksScreen:width:
+   *
+   * The screen width in pixels.
+   */
+  properties [PROP_WIDTH] =
+    g_param_spec_uint ("width", NULL, NULL,
+                       0, G_MAXUINT, 0,
+                       (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_properties (object_class, N_PROPS, properties);
 }
 
 static void
@@ -48,6 +218,22 @@ MksScreenKind
 mks_screen_get_kind (MksScreen *self)
 {
   DELEGATE_OR_ZERO (get_kind, MKS_SCREEN_KIND_TEXT);
+}
+
+void
+_mks_screen_mark_active (MksScreen *self)
+{
+  gint64 now;
+
+  g_return_if_fail (MKS_IS_SCREEN (self));
+
+  now = g_get_monotonic_time ();
+
+  if (self->last_active_time != now)
+    {
+      self->last_active_time = now;
+      g_object_notify_by_pspec (G_OBJECT (self), properties [PROP_LAST_ACTIVE_TIME]);
+    }
 }
 
 /**
@@ -108,6 +294,25 @@ guint
 mks_screen_get_number (MksScreen *self)
 {
   DELEGATE_OR_ZERO (get_number, 0);
+}
+
+/**
+ * mks_screen_get_last_active_time:
+ * @self: a `MksScreen`
+ *
+ * Gets the last time that display contents were observed for @self.
+ *
+ * The value is in monotonic time, comparable to [func@GLib.get_monotonic_time].
+ * A value of 0 means no display content has been observed yet.
+ *
+ * Returns: the last active time for @self, or 0
+ */
+gint64
+mks_screen_get_last_active_time (MksScreen *self)
+{
+  g_return_val_if_fail (MKS_IS_SCREEN (self), 0);
+
+  return self->last_active_time;
 }
 
 const char *
