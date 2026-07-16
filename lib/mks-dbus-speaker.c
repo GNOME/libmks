@@ -927,23 +927,20 @@ mks_dbus_speaker_create_gst_source (MksSpeaker *speaker,
   source->speaker = g_object_ref (self);
   source->stream_id = stream_id;
   source->stream_added_handler =
-    g_signal_connect_object (self,
-                             "stream-added",
-                             G_CALLBACK (mks_dbus_speaker_gst_source_stream_added_cb),
-                             element,
-                             G_CONNECT_SWAPPED);
+    g_signal_connect_swapped (self,
+                              "stream-added",
+                              G_CALLBACK (mks_dbus_speaker_gst_source_stream_added_cb),
+                              element);
   source->stream_removed_handler =
-    g_signal_connect_object (self,
-                             "stream-removed",
-                             G_CALLBACK (mks_dbus_speaker_gst_source_stream_removed_cb),
-                             element,
-                             G_CONNECT_SWAPPED);
+    g_signal_connect_swapped (self,
+                              "stream-removed",
+                              G_CALLBACK (mks_dbus_speaker_gst_source_stream_removed_cb),
+                              element);
   source->stream_enabled_handler =
-    g_signal_connect_object (self,
-                             "stream-enabled",
-                             G_CALLBACK (mks_dbus_speaker_gst_source_stream_enabled_cb),
-                             element,
-                             G_CONNECT_SWAPPED);
+    g_signal_connect_swapped (self,
+                              "stream-enabled",
+                              G_CALLBACK (mks_dbus_speaker_gst_source_stream_enabled_cb),
+                              element);
   source->pcm_observer_id =
     mks_dbus_speaker_add_pcm_observer (MKS_SPEAKER (self),
                                   mks_dbus_speaker_gst_source_pcm_cb,
