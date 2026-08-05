@@ -373,18 +373,38 @@ mks_display_picture_invalidate_size_cb (MksDisplayPicture *self,
 }
 
 static void
+mks_display_picture_set_cursor (MksDisplayPicture *self,
+                                GdkCursor         *cursor)
+{
+  static GdkCursor *none_cursor;
+
+  g_assert (MKS_IS_DISPLAY_PICTURE (self));
+  g_assert (!cursor || GDK_IS_CURSOR (cursor));
+
+  /* Fallback to the "none" cursor rather than NULL so that we hide the
+   * host cursor instead of inheriting the one from our parent, which
+   * would be displayed on top of the cursor drawn by the guest.
+   */
+  if (cursor == NULL)
+    {
+      if (none_cursor == NULL)
+        none_cursor = gdk_cursor_new_from_name ("none", NULL);
+
+      cursor = none_cursor;
+    }
+
+  gtk_widget_set_cursor (GTK_WIDGET (self), cursor);
+}
+
+static void
 mks_display_picture_notify_cursor_cb (MksDisplayPicture *self,
                                       GParamSpec        *pspec,
                                       MksPaintable      *paintable)
 {
-  GdkCursor *cursor;
-
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
   g_assert (MKS_IS_PAINTABLE (paintable));
 
-  cursor = _mks_paintable_get_cursor (paintable);
-
-  gtk_widget_set_cursor (GTK_WIDGET (self), cursor);
+  mks_display_picture_set_cursor (self, _mks_paintable_get_cursor (paintable));
 }
 
 static void
@@ -397,7 +417,7 @@ mks_display_picture_sync_cursor (MksDisplayPicture *self)
   if (self->paintable != NULL)
     cursor = _mks_paintable_get_cursor (self->paintable);
 
-  gtk_widget_set_cursor (GTK_WIDGET (self), cursor);
+  mks_display_picture_set_cursor (self, cursor);
 }
 
 static void
@@ -632,7 +652,6 @@ static void
 mks_display_picture_init (MksDisplayPicture *self)
 {
   GtkEventController *controller;
-  g_autoptr(GdkCursor) gdk_cursor = gdk_cursor_new_from_name ("none", NULL);
 
   controller = gtk_event_controller_legacy_new ();
   g_signal_connect_object (controller,
@@ -665,7 +684,7 @@ mks_display_picture_init (MksDisplayPicture *self)
                                  self,
                                  G_CONNECT_SWAPPED);
 
-  gtk_widget_set_cursor (GTK_WIDGET (self), gdk_cursor);
+  mks_display_picture_set_cursor (self, NULL);
   gtk_widget_set_focusable (GTK_WIDGET (self), TRUE);
 }
 
