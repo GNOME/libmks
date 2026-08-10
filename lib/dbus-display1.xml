@@ -508,6 +508,56 @@
   </interface>
 
   <!--
+      org.qemu.Display1.Listener.Unix.DMABUF3:
+
+      Optional client-side interface for registered swapchain-style DMA-BUF
+      presentation.
+  -->
+  <interface name="org.qemu.Display1.Listener.Unix.DMABUF3">
+    <method name="GetCapabilities">
+      <arg type="u" name="version" direction="out"/>
+      <arg type="u" name="flags" direction="out"/>
+      <arg type="a(utu)" name="formats" direction="out"/>
+      <arg type="a{sv}" name="limits" direction="out"/>
+    </method>
+
+    <method name="RegisterBuffer">
+      <annotation name="org.gtk.GDBus.C.UnixFD" value="true"/>
+      <arg type="t" name="buffer_id" direction="in"/>
+      <arg type="ah" name="fds" direction="in"/>
+      <arg type="au" name="offsets" direction="in"/>
+      <arg type="au" name="strides" direction="in"/>
+      <arg type="u" name="fourcc" direction="in"/>
+      <arg type="t" name="modifier" direction="in"/>
+      <arg type="u" name="backing_width" direction="in"/>
+      <arg type="u" name="backing_height" direction="in"/>
+      <arg type="a{sv}" name="metadata" direction="in"/>
+      <arg type="u" name="status" direction="out"/>
+      <arg type="s" name="message" direction="out"/>
+    </method>
+
+    <method name="Present">
+      <annotation name="org.gtk.GDBus.C.UnixFD" value="true"/>
+      <arg type="t" name="buffer_id" direction="in"/>
+      <arg type="t" name="frame_serial" direction="in"/>
+      <arg type="a(uuuu)" name="damage" direction="in"/>
+      <arg type="ah" name="acquire_fence" direction="in"/>
+    </method>
+
+    <method name="UnregisterBuffer">
+      <arg type="t" name="buffer_id" direction="in"/>
+    </method>
+
+    <method name="Disable"/>
+
+    <signal name="Release">
+      <arg type="t" name="buffer_id"/>
+      <arg type="t" name="frame_serial"/>
+      <arg type="ah" name="release_fence"/>
+    </signal>
+  </interface>
+
+  <!--
       org.qemu.Display1.Listener.Unix.Map:
 
       This optional client-side interface can complement

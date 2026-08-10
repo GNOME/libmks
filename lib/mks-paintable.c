@@ -41,12 +41,14 @@ struct _MksPaintable
   GObject                            parent_instance;
   MksQemuListener                   *listener;
   MksQemuListenerUnixScanoutDMABUF2 *listener_dmabuf2;
+  MksQemuListenerUnixDMABUF3        *listener_dmabuf3;
   MksQemuListenerUnixMap            *listener_map;
   GDBusConnection                   *connection;
   GdkDisplay                        *display;
   GdkPaintable                      *child;
   GdkCursor                         *cursor;
   MksDmabufScanoutData              *scanout_data;
+  GHashTable                        *dmabuf3_buffers;
   int                                mouse_x;
   int                                mouse_y;
   guint                              y0_top : 1;
@@ -155,11 +157,13 @@ mks_paintable_dispose (GObject *object)
   g_clear_object (&self->connection);
   g_clear_object (&self->listener);
   g_clear_object (&self->listener_dmabuf2);
+  g_clear_object (&self->listener_dmabuf3);
   g_clear_object (&self->listener_map);
   g_clear_object (&self->child);
   g_clear_object (&self->cursor);
   g_clear_object (&self->display);
   g_clear_pointer (&self->scanout_data, mks_dmabuf_scanout_data_free);
+  g_clear_pointer (&self->dmabuf3_buffers, g_hash_table_unref);
 
   G_OBJECT_CLASS (mks_paintable_parent_class)->dispose (object);
 }
@@ -854,6 +858,231 @@ mks_paintable_listener_disable (MksPaintable          *self,
   return TRUE;
 }
 
+static gboolean
+mks_paintable_dmabuf3_get_capabilities (MksPaintable               *self,
+                                        GDBusMethodInvocation      *invocation,
+                                        MksQemuListenerUnixDMABUF3 *listener)
+{
+  GdkDmabufFormats *supported;
+  GVariantBuilder formats;
+  GVariantBuilder limits;
+  gsize n_formats;
+
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER_UNIX_DMABUF3 (listener));
+
+  supported = gdk_display_get_dmabuf_formats (self->display);
+  n_formats = gdk_dmabuf_formats_get_n_formats (supported);
+  g_variant_builder_init (&formats, G_VARIANT_TYPE ("a(utu)"));
+
+  for (gsize i = 0; i < n_formats; i++)
+    {
+      guint32 fourcc;
+      guint64 modifier;
+
+      gdk_dmabuf_formats_get_format (supported, i, &fourcc, &modifier);
+      g_variant_builder_add (&formats, "(utu)", fourcc, modifier, 1u);
+    }
+
+  g_variant_builder_init (&limits, G_VARIANT_TYPE ("a{sv}"));
+  g_variant_builder_add (&limits, "{sv}", "max-buffers", g_variant_new_uint32 (8));
+  g_variant_builder_add (&limits, "{sv}", "max-planes",
+                         g_variant_new_uint32 (MKS_DMABUF_MAX_PLANES));
+  g_variant_builder_add (&limits, "{sv}", "max-damage-rects", g_variant_new_uint32 (256));
+  g_variant_builder_add (&limits, "{sv}", "max-width", g_variant_new_uint32 (G_MAXUINT16));
+  g_variant_builder_add (&limits, "{sv}", "max-height", g_variant_new_uint32 (G_MAXUINT16));
+  mks_qemu_listener_unix_dmabuf3_complete_get_capabilities (listener,
+                                                            invocation,
+                                                            1,
+                                                            1,
+                                                            g_variant_builder_end (&formats),
+                                                            g_variant_builder_end (&limits));
+  return TRUE;
+}
+
+static gboolean
+mks_paintable_dmabuf3_register_buffer (MksPaintable               *self,
+                                       GDBusMethodInvocation      *invocation,
+                                       GUnixFDList                *fd_list,
+                                       guint64                     buffer_id,
+                                       GVariant                   *fds,
+                                       GVariant                   *offsets,
+                                       GVariant                   *strides,
+                                       guint                       fourcc,
+                                       guint64                     modifier,
+                                       guint                       backing_width,
+                                       guint                       backing_height,
+                                       GVariant                   *metadata,
+                                       MksQemuListenerUnixDMABUF3 *listener)
+{
+  g_autoptr(MksDmabufScanoutData) data = NULL;
+  g_autoptr(GError) error = NULL;
+  guint64 lookup_id = buffer_id;
+  gsize n_offsets;
+  gsize n_strides;
+  const guint32 *offset_values;
+  const guint32 *stride_values;
+  gsize n_planes;
+
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER_UNIX_DMABUF3 (listener));
+
+  n_planes = g_variant_n_children (fds);
+  offset_values = g_variant_get_fixed_array (offsets, &n_offsets, sizeof (guint32));
+  stride_values = g_variant_get_fixed_array (strides, &n_strides, sizeof (guint32));
+
+  if (buffer_id == 0 ||
+      g_hash_table_contains (self->dmabuf3_buffers, &lookup_id) ||
+      n_planes == 0 || n_planes > MKS_DMABUF_MAX_PLANES ||
+      n_offsets != n_planes || n_strides != n_planes ||
+      backing_width == 0 || backing_height == 0)
+    {
+      mks_qemu_listener_unix_dmabuf3_complete_register_buffer (listener,
+                                                               invocation,
+                                                               NULL,
+                                                               1,
+                                                               "Invalid buffer description");
+      return TRUE;
+    }
+
+  data = g_new0 (MksDmabufScanoutData, 1);
+  for (guint i = 0; i < MKS_DMABUF_MAX_PLANES; i++)
+    data->dmabuf_fd[i] = -1;
+  data->n_planes = n_planes;
+  data->fourcc = fourcc;
+  data->modifier = modifier;
+  data->backing_width = backing_width;
+  data->backing_height = backing_height;
+  data->width = backing_width;
+  data->height = backing_height;
+  g_variant_lookup (metadata, "source-x", "u", &data->x);
+  g_variant_lookup (metadata, "source-y", "u", &data->y);
+  g_variant_lookup (metadata, "source-width", "u", &data->width);
+  g_variant_lookup (metadata, "source-height", "u", &data->height);
+
+  for (guint i = 0; i < n_planes; i++)
+    {
+      g_autoptr(GVariant) handle = g_variant_get_child_value (fds, i);
+
+      data->offset[i] = offset_values[i];
+      data->stride[i] = stride_values[i];
+      data->dmabuf_fd[i] = g_unix_fd_list_get (fd_list, g_variant_get_handle (handle), &error);
+
+      if (data->dmabuf_fd[i] < 0 || data->stride[i] == 0)
+        {
+          mks_qemu_listener_unix_dmabuf3_complete_register_buffer (listener,
+                                                                   invocation,
+                                                                   NULL,
+                                                                   1,
+                                                                   error ? error->message :
+                                                                   "Invalid DMA-BUF plane");
+          return TRUE;
+        }
+    }
+
+  g_hash_table_insert (self->dmabuf3_buffers,
+                       g_memdup2 (&buffer_id, sizeof buffer_id),
+                       g_steal_pointer (&data));
+
+  mks_qemu_listener_unix_dmabuf3_complete_register_buffer (listener, invocation, NULL, 0, "");
+
+  return TRUE;
+}
+
+static gboolean
+mks_paintable_dmabuf3_present (MksPaintable               *self,
+                               GDBusMethodInvocation      *invocation,
+                               GUnixFDList                *fd_list,
+                               guint64                     buffer_id,
+                               guint64                     frame_serial,
+                               GVariant                   *damage,
+                               GVariant                   *acquire_fence,
+                               MksQemuListenerUnixDMABUF3 *listener)
+{
+  MksDmabufScanoutData *data;
+  g_autoptr(GError) error = NULL;
+  cairo_region_t *region;
+  GVariantIter iter;
+  guint x, y, width, height;
+
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER_UNIX_DMABUF3 (listener));
+
+  if (!(data = g_hash_table_lookup (self->dmabuf3_buffers, &buffer_id)))
+    {
+      g_dbus_method_invocation_return_error_literal (invocation,
+                                                     G_IO_ERROR,
+                                                     G_IO_ERROR_NOT_FOUND,
+                                                     "Unknown DMA-BUF buffer");
+      return TRUE;
+    }
+
+  if (!MKS_IS_DMABUF_PAINTABLE (self->child))
+    {
+      g_autoptr(MksDmabufPaintable) child = mks_dmabuf_paintable_new ();
+
+      mks_paintable_set_child (self, GDK_PAINTABLE (child));
+    }
+
+  region = cairo_region_create ();
+  g_variant_iter_init (&iter, damage);
+  while (g_variant_iter_next (&iter, "(uuuu)", &x, &y, &width, &height))
+    cairo_region_union_rectangle (region,
+                                  &(cairo_rectangle_int_t) {
+                                    data->x + x, data->y + y, width, height
+                                  });
+
+  if (!mks_dmabuf_paintable_import (MKS_DMABUF_PAINTABLE (self->child),
+                                    self->display, data, region,
+                                    &error))
+    {
+      cairo_region_destroy (region);
+      g_dbus_method_invocation_return_gerror (invocation, error);
+      return TRUE;
+    }
+
+  cairo_region_destroy (region);
+  mks_qemu_listener_unix_dmabuf3_complete_present (listener, invocation, NULL);
+  mks_qemu_listener_unix_dmabuf3_emit_release (listener, buffer_id, frame_serial,
+                                               g_variant_new_array (G_VARIANT_TYPE_HANDLE, NULL, 0));
+
+  return TRUE;
+}
+
+static gboolean
+mks_paintable_dmabuf3_unregister_buffer (MksPaintable               *self,
+                                         GDBusMethodInvocation      *invocation,
+                                         guint64                     buffer_id,
+                                         MksQemuListenerUnixDMABUF3 *listener)
+{
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER_UNIX_DMABUF3 (listener));
+
+  g_hash_table_remove (self->dmabuf3_buffers, &buffer_id);
+  mks_qemu_listener_unix_dmabuf3_complete_unregister_buffer (listener, invocation);
+
+  return TRUE;
+}
+
+static gboolean
+mks_paintable_dmabuf3_disable (MksPaintable               *self,
+                               GDBusMethodInvocation      *invocation,
+                               MksQemuListenerUnixDMABUF3 *listener)
+{
+  g_assert (MKS_IS_PAINTABLE (self));
+  g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
+  g_assert (MKS_QEMU_IS_LISTENER_UNIX_DMABUF3 (listener));
+
+  g_hash_table_remove_all (self->dmabuf3_buffers);
+  mks_qemu_listener_unix_dmabuf3_complete_disable (listener, invocation);
+
+  return TRUE;
+}
+
 
 static DexFuture *
 mks_paintable_connection_cb (DexFuture *future,
@@ -889,6 +1118,15 @@ mks_paintable_connection_cb (DexFuture *future,
                                          &error))
     {
       g_warning ("Failed to export DMA-BUF2 listener on bus: %s", error->message);
+      return dex_future_new_true ();
+    }
+
+  if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self->listener_dmabuf3),
+                                         self->connection,
+                                         "/org/qemu/Display1/Listener",
+                                         &error))
+    {
+      g_warning ("Failed to export DMA-BUF3 listener on bus: %s", error->message);
       return dex_future_new_true ();
     }
 
@@ -943,11 +1181,17 @@ _mks_paintable_new (GdkDisplay    *display,
   /* Setup our listener and callbacks to process requests */
   self->listener = mks_qemu_listener_skeleton_new ();
   self->listener_dmabuf2 = mks_qemu_listener_unix_scanout_dmabuf2_skeleton_new ();
+  self->listener_dmabuf3 = mks_qemu_listener_unix_dmabuf3_skeleton_new ();
   self->listener_map = mks_qemu_listener_unix_map_skeleton_new ();
+  self->dmabuf3_buffers = g_hash_table_new_full (g_int64_hash,
+                                                 g_int64_equal,
+                                                 g_free,
+                                                 (GDestroyNotify)mks_dmabuf_scanout_data_free);
   mks_qemu_listener_set_interfaces (self->listener,
                                     (const char * const[]) {
                                       "org.qemu.Display1.Listener.Unix.Map",
                                       "org.qemu.Display1.Listener.Unix.ScanoutDMABUF2",
+                                      "org.qemu.Display1.Listener.Unix.DMABUF3",
                                       NULL
                                     });
   g_signal_connect_object (self->listener,
@@ -973,6 +1217,31 @@ _mks_paintable_new (GdkDisplay    *display,
   g_signal_connect_object (self->listener_dmabuf2,
                            "handle-scanout-dmabuf2",
                            G_CALLBACK (mks_paintable_listener_scanout_dmabuf2),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->listener_dmabuf3,
+                           "handle-get-capabilities",
+                           G_CALLBACK (mks_paintable_dmabuf3_get_capabilities),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->listener_dmabuf3,
+                           "handle-register-buffer",
+                           G_CALLBACK (mks_paintable_dmabuf3_register_buffer),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->listener_dmabuf3,
+                           "handle-present",
+                           G_CALLBACK (mks_paintable_dmabuf3_present),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->listener_dmabuf3,
+                           "handle-unregister-buffer",
+                           G_CALLBACK (mks_paintable_dmabuf3_unregister_buffer),
+                           self,
+                           G_CONNECT_SWAPPED);
+  g_signal_connect_object (self->listener_dmabuf3,
+                           "handle-disable",
+                           G_CALLBACK (mks_paintable_dmabuf3_disable),
                            self,
                            G_CONNECT_SWAPPED);
   g_signal_connect_object (self->listener_map,
