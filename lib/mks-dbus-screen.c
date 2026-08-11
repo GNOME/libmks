@@ -798,13 +798,14 @@ mks_dbus_screen_configure (MksScreen           *screen,
   else
     {
       begin_time = MKS_TRACE_BEGIN_MARK ();
-      ret = mks_marked_future (mks_qemu_console_call_set_uiinfo_future (self->console,
-                                                                        attributes->width_mm,
-                                                                        attributes->height_mm,
-                                                                        attributes->x_offset,
-                                                                        attributes->y_offset,
-                                                                        attributes->width,
-                                                                        attributes->height),
+      ret = mks_marked_future (mks_qemu_console_call_set_uiinfo2_future (self->console,
+                                                                         attributes->width_mm,
+                                                                         attributes->height_mm,
+                                                                         attributes->x_offset,
+                                                                         attributes->y_offset,
+                                                                         attributes->width,
+                                                                         attributes->height,
+                                                                         attributes->refresh_rate),
                                begin_time,
                                "screen.configure");
     }

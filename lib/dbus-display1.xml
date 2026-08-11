@@ -96,6 +96,28 @@
     </method>
 
     <!--
+        SetUIInfo2:
+        @width_mm: the physical display width in millimeters.
+        @height_mm: the physical display height in millimeters.
+        @xoff: horizontal offset, in pixels.
+        @yoff: vertical offset, in pixels.
+        @width: console width, in pixels.
+        @height: console height, in pixels.
+        @refresh_rate: physical display refresh rate, in milli-Hertz.
+
+        Modify the dimensions, refresh rate, and display settings.
+    -->
+    <method name="SetUIInfo2">
+      <arg name="width_mm" type="q" direction="in"/>
+      <arg name="height_mm" type="q" direction="in"/>
+      <arg name="xoff" type="i" direction="in"/>
+      <arg name="yoff" type="i" direction="in"/>
+      <arg name="width" type="u" direction="in"/>
+      <arg name="height" type="u" direction="in"/>
+      <arg name="refresh_rate" type="u" direction="in"/>
+    </method>
+
+    <!--
         Label:
 
         A user-friendly name for the console (for ex: "VGA").

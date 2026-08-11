@@ -32,6 +32,7 @@ struct _MksScreenAttributes
   int     y_offset;
   guint   width;
   guint   height;
+  guint   refresh_rate;
 };
 
 G_END_DECLS

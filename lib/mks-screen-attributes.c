@@ -101,7 +101,8 @@ mks_screen_attributes_equal (MksScreenAttributes *self,
           self->x_offset == other->x_offset &&
           self->y_offset == other->y_offset &&
           self->width_mm == other->width_mm &&
-          self->height_mm == other->height_mm);
+          self->height_mm == other->height_mm &&
+          self->refresh_rate == other->refresh_rate);
 }
 
 /**
@@ -186,4 +187,20 @@ mks_screen_attributes_set_height (MksScreenAttributes *self,
                                   guint                height)
 {
   self->height = height;
+}
+
+/**
+ * mks_screen_attributes_set_refresh_rate:
+ * @self: A MksScreenAttributes.
+ * @refresh_rate: The display refresh rate in milli-Hertz.
+ *
+ * Sets the physical display refresh rate.
+ */
+void
+mks_screen_attributes_set_refresh_rate (MksScreenAttributes *self,
+                                        guint                refresh_rate)
+{
+  g_return_if_fail (self != NULL);
+
+  self->refresh_rate = refresh_rate;
 }

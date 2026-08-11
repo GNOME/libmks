@@ -34,34 +34,37 @@ G_BEGIN_DECLS
 #define MKS_TYPE_SCREEN_ATTRIBUTES (mks_screen_attributes_get_type())
 
 MKS_AVAILABLE_IN_ALL
-GType                mks_screen_attributes_get_type      (void) G_GNUC_CONST;
+GType                mks_screen_attributes_get_type         (void) G_GNUC_CONST;
 MKS_AVAILABLE_IN_ALL
-MksScreenAttributes *mks_screen_attributes_new           (void);
+MksScreenAttributes *mks_screen_attributes_new              (void);
 MKS_AVAILABLE_IN_ALL
-MksScreenAttributes *mks_screen_attributes_copy          (MksScreenAttributes *self);
+MksScreenAttributes *mks_screen_attributes_copy             (MksScreenAttributes *self);
 MKS_AVAILABLE_IN_ALL
-void                 mks_screen_attributes_free          (MksScreenAttributes *self);
+void                 mks_screen_attributes_free             (MksScreenAttributes *self);
 MKS_AVAILABLE_IN_ALL
-gboolean             mks_screen_attributes_equal         (MksScreenAttributes *self,
-                                                          MksScreenAttributes *other);
+gboolean             mks_screen_attributes_equal            (MksScreenAttributes *self,
+                                                             MksScreenAttributes *other);
 MKS_AVAILABLE_IN_ALL
-void                 mks_screen_attributes_set_width_mm  (MksScreenAttributes *self,
-                                                          guint16              width_mm);
+void                 mks_screen_attributes_set_width_mm     (MksScreenAttributes *self,
+                                                             guint16              width_mm);
 MKS_AVAILABLE_IN_ALL
-void                 mks_screen_attributes_set_height_mm (MksScreenAttributes *self,
-                                                          guint16              height_mm);
+void                 mks_screen_attributes_set_height_mm    (MksScreenAttributes *self,
+                                                             guint16              height_mm);
 MKS_AVAILABLE_IN_ALL
-void                 mks_screen_attributes_set_x_offset  (MksScreenAttributes *self,
-                                                          int                  x_offset);
+void                 mks_screen_attributes_set_x_offset     (MksScreenAttributes *self,
+                                                             int                  x_offset);
 MKS_AVAILABLE_IN_ALL
-void                 mks_screen_attributes_set_y_offset  (MksScreenAttributes *self,
-                                                          int                  y_offset);
+void                 mks_screen_attributes_set_y_offset     (MksScreenAttributes *self,
+                                                             int                  y_offset);
 MKS_AVAILABLE_IN_ALL
-void                 mks_screen_attributes_set_width     (MksScreenAttributes *self,
-                                                          guint                width);
+void                 mks_screen_attributes_set_width        (MksScreenAttributes *self,
+                                                             guint                width);
 MKS_AVAILABLE_IN_ALL
-void                 mks_screen_attributes_set_height    (MksScreenAttributes *self,
-                                                          guint                height);
+void                 mks_screen_attributes_set_height       (MksScreenAttributes *self,
+                                                             guint                height);
+MKS_AVAILABLE_IN_ALL
+void                 mks_screen_attributes_set_refresh_rate (MksScreenAttributes *self,
+                                                             guint                refresh_rate);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (MksScreenAttributes, mks_screen_attributes_free)
 

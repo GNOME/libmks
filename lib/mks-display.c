@@ -283,9 +283,15 @@ mks_display_size_allocate (GtkWidget *widget,
 
   if (priv->auto_resize)
     {
+      GtkNative *native = gtk_widget_get_native (widget);
+      GdkSurface *surface = native ? gtk_native_get_surface (native) : NULL;
+      GdkMonitor *monitor = surface ? gdk_display_get_monitor_at_surface (gdk_surface_get_display (surface), surface) : NULL;
       attributes = mks_screen_attributes_new ();
       mks_screen_attributes_set_width (attributes, width);
       mks_screen_attributes_set_height (attributes, height);
+      if (monitor != NULL)
+        mks_screen_attributes_set_refresh_rate (attributes,
+                                                gdk_monitor_get_refresh_rate (monitor));
 
       mks_screen_resizer_queue_resize (priv->resizer,
                                        g_steal_pointer (&attributes));
