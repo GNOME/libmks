@@ -28,18 +28,19 @@ G_BEGIN_DECLS
 
 typedef struct _MksDmabufScanoutData
 {
-  guint   x;
-  guint   y;
-  guint   width;
-  guint   height;
-  guint   backing_width;
-  guint   backing_height;
-  guint   n_planes;
-  guint   fourcc;
-  guint   offset[MKS_DMABUF_MAX_PLANES];
-  guint   stride[MKS_DMABUF_MAX_PLANES];
-  guint64 modifier;
-  int     dmabuf_fd[MKS_DMABUF_MAX_PLANES];
+  guint    x;
+  guint    y;
+  guint    width;
+  guint    height;
+  guint    backing_width;
+  guint    backing_height;
+  guint    n_planes;
+  guint    fourcc;
+  guint    offset[MKS_DMABUF_MAX_PLANES];
+  guint    stride[MKS_DMABUF_MAX_PLANES];
+  guint64  modifier;
+  gboolean y0_top;
+  int      dmabuf_fd[MKS_DMABUF_MAX_PLANES];
 } MksDmabufScanoutData;
 
 void mks_dmabuf_scanout_data_free (MksDmabufScanoutData *data);

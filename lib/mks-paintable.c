@@ -453,6 +453,7 @@ mks_paintable_listener_scanout_dmabuf (MksPaintable          *self,
   scanout_data->stride[0] = stride;
   scanout_data->fourcc = fourcc;
   scanout_data->modifier = modifier;
+  scanout_data->y0_top = y0_top;
 
   g_clear_pointer (&self->scanout_data, mks_dmabuf_scanout_data_free);
   self->scanout_data = scanout_data;
@@ -536,6 +537,7 @@ mks_paintable_listener_scanout_dmabuf2 (MksPaintable                      *self,
   scanout_data->n_planes = num_planes;
   scanout_data->fourcc = fourcc;
   scanout_data->modifier = modifier;
+  scanout_data->y0_top = y0_top;
 
   for (i = 0; i < num_planes; i++)
     {
@@ -961,6 +963,7 @@ mks_paintable_dmabuf3_register_buffer (MksPaintable               *self,
   g_variant_lookup (metadata, "source-y", "u", &data->y);
   g_variant_lookup (metadata, "source-width", "u", &data->width);
   g_variant_lookup (metadata, "source-height", "u", &data->height);
+  g_variant_lookup (metadata, "y0-top", "b", &data->y0_top);
 
   for (guint i = 0; i < n_planes; i++)
     {
@@ -1006,6 +1009,7 @@ mks_paintable_dmabuf3_present (MksPaintable               *self,
   cairo_region_t *region;
   GVariantIter iter;
   guint x, y, width, height;
+  gboolean previous_y0_top;
 
   g_assert (MKS_IS_PAINTABLE (self));
   g_assert (G_IS_DBUS_METHOD_INVOCATION (invocation));
@@ -1030,15 +1034,26 @@ mks_paintable_dmabuf3_present (MksPaintable               *self,
   region = cairo_region_create ();
   g_variant_iter_init (&iter, damage);
   while (g_variant_iter_next (&iter, "(uuuu)", &x, &y, &width, &height))
-    cairo_region_union_rectangle (region,
-                                  &(cairo_rectangle_int_t) {
-                                    data->x + x, data->y + y, width, height
-                                  });
+    {
+      if (data->y0_top)
+        y = data->backing_height - (data->y + y) - height;
+      else
+        y = data->y + y;
+
+      cairo_region_union_rectangle (region,
+                                    &(cairo_rectangle_int_t) {
+                                      data->x + x, y, width, height
+                                    });
+    }
+
+  previous_y0_top = self->y0_top;
+  self->y0_top = data->y0_top;
 
   if (!mks_dmabuf_paintable_import (MKS_DMABUF_PAINTABLE (self->child),
                                     self->display, data, region,
                                     &error))
     {
+      self->y0_top = previous_y0_top;
       cairo_region_destroy (region);
       g_dbus_method_invocation_return_gerror (invocation, error);
       return TRUE;
