@@ -410,14 +410,15 @@ mks_display_picture_notify_cursor_cb (MksDisplayPicture *self,
 static void
 mks_display_picture_sync_cursor (MksDisplayPicture *self)
 {
-  GdkCursor *cursor = NULL;
-
   g_assert (MKS_IS_DISPLAY_PICTURE (self));
 
-  if (self->paintable != NULL)
-    cursor = _mks_paintable_get_cursor (self->paintable);
-
-  mks_display_picture_set_cursor (self, cursor);
+  /* Without a guest there is nothing to draw a cursor for, so let the
+   * host cursor through instead of hiding it.
+   */
+  if (self->paintable == NULL)
+    gtk_widget_set_cursor (GTK_WIDGET (self), NULL);
+  else
+    mks_display_picture_set_cursor (self, _mks_paintable_get_cursor (self->paintable));
 }
 
 static void
@@ -684,7 +685,6 @@ mks_display_picture_init (MksDisplayPicture *self)
                                  self,
                                  G_CONNECT_SWAPPED);
 
-  mks_display_picture_set_cursor (self, NULL);
   gtk_widget_set_focusable (GTK_WIDGET (self), TRUE);
 }
 
