@@ -162,6 +162,41 @@ mks_dbus_speaker_gst_source_free (gpointer data)
   g_free (source);
 }
 
+static void
+mks_dbus_speaker_gst_source_handler_invalidated_cb (gpointer  data,
+                                                    GClosure *closure)
+{
+  gulong *handler_id = data;
+
+  g_assert (handler_id != NULL);
+
+  *handler_id = 0;
+}
+
+static void
+mks_dbus_speaker_gst_source_connect_signal (MksDBusSpeaker *self,
+                                            const char     *detailed_signal,
+                                            GCallback       callback,
+                                            GstElement     *element,
+                                            gulong         *handler_id)
+{
+  GClosure *closure;
+
+  g_assert (MKS_IS_DBUS_SPEAKER (self));
+  g_assert (detailed_signal != NULL);
+  g_assert (callback != NULL);
+  g_assert (GST_IS_APP_SRC (element));
+  g_assert (handler_id != NULL);
+  g_assert (*handler_id == 0);
+
+  closure = g_cclosure_new_object_swap (callback, G_OBJECT (element));
+  g_closure_add_invalidate_notifier (closure,
+                                     handler_id,
+                                     mks_dbus_speaker_gst_source_handler_invalidated_cb);
+
+  *handler_id = g_signal_connect_closure (self, detailed_signal, closure, FALSE);
+}
+
 static MksDBusSpeakerStream *
 mks_dbus_speaker_lookup_stream (MksDBusSpeaker *self,
                                 guint64         id)
@@ -937,24 +972,21 @@ mks_dbus_speaker_create_gst_source (MksSpeaker *speaker,
   source = g_new0 (MksDBusSpeakerGstSource, 1);
   source->speaker = g_object_ref (self);
   source->stream_id = stream_id;
-  source->stream_added_handler =
-    g_signal_connect_object (self,
-                             "stream-added",
-                             G_CALLBACK (mks_dbus_speaker_gst_source_stream_added_cb),
-                             element,
-                             G_CONNECT_SWAPPED);
-  source->stream_removed_handler =
-    g_signal_connect_object (self,
-                             "stream-removed",
-                             G_CALLBACK (mks_dbus_speaker_gst_source_stream_removed_cb),
-                             element,
-                             G_CONNECT_SWAPPED);
-  source->stream_enabled_handler =
-    g_signal_connect_object (self,
-                             "stream-enabled",
-                             G_CALLBACK (mks_dbus_speaker_gst_source_stream_enabled_cb),
-                             element,
-                             G_CONNECT_SWAPPED);
+  mks_dbus_speaker_gst_source_connect_signal (self,
+                                              "stream-added",
+                                              G_CALLBACK (mks_dbus_speaker_gst_source_stream_added_cb),
+                                              element,
+                                              &source->stream_added_handler);
+  mks_dbus_speaker_gst_source_connect_signal (self,
+                                              "stream-removed",
+                                              G_CALLBACK (mks_dbus_speaker_gst_source_stream_removed_cb),
+                                              element,
+                                              &source->stream_removed_handler);
+  mks_dbus_speaker_gst_source_connect_signal (self,
+                                              "stream-enabled",
+                                              G_CALLBACK (mks_dbus_speaker_gst_source_stream_enabled_cb),
+                                              element,
+                                              &source->stream_enabled_handler);
   source->pcm_observer_id =
     mks_dbus_speaker_add_pcm_observer (MKS_SPEAKER (self),
                                   mks_dbus_speaker_gst_source_pcm_cb,
