@@ -36,10 +36,7 @@ GdkCursor    *_mks_paintable_get_cursor   (MksPaintable  *self);
 void          _mks_paintable_snapshot     (MksPaintable  *self,
                                            GtkSnapshot   *snapshot,
                                            double         width,
-                                           double         height,
-                                           double         surface_x,
-                                           double         surface_y,
-                                           int            scale);
+                                           double         height);
 void          _mks_paintable_get_position (MksPaintable  *self,
                                            int           *x,
                                            int           *y);
