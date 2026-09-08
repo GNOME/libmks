@@ -33,6 +33,7 @@
 #include "mks-keyboard.h"
 #include "mks-microphone.h"
 #include "mks-mouse.h"
+#include "mks-remote.h"
 #include "mks-paintable-private.h"
 #include "mks-qemu.h"
 #include "mks-read-only-list-model-private.h"
@@ -57,6 +58,7 @@ mks_init_gtypes (void)
   g_type_ensure (MKS_QEMU_TYPE_CONSOLE);
   g_type_ensure (MKS_QEMU_TYPE_LISTENER);
   g_type_ensure (MKS_QEMU_TYPE_MOUSE);
+  g_type_ensure (MKS_QEMU_TYPE_REMOTE);
   g_type_ensure (MKS_QEMU_TYPE_VM);
 
   /* Internal types not exposed in public API */
@@ -75,6 +77,7 @@ mks_init_gtypes (void)
   g_type_ensure (MKS_TYPE_KEYBOARD);
   g_type_ensure (MKS_TYPE_MICROPHONE);
   g_type_ensure (MKS_TYPE_MOUSE);
+  g_type_ensure (MKS_TYPE_REMOTE);
   g_type_ensure (MKS_TYPE_SCREEN);
   g_type_ensure (MKS_TYPE_SCREEN_ATTRIBUTES);
   g_type_ensure (MKS_TYPE_SESSION);

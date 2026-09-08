@@ -39,6 +39,7 @@ struct _MksScreenClass
   MksScreenKind  (*get_kind)           (MksScreen           *self);
   MksKeyboard   *(*get_keyboard)       (MksScreen           *self);
   MksMouse      *(*get_mouse)          (MksScreen           *self);
+  MksRemote     *(*get_remote)         (MksScreen           *self);
   MksTouchable  *(*get_touchable)      (MksScreen           *self);
   guint          (*get_width)          (MksScreen           *self);
   guint          (*get_height)         (MksScreen           *self);

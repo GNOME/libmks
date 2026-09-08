@@ -15,6 +15,7 @@ lib_testsuite_c_args = [
 lib_testsuite = {
   'test-audio-format': {},
   'test-mks': {},
+  'test-mks-remote': {},
   'test-mks-transport': {},
 }
 

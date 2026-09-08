@@ -41,6 +41,7 @@ typedef struct _MksDevice              MksDevice;
 typedef struct _MksKeyboard            MksKeyboard;
 typedef struct _MksMicrophone          MksMicrophone;
 typedef struct _MksMouse               MksMouse;
+typedef struct _MksRemote              MksRemote;
 typedef struct _MksScreen              MksScreen;
 typedef struct _MksScreenAttributes    MksScreenAttributes;
 typedef struct _MksSession             MksSession;

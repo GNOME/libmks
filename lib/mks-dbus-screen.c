@@ -31,6 +31,7 @@
 #include "mks-qemu.h"
 #include "mks-dbus-keyboard-private.h"
 #include "mks-dbus-mouse-private.h"
+#include "mks-dbus-remote-private.h"
 #include "mks-paintable-private.h"
 #include "mks-screen-attributes-private.h"
 #include "mks-dbus-screen-private.h"
@@ -53,6 +54,7 @@ struct _MksDBusScreen
   MksQemuListenerUnixMap            *activity_listener_map;
   MksKeyboard                       *keyboard;
   MksMouse                          *mouse;
+  MksRemote                         *remote;
   MksTouchable                      *touchable;
   guint                              number;
   guint                              width;
@@ -64,6 +66,7 @@ G_DEFINE_FINAL_TYPE (MksDBusScreen, mks_dbus_screen, MKS_TYPE_SCREEN)
 
 static MksKeyboard   *mks_dbus_screen_get_keyboard       (MksScreen           *screen);
 static MksMouse      *mks_dbus_screen_get_mouse          (MksScreen           *screen);
+static MksRemote     *mks_dbus_screen_get_remote         (MksScreen           *screen);
 static MksTouchable  *mks_dbus_screen_get_touchable      (MksScreen           *screen);
 static MksScreenKind  mks_dbus_screen_get_kind           (MksScreen           *screen);
 static guint          mks_dbus_screen_get_width          (MksScreen           *screen);
@@ -617,6 +620,14 @@ mks_dbus_screen_setup (MksDevice *device,
           if (g_set_object (&self->mouse, mouse))
             g_object_notify (G_OBJECT (self), "mouse");
         }
+      else if (MKS_QEMU_IS_REMOTE (iface))
+        {
+          g_autoptr(MksRemote) remote = NULL;
+
+          remote = _mks_device_new (MKS_TYPE_DBUS_REMOTE, device->transport, object);
+          if (g_set_object (&self->remote, remote))
+            g_object_notify (G_OBJECT (self), "remote");
+        }
       else if (MKS_QEMU_IS_MULTI_TOUCH (iface))
         {
           g_autoptr(MksTouchable) touchable = NULL;
@@ -645,6 +656,7 @@ mks_dbus_screen_dispose (GObject *object)
 
   g_clear_object (&self->keyboard);
   g_clear_object (&self->mouse);
+  g_clear_object (&self->remote);
   g_clear_object (&self->touchable);
   g_clear_object (&self->activity_listener);
   g_clear_object (&self->activity_listener_dmabuf2);
@@ -664,6 +676,7 @@ mks_dbus_screen_class_init (MksDBusScreenClass *klass)
   screen_class->get_kind = mks_dbus_screen_get_kind;
   screen_class->get_keyboard = mks_dbus_screen_get_keyboard;
   screen_class->get_mouse = mks_dbus_screen_get_mouse;
+  screen_class->get_remote = mks_dbus_screen_get_remote;
   screen_class->get_touchable = mks_dbus_screen_get_touchable;
   screen_class->get_width = mks_dbus_screen_get_width;
   screen_class->get_height = mks_dbus_screen_get_height;
@@ -700,6 +713,16 @@ mks_dbus_screen_get_mouse (MksScreen *screen)
   g_return_val_if_fail (MKS_IS_DBUS_SCREEN (self), NULL);
 
   return self->mouse;
+}
+
+static MksRemote *
+mks_dbus_screen_get_remote (MksScreen *screen)
+{
+  MksDBusScreen *self = MKS_DBUS_SCREEN (screen);
+
+  g_return_val_if_fail (MKS_IS_DBUS_SCREEN (self), NULL);
+
+  return self->remote;
 }
 
 static MksTouchable *

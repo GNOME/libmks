@@ -39,6 +39,7 @@ G_BEGIN_DECLS
 # include "mks-keyboard.h"
 # include "mks-microphone.h"
 # include "mks-mouse.h"
+# include "mks-remote.h"
 # include "mks-screen.h"
 # include "mks-screen-attributes.h"
 # include "mks-session.h"

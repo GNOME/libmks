@@ -23,6 +23,7 @@
 #include "mks-enums.h"
 #include "mks-keyboard.h"
 #include "mks-mouse.h"
+#include "mks-remote.h"
 #include "mks-screen-private.h"
 #include "mks-screen-attributes.h"
 #include "mks-touchable.h"
@@ -39,6 +40,7 @@ enum {
   PROP_LAST_ACTIVE_TIME,
   PROP_MOUSE,
   PROP_NUMBER,
+  PROP_REMOTE,
   PROP_TOUCHABLE,
   PROP_WIDTH,
   N_PROPS
@@ -82,6 +84,10 @@ mks_screen_get_property (GObject    *object,
 
     case PROP_NUMBER:
       g_value_set_uint (value, mks_screen_get_number (self));
+      break;
+
+    case PROP_REMOTE:
+      g_value_set_object (value, mks_screen_get_remote (self));
       break;
 
     case PROP_TOUCHABLE:
@@ -179,6 +185,16 @@ mks_screen_class_init (MksScreenClass *klass)
                        (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   /**
+   * MksScreen:remote:
+   *
+   * The remote control associated with the screen, if available.
+   */
+  properties [PROP_REMOTE] =
+    g_param_spec_object ("remote", NULL, NULL,
+                         MKS_TYPE_REMOTE,
+                         (G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  /**
    * MksScreen:touchable:
    *
    * The touch device associated with the screen.
@@ -262,6 +278,20 @@ MksMouse *
 mks_screen_get_mouse (MksScreen *self)
 {
   DELEGATE_OR_ZERO (get_mouse, NULL);
+}
+
+/**
+ * mks_screen_get_remote:
+ * @self: a `MksScreen`
+ *
+ * Gets the remote control associated with @self.
+ *
+ * Returns: (transfer none) (nullable): a `MksRemote`, or %NULL
+ */
+MksRemote *
+mks_screen_get_remote (MksScreen *self)
+{
+  DELEGATE_OR_ZERO (get_remote, NULL);
 }
 
 /**

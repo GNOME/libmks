@@ -56,6 +56,8 @@
       :dbus:iface:`org.qemu.Display1.Keyboard`,
       :dbus:iface:`org.qemu.Display1.Mouse` and
       :dbus:iface:`org.qemu.Display1.MultiTouch` interfaces when available.
+      Graphical consoles may also provide
+      :dbus:iface:`org.qemu.Display1.Remote`.
   -->
   <interface name="org.qemu.Display1.Console">
     <!--
@@ -212,6 +214,22 @@
           Caps   = 1 << 2
     -->
     <property name="Modifiers" type="u" access="read"/>
+  </interface>
+
+  <!--
+      org.qemu.Display1.Remote:
+
+      This interface is optionally implemented on graphical console objects
+      and accepts exact Linux input keycodes.
+  -->
+  <interface name="org.qemu.Display1.Remote">
+    <method name="Press">
+      <arg type="u" name="linux_keycode" direction="in"/>
+    </method>
+
+    <method name="Release">
+      <arg type="u" name="linux_keycode" direction="in"/>
+    </method>
   </interface>
 
   <!--
