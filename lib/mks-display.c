@@ -42,8 +42,10 @@ typedef struct
   MksScreenResizer   *resizer;
   MksDisplayPicture  *picture;
   MksInhibitor       *inhibitor;
+  GdkSurface         *surface;
   GtkWidget          *offload;
   GtkShortcutTrigger *ungrab_trigger;
+  gulong              scale_handler;
   guint               auto_resize : 1;
 } MksDisplayPrivate;
 
@@ -58,6 +60,74 @@ enum {
 G_DEFINE_TYPE_WITH_PRIVATE (MksDisplay, mks_display, GTK_TYPE_WIDGET)
 
 static GParamSpec *properties [N_PROPS];
+
+static double
+mks_display_get_surface_scale (MksDisplay *self)
+{
+  GtkNative *native;
+  GdkSurface *surface;
+
+  g_assert (MKS_IS_DISPLAY (self));
+
+  native = gtk_widget_get_native (GTK_WIDGET (self));
+  if (native != NULL && (surface = gtk_native_get_surface (native)))
+    return gdk_surface_get_scale (surface);
+
+  return 1;
+}
+
+static void
+mks_display_get_physical_size (MksDisplay *self,
+                               int         width,
+                               int         height,
+                               guint16    *width_mm,
+                               guint16    *height_mm)
+{
+  GdkRectangle geometry;
+  GdkMonitor *monitor;
+  GdkSurface *surface;
+  GtkNative *native;
+  int monitor_height_mm;
+  int monitor_width_mm;
+
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (width_mm != NULL);
+  g_assert (height_mm != NULL);
+
+  *width_mm = 0;
+  *height_mm = 0;
+
+  native = gtk_widget_get_native (GTK_WIDGET (self));
+  if (native == NULL || !(surface = gtk_native_get_surface (native)))
+    return;
+
+  monitor = gdk_display_get_monitor_at_surface (gdk_surface_get_display (surface), surface);
+  if (monitor == NULL)
+    return;
+
+  gdk_monitor_get_geometry (monitor, &geometry);
+  monitor_width_mm = gdk_monitor_get_width_mm (monitor);
+  monitor_height_mm = gdk_monitor_get_height_mm (monitor);
+
+  if (geometry.width > 0 && monitor_width_mm > 0)
+    *width_mm = CLAMP (round ((double)width * monitor_width_mm / geometry.width),
+                       1,
+                       G_MAXUINT16);
+
+  if (geometry.height > 0 && monitor_height_mm > 0)
+    *height_mm = CLAMP (round ((double)height * monitor_height_mm / geometry.height),
+                        1,
+                        G_MAXUINT16);
+}
+
+static void
+mks_display_scale_changed (MksDisplay *self,
+                           GParamSpec *pspec)
+{
+  g_assert (MKS_IS_DISPLAY (self));
+
+  gtk_widget_queue_allocate (GTK_WIDGET (self));
+}
 
 static void
 mks_display_get_paintable_area (MksDisplay      *self,
@@ -224,6 +294,8 @@ mks_display_dispose (GObject *object)
 
   mks_display_disconnect (self);
 
+  g_clear_signal_handler (&priv->scale_handler, priv->surface);
+  g_clear_object (&priv->surface);
   g_clear_pointer (&priv->offload, gtk_widget_unparent);
   g_clear_object (&priv->resizer);
 
@@ -238,6 +310,47 @@ mks_display_grab_focus (GtkWidget *widget)
 
   g_assert (MKS_IS_DISPLAY (self));
   return gtk_widget_grab_focus (GTK_WIDGET (priv->picture));
+}
+
+static void
+mks_display_map (GtkWidget *widget)
+{
+  MksDisplay *self = (MksDisplay *)widget;
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+  GtkNative *native;
+  GdkSurface *surface;
+
+  g_assert (MKS_IS_DISPLAY (self));
+  g_assert (priv->surface == NULL);
+  g_assert (priv->scale_handler == 0);
+
+  GTK_WIDGET_CLASS (mks_display_parent_class)->map (widget);
+
+  native = gtk_widget_get_native (widget);
+  if (native != NULL && (surface = gtk_native_get_surface (native)))
+    {
+      priv->surface = g_object_ref (surface);
+      priv->scale_handler = g_signal_connect_swapped (priv->surface,
+                                                      "notify::scale",
+                                                      G_CALLBACK (mks_display_scale_changed),
+                                                      self);
+    }
+
+  gtk_widget_queue_allocate (widget);
+}
+
+static void
+mks_display_unmap (GtkWidget *widget)
+{
+  MksDisplay *self = (MksDisplay *)widget;
+  MksDisplayPrivate *priv = mks_display_get_instance_private (self);
+
+  g_assert (MKS_IS_DISPLAY (self));
+
+  g_clear_signal_handler (&priv->scale_handler, priv->surface);
+  g_clear_object (&priv->surface);
+
+  GTK_WIDGET_CLASS (mks_display_parent_class)->unmap (widget);
 }
 
 static GtkSizeRequestMode
@@ -274,6 +387,11 @@ mks_display_size_allocate (GtkWidget *widget,
   MksDisplayPrivate *priv = mks_display_get_instance_private (self);
   graphene_rect_t area;
   MksScreenAttributes *attributes;
+  double scale;
+  guint device_width;
+  guint device_height;
+  guint16 width_mm;
+  guint16 height_mm;
 
   g_assert (MKS_IS_DISPLAY (self));
 
@@ -283,9 +401,20 @@ mks_display_size_allocate (GtkWidget *widget,
 
   if (priv->auto_resize)
     {
+      /* Widget allocations are in logical pixels. Match the guest framebuffer
+       * to GTK's Wayland buffer extent so that GTK can present it without an
+       * intermediate image scale. Snapshot bounds remain in logical pixels.
+       */
+      scale = mks_display_get_surface_scale (self);
+      device_width = round ((double)width * scale);
+      device_height = round ((double)height * scale);
+      mks_display_get_physical_size (self, width, height, &width_mm, &height_mm);
+
       attributes = mks_screen_attributes_new ();
-      mks_screen_attributes_set_width (attributes, width);
-      mks_screen_attributes_set_height (attributes, height);
+      mks_screen_attributes_set_width_mm (attributes, width_mm);
+      mks_screen_attributes_set_height_mm (attributes, height_mm);
+      mks_screen_attributes_set_width (attributes, device_width);
+      mks_screen_attributes_set_height (attributes, device_height);
 
       mks_screen_resizer_queue_resize (priv->resizer,
                                        g_steal_pointer (&attributes));
@@ -370,6 +499,8 @@ mks_display_class_init (MksDisplayClass *klass)
   widget_class->measure = mks_display_measure;
   widget_class->size_allocate = mks_display_size_allocate;
   widget_class->grab_focus = mks_display_grab_focus;
+  widget_class->map = mks_display_map;
+  widget_class->unmap = mks_display_unmap;
 
   properties[PROP_SCREEN] =
     g_param_spec_object ("screen", NULL, NULL,
