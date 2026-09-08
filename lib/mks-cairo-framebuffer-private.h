@@ -49,6 +49,6 @@ void                 mks_cairo_framebuffer_snapshot   (MksCairoFramebuffer *self
                                                        double               height,
                                                        double               surface_x,
                                                        double               surface_y,
-                                                       int                  scale);
+                                                       double               scale);
 
 G_END_DECLS

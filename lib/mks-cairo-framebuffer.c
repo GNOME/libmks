@@ -138,7 +138,7 @@ mks_cairo_framebuffer_snapshot_internal (MksCairoFramebuffer *self,
                                          double               height,
                                          double               surface_x,
                                          double               surface_y,
-                                         int                  scale)
+                                         double               scale)
 {
   graphene_rect_t bounds;
 
@@ -150,10 +150,10 @@ mks_cairo_framebuffer_snapshot_internal (MksCairoFramebuffer *self,
     mks_cairo_framebuffer_rebuild_texture (self);
 
   bounds = GRAPHENE_RECT_INIT (0, 0, width, height);
-  bounds.origin.x = floor ((bounds.origin.x + surface_x) * scale) / scale - surface_x;
-  bounds.origin.y = floor ((bounds.origin.y + surface_y) * scale) / scale - surface_y;
-  bounds.size.width = ceil ((width + surface_x) * scale) / scale - surface_x - bounds.origin.x;
-  bounds.size.height = ceil ((height + surface_y) * scale) / scale - surface_y - bounds.origin.y;
+  bounds.origin.x = round ((bounds.origin.x + surface_x) * scale) / scale - surface_x;
+  bounds.origin.y = round ((bounds.origin.y + surface_y) * scale) / scale - surface_y;
+  bounds.size.width = round (width * scale) / scale;
+  bounds.size.height = round (height * scale) / scale;
 
   gtk_snapshot_append_scaled_texture (snapshot,
                                       self->texture,
@@ -443,7 +443,7 @@ mks_cairo_framebuffer_snapshot (MksCairoFramebuffer *self,
                                 double               height,
                                 double               surface_x,
                                 double               surface_y,
-                                int                  scale)
+                                double               scale)
 {
   g_return_if_fail (MKS_IS_CAIRO_FRAMEBUFFER (self));
   g_return_if_fail (GTK_IS_SNAPSHOT (snapshot));

@@ -1047,7 +1047,7 @@ _mks_paintable_snapshot (MksPaintable *self,
                          double        height,
                          double        surface_x,
                          double        surface_y,
-                         int           scale)
+                         double        scale)
 {
   g_return_if_fail (MKS_IS_PAINTABLE (self));
   g_return_if_fail (GTK_IS_SNAPSHOT (snapshot));

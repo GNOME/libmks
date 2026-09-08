@@ -503,22 +503,29 @@ mks_display_picture_snapshot (GtkWidget   *widget,
 {
   MksDisplayPicture *self = (MksDisplayPicture *)widget;
   GtkNative *native;
+  GdkSurface *surface;
   graphene_rect_t bounds;
   double native_x = 0;
   double native_y = 0;
+  double scale = 1;
   double surface_x = 0;
   double surface_y = 0;
 
   if (self->paintable == NULL)
     return;
 
-  if ((native = gtk_widget_get_native (widget)) &&
-      gtk_widget_compute_bounds (widget, GTK_WIDGET (native), &bounds))
+  if ((native = gtk_widget_get_native (widget)))
     {
-      gtk_native_get_surface_transform (native, &native_x, &native_y);
+      if ((surface = gtk_native_get_surface (native)))
+        scale = gdk_surface_get_scale (surface);
 
-      surface_x = bounds.origin.x + native_x;
-      surface_y = bounds.origin.y + native_y;
+      if (gtk_widget_compute_bounds (widget, GTK_WIDGET (native), &bounds))
+        {
+          gtk_native_get_surface_transform (native, &native_x, &native_y);
+
+          surface_x = bounds.origin.x + native_x;
+          surface_y = bounds.origin.y + native_y;
+        }
     }
 
   gtk_snapshot_push_clip (snapshot,
@@ -532,7 +539,7 @@ mks_display_picture_snapshot (GtkWidget   *widget,
                            gtk_widget_get_height (widget),
                            surface_x,
                            surface_y,
-                           gtk_widget_get_scale_factor (widget));
+                           scale);
   gtk_snapshot_pop (snapshot);
 }
 

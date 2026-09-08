@@ -39,7 +39,7 @@ void          _mks_paintable_snapshot     (MksPaintable  *self,
                                            double         height,
                                            double         surface_x,
                                            double         surface_y,
-                                           int            scale);
+                                           double         scale);
 void          _mks_paintable_get_position (MksPaintable  *self,
                                            int           *x,
                                            int           *y);
