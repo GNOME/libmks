@@ -129,10 +129,7 @@ mks_paintable_snapshot (GdkPaintable *paintable,
   _mks_paintable_snapshot (MKS_PAINTABLE (paintable),
                            GTK_SNAPSHOT (snapshot),
                            width,
-                           height,
-                           0,
-                           0,
-                           1);
+                           height);
 }
 
 static void
@@ -1044,14 +1041,10 @@ void
 _mks_paintable_snapshot (MksPaintable *self,
                          GtkSnapshot  *snapshot,
                          double        width,
-                         double        height,
-                         double        surface_x,
-                         double        surface_y,
-                         int           scale)
+                         double        height)
 {
   g_return_if_fail (MKS_IS_PAINTABLE (self));
   g_return_if_fail (GTK_IS_SNAPSHOT (snapshot));
-  g_return_if_fail (scale > 0);
 
   if (self->child == NULL)
     return;
@@ -1061,10 +1054,7 @@ _mks_paintable_snapshot (MksPaintable *self,
       mks_cairo_framebuffer_snapshot (MKS_CAIRO_FRAMEBUFFER (self->child),
                                       snapshot,
                                       width,
-                                      height,
-                                      surface_x,
-                                      surface_y,
-                                      scale);
+                                      height);
     }
   else if (MKS_IS_DMABUF_PAINTABLE (self->child) && self->y0_top)
     {

@@ -135,29 +135,21 @@ static void
 mks_cairo_framebuffer_snapshot_internal (MksCairoFramebuffer *self,
                                          GtkSnapshot         *snapshot,
                                          double               width,
-                                         double               height,
-                                         double               surface_x,
-                                         double               surface_y,
-                                         int                  scale)
+                                         double               height)
 {
   graphene_rect_t bounds;
 
   g_assert (MKS_IS_CAIRO_FRAMEBUFFER (self));
   g_assert (GTK_IS_SNAPSHOT (snapshot));
-  g_assert (scale > 0);
 
   if (self->texture == NULL)
     mks_cairo_framebuffer_rebuild_texture (self);
 
   bounds = GRAPHENE_RECT_INIT (0, 0, width, height);
-  bounds.origin.x = floor ((bounds.origin.x + surface_x) * scale) / scale - surface_x;
-  bounds.origin.y = floor ((bounds.origin.y + surface_y) * scale) / scale - surface_y;
-  bounds.size.width = ceil ((width + surface_x) * scale) / scale - surface_x - bounds.origin.x;
-  bounds.size.height = ceil ((height + surface_y) * scale) / scale - surface_y - bounds.origin.y;
 
   gtk_snapshot_append_scaled_texture (snapshot,
                                       self->texture,
-                                      GSK_SCALING_FILTER_NEAREST,
+                                      GSK_SCALING_FILTER_LINEAR,
                                       &bounds);
 }
 
@@ -170,10 +162,7 @@ mks_cairo_framebuffer_paintable_snapshot (GdkPaintable *paintable,
   mks_cairo_framebuffer_snapshot_internal (MKS_CAIRO_FRAMEBUFFER (paintable),
                                            GTK_SNAPSHOT (snapshot),
                                            width,
-                                           height,
-                                           0,
-                                           0,
-                                           1);
+                                           height);
 }
 
 static void
@@ -440,22 +429,15 @@ void
 mks_cairo_framebuffer_snapshot (MksCairoFramebuffer *self,
                                 GtkSnapshot         *snapshot,
                                 double               width,
-                                double               height,
-                                double               surface_x,
-                                double               surface_y,
-                                int                  scale)
+                                double               height)
 {
   g_return_if_fail (MKS_IS_CAIRO_FRAMEBUFFER (self));
   g_return_if_fail (GTK_IS_SNAPSHOT (snapshot));
-  g_return_if_fail (scale > 0);
 
   mks_cairo_framebuffer_snapshot_internal (self,
                                            snapshot,
                                            width,
-                                           height,
-                                           surface_x,
-                                           surface_y,
-                                           scale);
+                                           height);
 }
 
 cairo_format_t

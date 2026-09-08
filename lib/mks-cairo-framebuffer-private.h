@@ -46,9 +46,6 @@ void                 mks_cairo_framebuffer_clear      (MksCairoFramebuffer *self
 void                 mks_cairo_framebuffer_snapshot   (MksCairoFramebuffer *self,
                                                        GtkSnapshot         *snapshot,
                                                        double               width,
-                                                       double               height,
-                                                       double               surface_x,
-                                                       double               surface_y,
-                                                       int                  scale);
+                                                       double               height);
 
 G_END_DECLS
