@@ -868,7 +868,7 @@ mks_session_new_complete (DexFuture *future,
 }
 
 /**
- * mks_session_new:
+ * mks_session_new: (skip)
  * @transport: a #MksTransport
  *
  * Creates a #MksSession which communicates using @transport.
@@ -900,9 +900,40 @@ mks_session_new (MksTransport *transport)
                             "session.new");
 }
 
+/**
+ * mks_session_new_async:
+ * @transport: a [class@Mks.Transport]
+ *
+ * Asynchronously create a [class@Mks.Session].
+ */
+void
+mks_session_new_async (MksTransport        *transport,
+                       GCancellable        *cancellable,
+                       GAsyncReadyCallback  callback,
+                       gpointer             user_data)
+{
+  g_autoptr(DexAsyncResult) result = NULL;
 
+  g_return_if_fail (MKS_IS_TRANSPORT (transport));
+  g_return_if_fail (!cancellable || G_IS_CANCELLABLE (cancellable));
 
+  result = dex_async_result_new (NULL, cancellable, callback, user_data);
+  return dex_async_result_await (result, mks_session_new (transport));
+}
 
+/**
+ * mks_session_new_finish:
+ *
+ * Returns: (transfer full): complete an asynchronous request to create a session.
+ */
+MksSession *
+mks_session_new_finish (GAsyncResult  *result,
+                        GError       **error)
+{
+  g_return_val_if_fail (DEX_IS_ASYNC_RESULT (result), NULL);
+
+  return dex_async_result_propagate_pointer (DEX_ASYNC_RESULT (result), error);
+}
 
 /**
  * mks_session_dup_transport:

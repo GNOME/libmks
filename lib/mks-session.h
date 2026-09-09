@@ -37,20 +37,28 @@ MKS_AVAILABLE_IN_ALL
 G_DECLARE_FINAL_TYPE (MksSession, mks_session, MKS, SESSION, GObject)
 
 MKS_AVAILABLE_IN_ALL
-DexFuture    *mks_session_new                (MksTransport *transport);
+DexFuture    *mks_session_new                (MksTransport         *transport);
 MKS_AVAILABLE_IN_ALL
-MksTransport *mks_session_dup_transport      (MksSession   *self);
+void          mks_session_new_async          (MksTransport         *transport,
+                                              GCancellable         *cancellable,
+                                              GAsyncReadyCallback   callback,
+                                              gpointer              user_data);
 MKS_AVAILABLE_IN_ALL
-GListModel   *mks_session_list_devices       (MksSession   *self);
+MksSession   *mks_session_new_finish         (GAsyncResult         *result,
+                                              GError              **error);
 MKS_AVAILABLE_IN_ALL
-GListModel   *mks_session_list_screens       (MksSession   *self);
+MksClipboard *mks_session_dup_clipboard      (MksSession           *self);
 MKS_AVAILABLE_IN_ALL
-MksScreen    *mks_session_dup_primary_screen (MksSession   *self);
+MksScreen    *mks_session_dup_primary_screen (MksSession           *self);
 MKS_AVAILABLE_IN_ALL
-MksClipboard *mks_session_dup_clipboard      (MksSession   *self);
+MksTransport *mks_session_dup_transport      (MksSession           *self);
 MKS_AVAILABLE_IN_ALL
-const char   *mks_session_get_name           (MksSession   *self);
+const char   *mks_session_get_name           (MksSession           *self);
 MKS_AVAILABLE_IN_ALL
-const char   *mks_session_get_uuid           (MksSession   *self);
+const char   *mks_session_get_uuid           (MksSession           *self);
+MKS_AVAILABLE_IN_ALL
+GListModel   *mks_session_list_devices       (MksSession           *self);
+MKS_AVAILABLE_IN_ALL
+GListModel   *mks_session_list_screens       (MksSession           *self);
 
 G_END_DECLS
